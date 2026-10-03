@@ -1,5 +1,5 @@
-import { AlertTriangle, CheckCircle2, Info, XCircle } from 'lucide-react-native';
-import type { ReactNode } from 'react';
+import { AlertTriangle, CheckCircle2, Eye, EyeOff, Info, XCircle } from 'lucide-react-native';
+import { useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -19,11 +19,12 @@ import { fonts, layout, space } from '../theme/tokens';
 
 // ---- Layout -------------------------------------------------------------------------------
 
-export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
+/** `headerless` adds the top safe-area inset for screens shown without a navigation header. */
+export function Screen({ children, scroll = true, headerless = false }: { children: ReactNode; scroll?: boolean; headerless?: boolean }) {
   const { colors } = useTheme();
   const body = <View style={styles.content}>{children}</View>;
   return (
-    <SafeAreaView edges={['bottom', 'left', 'right']} style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView edges={headerless ? ['top', 'bottom', 'left', 'right'] : ['bottom', 'left', 'right']} style={{ flex: 1, backgroundColor: colors.background }}>
       {scroll ? (
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           {body}
@@ -191,6 +192,8 @@ export function TextField({
   secureTextEntry = false,
   autoComplete,
   helper,
+  invalid = false,
+  trailing,
 }: {
   label: string;
   value: string;
@@ -199,30 +202,38 @@ export function TextField({
   error?: string | null;
   keyboardType?: 'default' | 'email-address' | 'decimal-pad' | 'numbers-and-punctuation';
   secureTextEntry?: boolean;
-  autoComplete?: 'email' | 'password' | 'off';
+  autoComplete?: 'email' | 'password' | 'current-password' | 'new-password' | 'off';
   helper?: string;
+  /** Red border without a message under the field, e.g. when one alert above covers the whole form. */
+  invalid?: boolean;
+  /** A control inside the right edge of the input, such as a show-password toggle. */
+  trailing?: ReactNode;
 }) {
   const { colors } = useTheme();
   return (
     <View style={{ gap: space(1) }}>
       <AppText variant="label">{label}</AppText>
-      <TextInput
-        accessibilityLabel={label}
-        {...(helper ? { accessibilityHint: helper } : {})}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.textMuted}
-        keyboardType={keyboardType}
-        secureTextEntry={secureTextEntry}
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete={autoComplete ?? 'off'}
-        style={[
-          styles.input,
-          { color: colors.text, backgroundColor: colors.surface, borderColor: error ? colors.danger : colors.border },
-        ]}
-      />
+      <View style={{ justifyContent: 'center' }}>
+        <TextInput
+          accessibilityLabel={label}
+          {...(helper ? { accessibilityHint: helper } : {})}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={colors.textMuted}
+          keyboardType={keyboardType}
+          secureTextEntry={secureTextEntry}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete={autoComplete ?? 'off'}
+          style={[
+            styles.input,
+            { color: colors.text, backgroundColor: colors.surface, borderColor: error || invalid ? colors.danger : colors.border },
+            trailing ? { paddingRight: layout.minHitArea + space(2) } : null,
+          ]}
+        />
+        {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
+      </View>
       {error ? (
         <AppText variant="caption" color={colors.danger}>
           {error}
@@ -233,6 +244,30 @@ export function TextField({
         </AppText>
       ) : null}
     </View>
+  );
+}
+
+/** Password input with a show/hide toggle; the toggle announces what it will do. */
+export function PasswordField(props: Omit<Parameters<typeof TextField>[0], 'secureTextEntry' | 'trailing' | 'keyboardType'>) {
+  const { colors } = useTheme();
+  const [visible, setVisible] = useState(false);
+  const Icon = visible ? EyeOff : Eye;
+  return (
+    <TextField
+      {...props}
+      secureTextEntry={!visible}
+      trailing={
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={visible ? 'Hide password' : 'Show password'}
+          onPress={() => setVisible((v) => !v)}
+          hitSlop={4}
+          style={styles.iconButton}
+        >
+          <Icon size={20} color={colors.textMuted} />
+        </Pressable>
+      }
+    />
   );
 }
 
@@ -365,6 +400,8 @@ const styles = StyleSheet.create({
   badge: { flexDirection: 'row', alignItems: 'center', gap: space(1), alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: space(2.5), paddingVertical: space(1) },
   notice: { flexDirection: 'row', gap: space(3), borderRadius: layout.radiusSmall, padding: space(3.5) },
   input: { minHeight: layout.minHitArea + 4, borderWidth: 1, borderRadius: layout.radiusSmall, paddingHorizontal: space(3), fontFamily: fonts.regular, fontSize: 16 },
+  trailing: { position: 'absolute', right: space(1) },
+  iconButton: { width: layout.minHitArea, height: layout.minHitArea, alignItems: 'center', justifyContent: 'center', borderRadius: layout.radiusSmall },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space(2) },
   chip: { minHeight: layout.minHitArea, borderWidth: 1.5, borderRadius: 999, paddingHorizontal: space(4), justifyContent: 'center' },
   unknownToggle: { flexDirection: 'row', alignItems: 'center', gap: space(2), minHeight: layout.minHitArea, alignSelf: 'flex-start' },

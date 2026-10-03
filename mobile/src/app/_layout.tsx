@@ -60,7 +60,8 @@ function Root() {
           }}
         >
           <Stack.Screen name="index" options={{ title: 'ActionBridge Dental' }} />
-          <Stack.Screen name="sign-in" options={{ title: 'Sign in', headerBackVisible: false }} />
+          <Stack.Screen name="welcome" options={{ headerShown: false, animation: 'fade' }} />
+          <Stack.Screen name="sign-in" options={{ headerShown: false }} />
         </Stack>
       </ApiProvider>
     </AuthProvider>

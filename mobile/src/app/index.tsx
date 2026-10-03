@@ -20,7 +20,7 @@ export default function HomeScreen() {
   const [result, setResult] = useState<{ caseId: string; estimate: EstimateResult; scenarios: ScenarioComparisonResult } | null>(null);
 
   if (auth.status === 'loading') return <Screen><AppText muted>Restoring your session…</AppText></Screen>;
-  if (auth.status === 'signed_out') return <Redirect href="/sign-in" />;
+  if (auth.status === 'signed_out') return <Redirect href="/welcome" />;
 
   const runSample = async () => {
     setBusy(true);

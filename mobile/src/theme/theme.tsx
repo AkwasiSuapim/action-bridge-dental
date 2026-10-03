@@ -10,8 +10,10 @@ interface Theme {
 
 const ThemeContext = createContext<Theme>({ colors: palettes.light, dark: false, reduceMotion: false });
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const scheme = useColorScheme();
+/** `scheme` forces a palette for one subtree (e.g. the always-dark Welcome screen); omitted, it follows the system. */
+export function ThemeProvider({ children, scheme: forced }: { children: ReactNode; scheme?: 'light' | 'dark' }) {
+  const system = useColorScheme();
+  const scheme = forced ?? system;
   const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {
