@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View } from 'react-native';
-import { AppText, Badge, Button, Card, Screen } from '../../components/ui';
+import { AppText, Button, Card, Screen } from '../../components/ui';
 import { useTheme } from '../../theme/theme';
 import { useFocusStatusBar } from '../../theme/status-bar';
 import { fonts, space } from '../../theme/tokens';
@@ -26,8 +26,7 @@ export function ProfileScreen() {
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(3) }}>
           <View
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
+            aria-hidden
             style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}
           >
             <AppText variant="heading" color={colors.primary} style={{ fontFamily: fonts.bold }}>
@@ -41,16 +40,12 @@ export function ProfileScreen() {
             <AppText style={{ fontFamily: fonts.semibold }}>{auth.email ?? 'Unknown account'}</AppText>
           </View>
         </View>
-        <Badge label="Demo account" tone="info" />
       </Card>
 
       <Card>
         <AppText variant="heading">Privacy</AppText>
         <AppText variant="caption">
           Your answers are used only to build your plans. We don’t share them with dentists, insurers or employers.
-        </AppText>
-        <AppText variant="caption" muted>
-          This is a demo environment. Use synthetic information only — never real patient or insurance details.
         </AppText>
       </Card>
 

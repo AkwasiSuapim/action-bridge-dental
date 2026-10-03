@@ -51,3 +51,12 @@ export function isIsoDate(value: string): boolean {
   const date = new Date(Date.UTC(y, m - 1, d));
   return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
 }
+
+/** "80", "80%", "62.5" → basis points (8000, 6250). Null for empty, malformed, above 100% or finer than 0.01%. */
+export function parsePercentToBps(input: string): number | null {
+  const cleaned = input.trim().replace(/%$/, '').trim();
+  if (!/^\d{1,3}(\.\d{0,2})?$/.test(cleaned)) return null;
+  const [whole, fraction = ''] = cleaned.split('.');
+  const bps = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
+  return bps <= 10_000 ? bps : null;
+}
