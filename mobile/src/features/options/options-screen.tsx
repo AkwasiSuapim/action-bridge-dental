@@ -109,9 +109,22 @@ function OptionsBody({ record, results }: { record: DentalCase; results: Results
   }
 
   const model = buildOptions(record, scenarios);
+  const selectedCard = model.cards.find((card) => card.scenarioId === selected);
   return (
-    <Screen footer={footer}>
-      <View style={{ flexDirection: 'row', gap: space(2) }}>
+    <Screen
+      footer={
+        <>
+          <Button
+            label="Review this plan"
+            onPress={() => selected && router.push({ pathname: '/case/[caseId]/plan', params: { caseId: record.caseId, scenario: selected } })}
+          />
+          <AppText variant="caption" muted style={{ textAlign: 'center' }}>
+            Shows the math and sources for {selectedCard ? selectedCard.title.toLowerCase() : 'this option'}. Nothing is saved yet.
+          </AppText>
+        </>
+      }
+    >
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space(2) }}>
         <Badge label="Estimated" tone="neutral" />
         {sample ? <Badge label="Sample data" tone="neutral" /> : null}
       </View>
