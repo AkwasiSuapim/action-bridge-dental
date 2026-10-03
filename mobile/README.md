@@ -28,7 +28,8 @@ aws cognito-idp admin-set-user-password --user-pool-id us-east-2_in8mqQVUv --use
 
 | Module | Use it for |
 |---|---|
-| `src/services/api-context.tsx` → `useApi()` | `createCase`, `getCase`, `patchCase`, `estimate`, `scenarios`, `coverageComparison`. Responses are validated against `@actionbridge/contracts`; failures are `ApiError` with `code`, user-facing `message` and `options.requestId` |
+| `src/services/api-context.tsx` → `useApi()` | `createCase`, `getCase`, `patchCase`, `estimate`, `scenarios`, `coverageComparison`, `saveStrategy`, `ledger`. Responses are validated against `@actionbridge/contracts`; failures are `ApiError` with `code`, user-facing `message` and `options.requestId` |
+| `src/lib/idempotency.ts` → `newIdempotencyKey()` | Create one key when the user taps Save and reuse it for retries of that tap: `saveStrategy(caseId, { scenarioId, expectedRevision, consent: true }, key)`. A replay returns `replayed: true` with the same strategy |
 | `src/features/auth/auth-context.tsx` → `useAuth()` | `status`, `email`, `signIn`, `signOut`. Tokens refresh automatically; the refresh token is kept in SecureStore |
 | `src/lib/questions.ts` | Adaptive loop, typed path: `questionFor(missingFact, case)` picks the control; `changesForAnswer(case, fieldPath, value)` builds the PATCH |
 | `src/lib/format.ts` | `formatCents`, `parseDollarsToCents` (exact cents; never round display values back into the engine), `formatDate`, `formatBps` |

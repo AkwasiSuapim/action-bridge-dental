@@ -62,6 +62,26 @@ describe('API client', () => {
     await expect(client(fakeFetch({ status: 401, body: { message: 'Unauthorized' } }).impl).estimate('c', 1)).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
   });
 
+  it('sends the idempotency key with a save and reads ledger pages with an encoded cursor', async () => {
+    const strategy = {
+      strategyId: 'st-1',
+      caseId: 'case-1',
+      caseRevision: 1,
+      savedAt: '2026-10-03T15:00:00.000Z',
+      scenario: { bad: true },
+    };
+    const save = fakeFetch({ status: 201, body: { strategy, replayed: false } });
+    await expect(
+      client(save.impl).saveStrategy('case-1', { scenarioId: 'alt-1', expectedRevision: 1, consent: true }, 'key-12345678'),
+    ).rejects.toMatchObject({ code: 'BAD_RESPONSE' });
+    expect((save.calls[0]?.init?.headers as Record<string, string>)['idempotency-key']).toBe('key-12345678');
+    expect(save.calls[0]?.url).toBe('https://api.example/dev/v1/cases/case-1/strategies');
+
+    const ledger = fakeFetch({ status: 200, body: { events: [], nextCursor: null } });
+    await expect(client(ledger.impl).ledger('case-1', 'TEVER0dFUiM=')).resolves.toEqual({ events: [], nextCursor: null });
+    expect(ledger.calls[0]?.url).toBe('https://api.example/dev/v1/cases/case-1/ledger?cursor=TEVER0dFUiM%3D');
+  });
+
   it('encodes case IDs in paths', async () => {
     const { impl, calls } = fakeFetch({ status: 404, body: { error: { code: 'NOT_FOUND', message: 'Case not found.', retryable: false, requestId: 'r' } } });
     await client(impl).getCase('../etc').catch(() => undefined);
