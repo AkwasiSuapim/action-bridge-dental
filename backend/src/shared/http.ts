@@ -12,6 +12,7 @@ import { logRequest } from './logger.js';
 export interface HttpEvent {
   routeKey: string;
   pathParameters?: Record<string, string | undefined>;
+  queryStringParameters?: Record<string, string | undefined>;
   headers?: Record<string, string | undefined>;
   body?: string;
   isBase64Encoded?: boolean;

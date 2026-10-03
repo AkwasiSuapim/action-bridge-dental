@@ -1,0 +1,143 @@
+import {
+  CoverageComparisonSchema,
+  CreateCaseResponseSchema,
+  DentalCaseSchema,
+  ErrorEnvelopeSchema,
+  EstimateResultSchema,
+  RETRY_POLICY,
+  retryDelayMs,
+  ScenarioComparisonResultSchema,
+  type CreateCaseRequest,
+  type ErrorIssue,
+  type PatchCaseRequest,
+} from '@actionbridge/contracts';
+import type { z } from 'zod';
+
+/**
+ * Typed client for the live ActionBridge API. Every response is validated against the shared
+ * contracts; nothing is cast. Failures surface as ApiError with a user-facing message and the
+ * request ID for diagnostics — the client never substitutes sample data for a failed live call.
+ */
+export type ApiErrorCode =
+  | 'NETWORK'
+  | 'TIMEOUT'
+  | 'UNAUTHENTICATED'
+  | 'BAD_RESPONSE'
+  | 'BAD_REQUEST'
+  | 'FORBIDDEN'
+  | 'NOT_FOUND'
+  | 'REVISION_CONFLICT'
+  | 'IDEMPOTENCY_CONFLICT'
+  | 'INCONSISTENT_INPUT'
+  | 'RATE_LIMITED'
+  | 'UPSTREAM_UNAVAILABLE'
+  | 'INTERNAL';
+
+export class ApiError extends Error {
+  constructor(
+    readonly code: ApiErrorCode,
+    message: string,
+    readonly options: { status?: number; requestId?: string; retryable?: boolean; issues?: ErrorIssue[] } = {},
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+export interface ApiClientOptions {
+  baseUrl: string;
+  getAccessToken: () => Promise<string | null>;
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+  random?: () => number;
+}
+
+export function createApiClient({
+  baseUrl,
+  getAccessToken,
+  fetchImpl = fetch,
+  timeoutMs = 15_000,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  random = Math.random,
+}: ApiClientOptions) {
+  async function once<S extends z.ZodType>(method: string, path: string, schema: S, body?: unknown): Promise<z.infer<S>> {
+    const token = await getAccessToken();
+    if (!token) throw new ApiError('UNAUTHENTICATED', 'Your session ended. Sign in again.');
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let response: Response;
+    try {
+      response = await fetchImpl(`${baseUrl}${path}`, {
+        method,
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        signal: controller.signal,
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    } catch {
+      if (controller.signal.aborted) throw new ApiError('TIMEOUT', 'The server took too long to respond. Your input is safe — try again.', { retryable: true });
+      throw new ApiError('NETWORK', 'You appear to be offline. Your input is safe — try again when connected.', { retryable: true });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const requestId = response.headers.get('x-request-id') ?? undefined;
+    const json: unknown = await response.json().catch(() => undefined);
+
+    if (response.status === 401) {
+      throw new ApiError('UNAUTHENTICATED', 'Your session ended. Sign in again.', { status: 401, ...(requestId ? { requestId } : {}) });
+    }
+    if (!response.ok) {
+      const envelope = ErrorEnvelopeSchema.safeParse(json);
+      if (envelope.success) {
+        const { code, message, retryable, issues } = envelope.data.error;
+        throw new ApiError(code, message, { status: response.status, requestId: envelope.data.error.requestId, retryable, ...(issues ? { issues } : {}) });
+      }
+      throw new ApiError(response.status >= 500 ? 'UPSTREAM_UNAVAILABLE' : 'BAD_RESPONSE', 'The service returned an unexpected error.', {
+        status: response.status,
+        retryable: response.status >= 500,
+        ...(requestId ? { requestId } : {}),
+      });
+    }
+
+    const parsed = schema.safeParse(json);
+    if (!parsed.success) {
+      throw new ApiError('BAD_RESPONSE', 'The service returned data this app version does not understand.', {
+        status: response.status,
+        ...(requestId ? { requestId } : {}),
+      });
+    }
+    return parsed.data;
+  }
+
+  /** Safe reads retry with bounded exponential backoff and jitter; writes never auto-retry. */
+  async function read<S extends z.ZodType>(path: string, schema: S): Promise<z.infer<S>> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await once('GET', path, schema);
+      } catch (error) {
+        const retryable = error instanceof ApiError && error.options.retryable === true;
+        if (!retryable || attempt >= RETRY_POLICY.maxAttempts) throw error;
+        await sleep(retryDelayMs(attempt, random));
+      }
+    }
+  }
+
+  const casePath = (caseId: string) => `/v1/cases/${encodeURIComponent(caseId)}`;
+
+  return {
+    health: () => fetchImpl(`${baseUrl}/health`).then((r) => r.ok),
+    createCase: (request: CreateCaseRequest) => once('POST', '/v1/cases', CreateCaseResponseSchema, request),
+    getCase: (caseId: string) => read(casePath(caseId), DentalCaseSchema),
+    patchCase: (caseId: string, request: PatchCaseRequest) => once('PATCH', casePath(caseId), CreateCaseResponseSchema, request),
+    estimate: (caseId: string, expectedRevision: number) =>
+      once('POST', `${casePath(caseId)}/estimates`, EstimateResultSchema, { expectedRevision }),
+    scenarios: (caseId: string, expectedRevision: number) =>
+      once('POST', `${casePath(caseId)}/scenarios`, ScenarioComparisonResultSchema, { expectedRevision }),
+    coverageComparison: (caseId: string, expectedRevision: number) =>
+      once('POST', `${casePath(caseId)}/coverage-comparison`, CoverageComparisonSchema, { expectedRevision }),
+  };
+}
+
+export type ApiClient = ReturnType<typeof createApiClient>;

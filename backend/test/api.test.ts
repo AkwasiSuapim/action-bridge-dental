@@ -1,4 +1,5 @@
 import {
+  CoverageComparisonSchema,
   CreateCaseResponseSchema,
   DentalCaseSchema,
   ErrorEnvelopeSchema,
@@ -7,7 +8,7 @@ import {
 } from '@actionbridge/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DentalCase } from '@actionbridge/contracts';
-import { InMemoryCaseRepository } from '../src/features/cases/infrastructure/in-memory-case-repository.js';
+import { InMemoryStore } from '../src/shared/in-memory-store.js';
 import { composeHandler } from '../src/functions/compose.js';
 import { healthRoutes } from '../src/features/health/health-routes.js';
 import { createTestApi, fixtureCreateRequest, OTHER, type TestApi } from './helpers.js';
@@ -132,6 +133,24 @@ describe('T3-01 estimates and scenarios', () => {
     });
   });
 
+  it('compares insured and self-pay, and reports self-pay as unavailable without quotes', async () => {
+    const api = createTestApi();
+    const { caseId } = await createFixtureCase(api);
+    const withoutQuotes = await api.call('POST /v1/cases/{caseId}/coverage-comparison', { caseId, body: { expectedRevision: 1 } });
+    expect(withoutQuotes.status).toBe(200);
+    expect(CoverageComparisonSchema.parse(withoutQuotes.body)).toMatchObject({
+      insured: { status: 'estimated', totals: { patientPaysCents: 120000 } },
+      selfPay: { status: 'unavailable' },
+      selfPayMinusInsuredCents: null,
+    });
+
+    const { caseId: quoted } = await createFixtureCase(api, (b) =>
+      b.procedures.forEach((p) => (p.selfPayQuote = { amountCents: 50000, quotedOn: '2026-10-01', source: 'synthetic', includedScope: p.label })),
+    );
+    const withQuotes = await api.call('POST /v1/cases/{caseId}/coverage-comparison', { caseId: quoted, body: { expectedRevision: 1 } });
+    expect(withQuotes.body).toMatchObject({ selfPay: { status: 'available', totalCents: 150000 }, selfPayMinusInsuredCents: 30000 });
+  });
+
   it('refuses to calculate from a stale revision', async () => {
     const api = createTestApi();
     const { caseId } = await createFixtureCase(api);
@@ -226,10 +245,10 @@ describe('T3-05 errors are explicit and correlated', () => {
   });
 
   it('unexpected failures return a generic 500 and never leak internal details', async () => {
-    const repository = new InMemoryCaseRepository();
-    vi.spyOn(repository, 'get').mockRejectedValue(new Error('DynamoDB connection string secret://abc'));
+    const store = new InMemoryStore();
+    vi.spyOn(store, 'get').mockRejectedValue(new Error('DynamoDB connection string secret://abc'));
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    const response = await createTestApi({ repository }).call(GET, { caseId: 'case-1' });
+    const response = await createTestApi({ store }).call(GET, { caseId: 'case-1' });
     const error = expectError(response, 500, 'INTERNAL');
     expect(JSON.stringify(response.body)).not.toContain('secret');
     expect(error.retryable).toBe(false);

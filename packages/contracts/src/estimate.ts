@@ -61,6 +61,7 @@ export const AssumptionSchema = z.strictObject({
 export const MissingFactSchema = z.strictObject({
   fieldPath: FieldPathSchema,
   code: z.enum([
+    'COVERAGE_MODE_UNKNOWN',
     'POLICY_NOT_SUPPLIED',
     'NO_PROCEDURES',
     'VALUE_UNKNOWN',
@@ -74,6 +75,7 @@ export const MissingFactSchema = z.strictObject({
 
 export const LimitationSchema = z.strictObject({
   code: z.enum([
+    'NOT_INSURED',
     'DEDUCTIBLE_AFTER_COINSURANCE_UNSUPPORTED',
     'PARTIAL_COVERAGE_UNSUPPORTED',
     'WAITING_PERIOD_UNSUPPORTED',
@@ -87,6 +89,37 @@ export const LimitationSchema = z.strictObject({
   message: z.string().max(300),
   fieldPath: FieldPathSchema.optional(),
   procedureId: IdSchema.optional(),
+});
+
+/**
+ * A specific finding from coverage review (doc 05 §3B): what is missing, conflicting or assumed,
+ * which fields it affects, whether it blocks a definitive result, and what resolves it.
+ * Never a made-up confidence percentage.
+ */
+export const CoverageIssueSchema = z.strictObject({
+  id: IdSchema,
+  code: z.enum([
+    'MISSING_REQUIRED_FACT',
+    'CONFLICTING_SOURCES',
+    'UNCONFIRMED_ASSUMPTION',
+    'UNSUPPORTED_RULE',
+    'USER_REPORTED_TIMING',
+    'NETWORK_UNCONFIRMED',
+    'PLAN_YEAR_MISMATCH',
+    'SCOPE_MISMATCH',
+  ]),
+  /** `blocking`: no definitive result; `conditional`: result shown but labeled conditional; `info`: worth knowing. */
+  severity: z.enum(['blocking', 'conditional', 'info']),
+  fieldPaths: z.array(FieldPathSchema).min(1).max(10),
+  message: z.string().min(1).max(300),
+  resolution: z.enum([
+    'answer_question',
+    'upload_document',
+    'review_conflict',
+    'confirm_with_dentist',
+    'confirm_with_insurer',
+  ]),
+  sourceFactIds: z.array(IdSchema).max(10),
 });
 
 const ResultMetaShape = {
@@ -172,13 +205,60 @@ export const ScenarioComparisonResultSchema = z.discriminatedUnion('status', [
   UnsupportedResultSchema,
 ]);
 
+/**
+ * Self-pay branch (doc 05 §3A, D-12): only explicit dentist cash quotes. Any procedure without a
+ * quote makes the whole branch unavailable — never a partial or zero total.
+ */
+export const SelfPayEstimateSchema = z.discriminatedUnion('status', [
+  z.strictObject({
+    status: z.literal('available'),
+    totalCents: CentsSchema,
+    lines: z.array(
+      z.strictObject({
+        procedureId: IdSchema,
+        amountCents: CentsSchema,
+        quotedOn: IsoDateSchema,
+        source: z.enum(['dentist_quote', 'user_reported', 'synthetic']),
+        includedScope: z.string().min(1).max(200),
+      }),
+    ),
+  }),
+  z.strictObject({
+    status: z.literal('unavailable'),
+    /** Empty when the case has no procedures yet. */
+    missingQuoteProcedureIds: z.array(IdSchema).max(20),
+  }),
+]);
+
+/**
+ * Treatment cost under the current plan versus explicit cash quotes for the same procedures.
+ * Not the value of buying insurance: premiums and other plan costs are out of scope.
+ */
+export const CoverageComparisonSchema = z.strictObject({
+  engineVersion: z.string().min(1).max(40),
+  caseRevision: z.number().int().min(1),
+  insured: EstimateResultSchema,
+  selfPay: SelfPayEstimateSchema,
+  /** Self-pay total minus insured employee estimate; null unless both branches are available. Negative: cash quote is lower. */
+  selfPayMinusInsuredCents: z.number().int().nullable(),
+  notes: z.array(
+    z.strictObject({
+      code: z.enum(['CONFIRM_CASH_BILLING_RULES', 'CONFIRM_SCOPE_MATCHES', 'INSURED_ESTIMATE_CONDITIONAL']),
+      message: z.string().max(300),
+    }),
+  ),
+});
+
 export type ScheduleEntry = z.infer<typeof ScheduleEntrySchema>;
+export type SelfPayEstimate = z.infer<typeof SelfPayEstimateSchema>;
+export type CoverageComparison = z.infer<typeof CoverageComparisonSchema>;
 export type CostLine = z.infer<typeof CostLineSchema>;
 export type EstimateTotals = z.infer<typeof EstimateTotalsSchema>;
 export type YearProjection = z.infer<typeof YearProjectionSchema>;
 export type Assumption = z.infer<typeof AssumptionSchema>;
 export type MissingFact = z.infer<typeof MissingFactSchema>;
 export type Limitation = z.infer<typeof LimitationSchema>;
+export type CoverageIssue = z.infer<typeof CoverageIssueSchema>;
 export type EstimatedResult = z.infer<typeof EstimatedResultSchema>;
 export type NeedsInformationResult = z.infer<typeof NeedsInformationResultSchema>;
 export type UnsupportedResult = z.infer<typeof UnsupportedResultSchema>;

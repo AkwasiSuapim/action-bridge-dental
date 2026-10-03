@@ -4,9 +4,11 @@ import type {
   CreateCaseResponse,
   DentalCase,
   DentalCaseInput,
+  LedgerEvent,
   PatchCaseRequest,
 } from '@actionbridge/contracts';
 import { estimateCase } from '@actionbridge/benefits-engine';
+import { expiresAtFrom } from '../../../shared/dynamo.js';
 import { HttpError } from '../../../shared/http.js';
 import type { CaseRepository } from '../ports/case-repository.js';
 
@@ -26,6 +28,7 @@ export class CaseService {
     const input: DentalCaseInput = {
       caseRevision: 1,
       currency: request.currency,
+      coverageMode: request.coverageMode,
       policy: request.policy,
       planYears: request.planYears,
       procedures: request.procedures,
@@ -39,7 +42,8 @@ export class CaseService {
       createdAt: timestamp,
       updatedAt: timestamp,
     };
-    await this.deps.repository.create(record, this.expiresAt());
+    const event = this.event(record, 'case_created', 'Case created');
+    await this.deps.repository.create(record, event, this.expiresAt());
     return { caseId: record.caseId, caseRevision: record.caseRevision };
   }
 
@@ -62,6 +66,7 @@ export class CaseService {
     const input: DentalCaseInput = {
       caseRevision: current.caseRevision + 1,
       currency: current.currency,
+      coverageMode: changes.coverageMode ?? current.coverageMode,
       policy: changes.policy !== undefined ? changes.policy : current.policy,
       planYears: changes.planYears ?? current.planYears,
       procedures: changes.procedures ?? current.procedures,
@@ -73,14 +78,29 @@ export class CaseService {
       sourceFacts: changes.sourceFacts ?? current.sourceFacts,
       updatedAt: this.deps.now().toISOString(),
     };
-    const outcome = await this.deps.repository.replace(updated, current.caseRevision, this.expiresAt());
+    // The summary names changed sections only; never values.
+    const sections = Object.keys(changes).sort().join(', ');
+    const event = this.event(updated, 'case_updated', `Case updated: ${sections}`);
+    const outcome = await this.deps.repository.replace(updated, event, current.caseRevision, this.expiresAt());
     if (outcome === 'revision_conflict') throw revisionConflict();
     return { caseId, caseRevision: updated.caseRevision };
   }
 
+  private event(record: DentalCase, action: LedgerEvent['action'], summary: string): LedgerEvent {
+    return {
+      eventId: this.deps.newId(),
+      caseId: record.caseId,
+      action,
+      actor: 'user',
+      caseRevision: record.caseRevision,
+      summary,
+      strategyId: null,
+      at: record.updatedAt,
+    };
+  }
+
   private expiresAt(): number | null {
-    if (this.deps.retentionDays === null) return null;
-    return Math.floor(this.deps.now().getTime() / 1000) + this.deps.retentionDays * 86_400;
+    return expiresAtFrom(this.deps.now(), this.deps.retentionDays);
   }
 }
 
@@ -89,6 +109,7 @@ export function toEngineInput(record: DentalCase): DentalCaseInput {
   return {
     caseRevision: record.caseRevision,
     currency: record.currency,
+    coverageMode: record.coverageMode,
     policy: record.policy,
     planYears: record.planYears,
     procedures: record.procedures,
@@ -100,6 +121,6 @@ function deriveStatus(input: DentalCaseInput): CaseStatus {
   return estimateCase(input).status === 'estimated' ? 'ready' : 'draft';
 }
 
-function revisionConflict(): HttpError {
+export function revisionConflict(): HttpError {
   return new HttpError('REVISION_CONFLICT', 'This case changed since you loaded it. Reload it and try again.');
 }

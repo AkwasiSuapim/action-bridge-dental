@@ -69,6 +69,18 @@ export const TimingSourceSchema = z.enum([
   'unknown',
 ]);
 
+/**
+ * A dentist's explicit cash (self-pay) price for one procedure (doc 05 §3A, D-12). Unknown is
+ * `null`/absent, never 0; a real $0 quote is allowed. An insurer allowed amount is never a cash price.
+ */
+export const SelfPayQuoteSchema = z.strictObject({
+  amountCents: CentsSchema,
+  quotedOn: IsoDateSchema,
+  source: z.enum(['dentist_quote', 'user_reported', 'synthetic']),
+  /** What the quoted price includes, so insured and self-pay scopes can be compared like for like. */
+  includedScope: z.string().min(1).max(200),
+});
+
 export const ProcedureSchema = z.strictObject({
   id: IdSchema,
   label: z.string().min(1).max(120),
@@ -87,12 +99,17 @@ export const ProcedureSchema = z.strictObject({
   dentistLatestDate: IsoDateSchema.nullable(),
   timingSource: TimingSourceSchema,
   prerequisiteIds: z.array(IdSchema).max(20),
+  selfPayQuote: SelfPayQuoteSchema.nullish(),
 });
+
+/** Whether the person has dental coverage. Describes the current situation, not a purchase recommendation. */
+export const CoverageModeSchema = z.enum(['insured', 'self_pay', 'unknown']);
 
 /** The calculation-relevant snapshot of a case at one revision. This is the engine's input. */
 export const DentalCaseInputSchema = z.strictObject({
   caseRevision: z.number().int().min(1),
   currency: CurrencySchema,
+  coverageMode: CoverageModeSchema,
   policy: PolicySchema.nullable(),
   planYears: z.record(IdSchema, PlanYearSchema),
   procedures: z.array(ProcedureSchema).max(20),
@@ -101,6 +118,7 @@ export const DentalCaseInputSchema = z.strictObject({
 export const SourceOriginSchema = z.enum([
   'document_extracted',
   'user_entered',
+  'voice_transcribed',
   'agent_proposed',
   'assumption',
   'synthetic',
@@ -114,7 +132,20 @@ export const ExtractionStatusSchema = z.enum([
 ]);
 
 /**
- * Provenance for one field value. Origin, user confirmation and insurer confirmation are
+ * Insurer verification is a separate fact from origin and user confirmation. "Verified" requires an
+ * attributable reference and time; a bare verified flag fails validation (doc 05 §6).
+ */
+export const InsurerVerificationSchema = z.discriminatedUnion('status', [
+  z.strictObject({ status: z.literal('not_verified') }),
+  z.strictObject({
+    status: z.literal('verified'),
+    reference: z.string().min(1).max(100),
+    verifiedAt: IsoDateTimeSchema,
+  }),
+]);
+
+/**
+ * Provenance for one field value. Origin, user confirmation and insurer verification are
  * separate facts and must not be collapsed into one badge.
  */
 export const SourceFactSchema = z.strictObject({
@@ -127,12 +158,19 @@ export const SourceFactSchema = z.strictObject({
       page: z.number().int().min(1).nullable(),
       section: z.string().max(200).nullable(),
       snippet: z.string().max(500).nullable(),
+      /** For voice answers: the transcript span the value came from. */
+      transcriptSpan: z
+        .strictObject({ startMs: z.number().int().min(0), endMs: z.number().int().min(0) })
+        .refine((span) => span.startMs <= span.endMs, 'Transcript span ends before it starts')
+        .nullish(),
     })
     .nullable(),
+  /** Date printed on the source document, when it has one. */
+  documentDate: IsoDateSchema.nullish(),
   origin: SourceOriginSchema,
   extractionStatus: ExtractionStatusSchema,
   userConfirmed: z.boolean(),
-  insurerConfirmed: z.boolean(),
+  insurerVerification: InsurerVerificationSchema,
   conflict: z.boolean(),
   recordedAt: IsoDateTimeSchema,
 });
@@ -154,6 +192,7 @@ export const DentalCaseSchema = DentalCaseInputSchema.extend({
 /** `POST /v1/cases`. Missing values are allowed as `null`; owner and revision are server-assigned. */
 export const CreateCaseRequestSchema = z.strictObject({
   currency: CurrencySchema,
+  coverageMode: CoverageModeSchema,
   policy: PolicySchema.nullable(),
   planYears: z.record(IdSchema, PlanYearSchema),
   procedures: z.array(ProcedureSchema).max(20),
@@ -170,6 +209,7 @@ export const PatchCaseRequestSchema = z.strictObject({
   expectedRevision: z.number().int().min(1),
   changes: z
     .strictObject({
+      coverageMode: CoverageModeSchema.optional(),
       policy: PolicySchema.nullable().optional(),
       planYears: z.record(IdSchema, PlanYearSchema).optional(),
       procedures: z.array(ProcedureSchema).max(20).optional(),
@@ -197,6 +237,9 @@ export type PlanYear = z.infer<typeof PlanYearSchema>;
 export type NetworkStatus = z.infer<typeof NetworkStatusSchema>;
 export type TimingSource = z.infer<typeof TimingSourceSchema>;
 export type Procedure = z.infer<typeof ProcedureSchema>;
+export type SelfPayQuote = z.infer<typeof SelfPayQuoteSchema>;
+export type CoverageMode = z.infer<typeof CoverageModeSchema>;
+export type InsurerVerification = z.infer<typeof InsurerVerificationSchema>;
 export type DentalCaseInput = z.infer<typeof DentalCaseInputSchema>;
 export type SourceFact = z.infer<typeof SourceFactSchema>;
 export type CaseStatus = z.infer<typeof CaseStatusSchema>;

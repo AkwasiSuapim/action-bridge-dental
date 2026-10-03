@@ -2,20 +2,34 @@ import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { caseRoutes } from '../features/cases/api/case-routes.js';
 import { CaseService } from '../features/cases/application/case-service.js';
-import { InMemoryCaseRepository } from '../features/cases/infrastructure/in-memory-case-repository.js';
 import { estimateRoutes } from '../features/estimates/estimate-routes.js';
 import { healthRoutes } from '../features/health/health-routes.js';
+import { ledgerRoutes } from '../features/ledger/api/ledger-routes.js';
 import { scheduleRoutes } from '../features/schedules/schedule-routes.js';
+import { strategyRoutes } from '../features/strategies/api/strategy-routes.js';
+import { StrategyService } from '../features/strategies/application/strategy-service.js';
 import { createRouter, type HttpEvent } from '../shared/http.js';
+import { InMemoryStore } from '../shared/in-memory-store.js';
 
 /**
  * Local development API: the same routes as the Lambdas, backed by an in-memory store that is
  * lost on restart. Demo auth only (x-demo-user-id). Synthetic data only.
  */
 const port = Number(process.env.PORT ?? 3000);
-const cases = new CaseService({ repository: new InMemoryCaseRepository(), now: () => new Date(), newId: randomUUID, retentionDays: null });
-const deps = { cases, authMode: 'demo' as const };
-const routes = { ...healthRoutes('local'), ...caseRoutes(deps), ...estimateRoutes(deps), ...scheduleRoutes(deps) };
+const store = new InMemoryStore();
+const clock = { now: () => new Date(), newId: randomUUID, retentionDays: null };
+const cases = new CaseService({ repository: store, ...clock });
+const strategies = new StrategyService({ cases, strategies: store, ...clock });
+const authMode = 'demo' as const;
+const deps = { cases, authMode };
+const routes = {
+  ...healthRoutes('local'),
+  ...caseRoutes(deps),
+  ...estimateRoutes(deps),
+  ...scheduleRoutes(deps),
+  ...strategyRoutes({ strategies, authMode }),
+  ...ledgerRoutes({ cases, ledger: store, authMode }),
+};
 const router = createRouter(routes);
 
 const templates = Object.keys(routes).map((routeKey) => {
@@ -50,6 +64,7 @@ createServer(async (req, res) => {
   const event: HttpEvent = {
     routeKey,
     pathParameters,
+    queryStringParameters: Object.fromEntries(url.searchParams),
     headers,
     body: Buffer.concat(chunks).toString('utf8'),
     requestContext: { requestId: randomUUID() },

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ErrorEnvelopeSchema } from './errors.js';
 import { IdSchema, IsoDateTimeSchema } from './primitives.js';
-import { UiBlockEnvelopeSchema } from './ui-blocks.js';
+import { ResponseModeSchema, UiBlockEnvelopeSchema } from './ui-blocks.js';
 
 export const JobStatusSchema = z.enum([
   'queued',
@@ -14,7 +14,8 @@ export const JobStatusSchema = z.enum([
 
 export const TERMINAL_JOB_STATUSES = ['needs_information', 'completed', 'failed', 'cancelled'] as const;
 
-export const JobOperationSchema = z.enum(['interpret', 'explain', 'analyze_document']);
+/** `transcribe_audio` produces an editable transcript that then feeds `interpret` (D-14). */
+export const JobOperationSchema = z.enum(['interpret', 'explain', 'analyze_document', 'transcribe_audio']);
 
 /** Real operational stages. The UI never invents stages or percentages beyond these events. */
 export const JobStageKeySchema = z.enum([
@@ -83,7 +84,12 @@ export const JobAnswersRequestSchema = z.strictObject({
         questionId: IdSchema,
         value: z.union([z.number().int(), z.string().max(200), z.boolean()]).nullable(),
         unknown: z.boolean(),
-      }),
+        /** How the user answered; voice and photo answers are confirmed by the user before submission. */
+        responseMode: ResponseModeSchema,
+        /** Uploaded audio or document the answer came from, when any. */
+        attachmentId: IdSchema.nullable(),
+      })
+      .refine((answer) => !(answer.unknown && answer.value !== null), 'An unknown answer cannot also carry a value'),
     )
     .min(1)
     .max(10),

@@ -13,7 +13,7 @@ Start with [docs/README.md](docs/README.md). Decisions and Phase 0 status are in
 | `packages/benefits-engine/` | Pure integer-cent calculator and bounded schedule comparison | Implemented (Phase 2) |
 | `backend/` | Lambda handlers, application services, DynamoDB adapter, local server, smoke test — see [backend/README.md](backend/README.md) | Phase 3 deployed and verified live; agent (Phase 5) not started |
 | `infra/` | SAM template: HTTP API + Cognito JWT authorizer, three Lambdas, DynamoDB; live smoke script | Deployed to Ohio (`actionbridge-dental-dev`), live smoke 10/10 |
-| `mobile/` | Expo React Native app | Not started (Phase 4) |
+| `mobile/` | Expo SDK 57 foundation: Cognito sign-in, typed live API client, theme and primitives — see [mobile/README.md](mobile/README.md) | Foundation built; team UI to be merged |
 
 ## Commands
 
