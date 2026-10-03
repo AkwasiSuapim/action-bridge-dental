@@ -12,7 +12,7 @@ export interface FactRow {
   label: string;
   value: string;
   source: FactSource;
-  /** Field path the Edit action opens; absent when the value is not editable here. */
+  /** Field path the Edit action opens, or `rules` for the coverage-rules screen; absent when not editable here. */
   editPath?: string;
 }
 
@@ -23,6 +23,12 @@ export interface FactGroup {
 }
 
 const NETWORK: Record<Procedure['network'], string> = { in: 'In network', out: 'Out of network', unknown: 'Not sure' };
+/** Plan-model assumptions recorded as `assumption` facts; always disclosed, never hidden. */
+const ASSUMPTIONS: Record<string, string> = {
+  'policy.deductibleBeforeCoinsurance': 'You pay the deductible before your plan’s percentage applies',
+  'policy.allServicesCovered': 'These services are covered, with no waiting period, exclusion or frequency limit',
+};
+
 const COVERAGE: Record<DentalCase['coverageMode'], string> = { insured: 'I have dental insurance', self_pay: 'Paying myself', unknown: 'Not sure' };
 
 /** True when the case carries the labeled synthetic fixture rather than the user's own data. */
@@ -135,10 +141,15 @@ export function buildFactGroups(record: DentalCase): FactGroup[] {
         label: `${category.charAt(0).toUpperCase()}${category.slice(1)} services`,
         value: `Plan pays ${formatBps(bps)} ${afterDeductible}`,
         source: fallback,
+        editPath: 'rules',
       });
     }
+    for (const fact of record.sourceFacts) {
+      const text = fact.origin === 'assumption' ? ASSUMPTIONS[fact.fieldPath] : undefined;
+      if (text) coverage.push({ key: `assumption.${fact.fieldPath}`, label: 'Assumed', value: text, source: 'assumed' });
+    }
   } else if (record.coverageMode !== 'self_pay') {
-    coverage.push({ key: 'policy', label: 'Plan rules', value: 'Not provided yet', source: 'missing' });
+    coverage.push({ key: 'policy', label: 'Plan rules', value: 'Not provided yet', source: 'missing', editPath: 'rules' });
   }
   groups.push({ key: 'coverage', title: 'Your coverage', rows: coverage });
 

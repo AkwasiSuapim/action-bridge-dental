@@ -48,3 +48,22 @@ export function valueAt(record: DentalCase, fieldPath: string): unknown {
   if (root === 'policy' && id && field) return (record.policy?.[id as 'deductibleAppliesByCategory'] as Record<string, unknown> | undefined)?.[field];
   return undefined;
 }
+
+/**
+ * Like `userEditChanges`, plus one forced consequence: when the allowed amount equals the charge,
+ * there is nothing left to write off, so an unknown write-off becomes 0. Arithmetic, not a default.
+ */
+export function answerChanges(
+  record: DentalCase,
+  fieldPath: string,
+  value: FactValue,
+  deps: { now: () => Date; newId: () => string },
+): PatchCaseRequest['changes'] {
+  const changes = userEditChanges(record, fieldPath, value, deps);
+  const [root, id, field] = fieldPath.split('.');
+  if (root !== 'procedures' || field !== 'allowedCents' || !id) return changes;
+  const procedure = record.procedures.find((p) => p.id === id);
+  if (!procedure || procedure.contractualWriteoffCents !== null || value === null || value !== procedure.providerChargeCents) return changes;
+  const next: DentalCase = { ...record, procedures: changes.procedures ?? record.procedures, sourceFacts: changes.sourceFacts ?? record.sourceFacts };
+  return { ...changes, ...userEditChanges(next, `procedures.${id}.contractualWriteoffCents`, 0, deps) };
+}

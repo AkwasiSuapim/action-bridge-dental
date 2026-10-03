@@ -84,7 +84,11 @@ function FactRowView({ row, first, caseId }: { row: FactRow; first: boolean; cas
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Edit ${row.label.toLowerCase()}`}
-          onPress={() => router.push({ pathname: '/case/[caseId]/edit', params: { caseId, field: row.editPath! } })}
+          onPress={() =>
+            row.editPath === 'rules'
+              ? router.push({ pathname: '/case/[caseId]/rules', params: { caseId } })
+              : router.push({ pathname: '/case/[caseId]/edit', params: { caseId, field: row.editPath! } })
+          }
           style={({ pressed }) => ({
             minHeight: layout.minHitArea,
             borderWidth: 1.5,

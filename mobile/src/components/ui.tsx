@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, Eye, EyeOff, Info, XCircle } from 'lucide-react-native';
-import { useState, type ReactNode } from 'react';
+import { useState, type ReactNode, type Ref } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -10,6 +10,7 @@ import {
   View,
   type StyleProp,
   type TextStyle,
+  type TextInputProps,
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,7 +40,13 @@ export function Screen({
   return (
     <SafeAreaView edges={headerless ? ['top', 'bottom', 'left', 'right'] : ['bottom', 'left', 'right']} style={{ flex: 1, backgroundColor: colors.background }}>
       {scroll ? (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets
+        >
           {body}
         </ScrollView>
       ) : (
@@ -212,6 +219,12 @@ export function TextField({
   helper,
   invalid = false,
   trailing,
+  inputRef,
+  returnKeyType,
+  onSubmitEditing,
+  submitBehavior,
+  textContentType,
+  autoCapitalize = 'none',
 }: {
   label: string;
   value: string;
@@ -226,6 +239,13 @@ export function TextField({
   invalid?: boolean;
   /** A control inside the right edge of the input, such as a show-password toggle. */
   trailing?: ReactNode;
+  inputRef?: Ref<TextInput>;
+  returnKeyType?: TextInputProps['returnKeyType'];
+  onSubmitEditing?: () => void;
+  submitBehavior?: TextInputProps['submitBehavior'];
+  /** iOS autofill hint, e.g. `username` and `password` on sign-in. */
+  textContentType?: TextInputProps['textContentType'];
+  autoCapitalize?: TextInputProps['autoCapitalize'];
 }) {
   const { colors } = useTheme();
   return (
@@ -233,6 +253,7 @@ export function TextField({
       <AppText variant="label">{label}</AppText>
       <View style={{ justifyContent: 'center' }}>
         <TextInput
+          ref={inputRef}
           accessibilityLabel={label}
           {...(helper ? { accessibilityHint: helper } : {})}
           value={value}
@@ -241,9 +262,13 @@ export function TextField({
           placeholderTextColor={colors.textMuted}
           keyboardType={keyboardType}
           secureTextEntry={secureTextEntry}
-          autoCapitalize="none"
+          autoCapitalize={autoCapitalize}
           autoCorrect={false}
           autoComplete={autoComplete ?? 'off'}
+          {...(textContentType ? { textContentType } : {})}
+          {...(returnKeyType ? { returnKeyType } : {})}
+          {...(submitBehavior ? { submitBehavior } : {})}
+          {...(onSubmitEditing ? { onSubmitEditing } : {})}
           style={[
             styles.input,
             { color: colors.text, backgroundColor: colors.surface, borderColor: error || invalid ? colors.danger : colors.border },

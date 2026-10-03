@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { DentalCaseSchema, PatchCaseRequestSchema, type DentalCase } from '@actionbridge/contracts';
 import { describe, expect, it } from 'vitest';
 import { readConfig } from './config';
-import { centsToInput, formatBps, formatCents, formatDate, isIsoDate, parseDollarsToCents } from './format';
+import { centsToInput, formatBps, formatCents, formatDate, isIsoDate, parseDollarsToCents, parsePercentToBps } from './format';
 import { changesForAnswer, questionFor } from './questions';
 
 describe('format', () => {
@@ -25,6 +25,15 @@ describe('format', () => {
   it('round-trips cents through the input text', () => {
     for (const cents of [0, 5, 120050, 80000]) expect(parseDollarsToCents(centsToInput(cents))).toBe(cents);
     expect(centsToInput(null)).toBe('');
+  });
+
+  it('parses percentages to exact basis points', () => {
+    expect(parsePercentToBps('80')).toBe(8000);
+    expect(parsePercentToBps('80%')).toBe(8000);
+    expect(parsePercentToBps('62.5')).toBe(6250);
+    expect(parsePercentToBps('100')).toBe(10000);
+    expect(parsePercentToBps('0')).toBe(0);
+    for (const bad of ['', '100.01', '101', '-5', '12.345', 'abc']) expect(parsePercentToBps(bad)).toBeNull();
   });
 
   it('formats rates and date-only values without time-zone shifts', () => {

@@ -69,7 +69,7 @@ export function AgentOrb({ size = 170, mode = 'idle' }: { size?: number; mode?: 
     ));
 
   return (
-    <View style={{ width: size, height: size }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <View style={{ width: size, height: size }} aria-hidden>
       <Svg viewBox="0 0 200 200" width={size} height={size} style={fill}>
         <Defs>
           <RadialGradient id={`orbCore-${amber ? 'a' : 'g'}`} cx="50%" cy="50%" r="50%">

@@ -16,13 +16,12 @@ import { sampleCaseRequest } from '../intake/sample-case';
 /**
  * Intake methods (design v3 "Home · multimodal start"). Voice, upload and photo need the job and
  * upload APIs, which do not exist yet, so they are shown as unavailable rather than simulated.
- * Typing is enabled once the manual-entry screen lands.
  */
 const METHODS: { id: 'speak' | 'upload' | 'photo' | 'type'; label: string; Icon: LucideIcon; available: boolean }[] = [
   { id: 'speak', label: 'Speak', Icon: Mic, available: false },
   { id: 'upload', label: 'Upload', Icon: Upload, available: false },
   { id: 'photo', label: 'Take photo', Icon: Camera, available: false },
-  { id: 'type', label: 'Type', Icon: Keyboard, available: false },
+  { id: 'type', label: 'Type', Icon: Keyboard, available: true },
 ];
 
 const STEPS = [
@@ -83,13 +82,8 @@ function HomeBody() {
             <MethodButton key={method.id} method={method} />
           ))}
         </View>
-        {anyUnavailable ? (
-          <AppText variant="caption" muted>
-            Speaking, uploading, photos and typing aren’t connected yet. Try the sample to see a live estimate.
-          </AppText>
-        ) : null}
         <AppText variant="caption" muted>
-          Photos are for documents like estimates and statements, not your teeth.
+          {anyUnavailable ? 'Speaking, uploading and photos are coming soon. ' : ''}Photos are for documents like estimates, not your teeth.
         </AppText>
       </View>
 
@@ -126,8 +120,7 @@ function HomeBody() {
           <View key={title} style={{ flexDirection: 'row', gap: space(3), alignItems: 'flex-start' }}>
             <View
               style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
+              aria-hidden
             >
               <AppText variant="label" color={colors.primary} style={{ fontFamily: fonts.bold }}>
                 {String(index + 1)}
@@ -155,10 +148,12 @@ function MethodButton({ method, large = false }: { method: (typeof METHODS)[numb
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={available ? label : `${label}, not available yet`}
+      accessibilityLabel={available ? label : `${label}, coming soon`}
       accessibilityState={{ disabled: !available }}
       disabled={!available}
-      onPress={() => undefined}
+      onPress={() => {
+        if (method.id === 'type') router.push('/case/new');
+      }}
       style={({ pressed }) => ({
         flex: large ? undefined : 1,
         minHeight: large ? layout.minHitArea + 12 : layout.minHitArea + 32,
@@ -181,7 +176,7 @@ function MethodButton({ method, large = false }: { method: (typeof METHODS)[numb
       </AppText>
       {available ? null : (
         <AppText variant="caption" muted style={{ fontSize: 11, lineHeight: 14 }}>
-          Not available yet
+          Coming soon
         </AppText>
       )}
     </Pressable>

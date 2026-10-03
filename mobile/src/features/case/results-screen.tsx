@@ -147,7 +147,7 @@ export function ResultsScreen() {
             <Notice tone="info" title="Limits of this comparison" body={comparison.limitations.map((l) => l.message).join('\n')} />
           ) : null}
           <AppText variant="caption" muted>
-            Estimates only. Your dentist and insurer decide final costs. Engine {estimate.engineVersion} · revision {estimate.caseRevision}
+            Estimates only. Your dentist and insurer decide final costs.
           </AppText>
         </>
       ) : null}

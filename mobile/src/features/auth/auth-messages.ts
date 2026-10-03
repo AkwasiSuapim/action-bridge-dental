@@ -36,7 +36,7 @@ export function signInErrorView(error: unknown): SignInErrorView {
       return {
         kind: 'invalid',
         tone: 'danger',
-        message: 'That email and password don’t match. Try again, or ask your team admin to reset your password.',
+        message: 'That email and password don’t match. Try again.',
       };
     }
     if (error.code === 'NETWORK') {
