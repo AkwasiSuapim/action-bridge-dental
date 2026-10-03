@@ -8,10 +8,13 @@ import { createCognitoClient, type SignInResult, type Tokens } from './cognito';
  * the access token lives in memory. Signing out clears both and revokes the refresh token.
  */
 type Status = 'loading' | 'signed_out' | 'signed_in';
+/** Why the user is signed out, so Welcome can say so. Null on a fresh start. */
+export type SignedOutReason = 'expired' | 'signed_out' | null;
 
 interface AuthValue {
   status: Status;
   email: string | null;
+  signedOutReason: SignedOutReason;
   signIn(email: string, password: string): Promise<SignInResult>;
   completeNewPassword(email: string, newPassword: string, session: string): Promise<void>;
   signOut(): Promise<void>;
@@ -29,13 +32,15 @@ export function AuthProvider({ config, children }: { config: AppConfig; children
   const cognito = useMemo(() => createCognitoClient({ region: config.cognitoRegion, clientId: config.cognitoClientId }), [config]);
   const [status, setStatus] = useState<Status>('loading');
   const [email, setEmail] = useState<string | null>(null);
+  const [signedOutReason, setSignedOutReason] = useState<SignedOutReason>(null);
   const tokens = useRef<Tokens | null>(null);
   const refreshing = useRef<Promise<Tokens | null> | null>(null);
 
-  const clear = useCallback(async () => {
+  const clear = useCallback(async (reason: SignedOutReason) => {
     tokens.current = null;
     await Promise.all([SecureStore.deleteItemAsync(REFRESH_KEY), SecureStore.deleteItemAsync(EMAIL_KEY)]);
     setEmail(null);
+    setSignedOutReason(reason);
     setStatus('signed_out');
   }, []);
 
@@ -43,6 +48,7 @@ export function AuthProvider({ config, children }: { config: AppConfig; children
     tokens.current = next;
     await Promise.all([SecureStore.setItemAsync(REFRESH_KEY, next.refreshToken), SecureStore.setItemAsync(EMAIL_KEY, who)]);
     setEmail(who);
+    setSignedOutReason(null);
     setStatus('signed_in');
   }, []);
 
@@ -56,7 +62,8 @@ export function AuthProvider({ config, children }: { config: AppConfig; children
           tokens.current = next;
           return next;
         } catch {
-          await clear();
+          // A stored session that can no longer be refreshed has expired.
+          await clear('expired');
           return null;
         }
       })().finally(() => {
@@ -88,6 +95,7 @@ export function AuthProvider({ config, children }: { config: AppConfig; children
   const value: AuthValue = {
     status,
     email,
+    signedOutReason,
     async signIn(who, password) {
       const result = await cognito.signIn(who.trim(), password);
       if (result.kind === 'signed_in') await accept(result.tokens, who.trim());
@@ -99,7 +107,7 @@ export function AuthProvider({ config, children }: { config: AppConfig; children
     async signOut() {
       const refreshToken = tokens.current?.refreshToken;
       if (refreshToken) await cognito.revoke(refreshToken);
-      await clear();
+      await clear('signed_out');
     },
     getAccessToken,
   };
