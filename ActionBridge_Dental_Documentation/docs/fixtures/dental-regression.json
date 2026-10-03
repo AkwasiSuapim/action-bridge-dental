@@ -1,0 +1,138 @@
+{
+  "fixtureId": "dental-regression-v1",
+  "schemaVersion": 1,
+  "synthetic": true,
+  "currency": "USD",
+  "warning": "Fictional acceptance data. Not Lincoln plan terms, FAIR Health prices, medical advice, or a guaranteed payment estimate.",
+  "caseRevision": 1,
+  "policy": {
+    "id": "fictional-individual-ppo-v1",
+    "deductibleBeforeCoinsurance": true,
+    "deductibleAppliesByCategory": { "basic": true, "major": true },
+    "insurerRateBpsByCategory": { "basic": 8000, "major": 5000 },
+    "annualMaximumAppliesByCategory": { "basic": true, "major": true },
+    "rounding": "half_up_to_cent",
+    "allServicesCovered": true,
+    "waitingPeriods": [],
+    "exclusions": [],
+    "frequencyRestrictions": [],
+    "notes": "No unsupported family, lifetime, copay, alternate-benefit or coordination-of-benefits rules in this fixture."
+  },
+  "planYears": {
+    "2026": {
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "annualMaximumCents": 80000,
+      "insurerAlreadyPaidCents": 50000,
+      "annualDeductibleCents": 5000,
+      "deductibleAlreadyMetCents": 0,
+      "sourceStatus": "synthetic_confirmed_input"
+    },
+    "2027": {
+      "startDate": "2027-01-01",
+      "endDate": "2027-12-31",
+      "annualMaximumCents": 80000,
+      "insurerAlreadyPaidCents": 0,
+      "annualDeductibleCents": 5000,
+      "deductibleAlreadyMetCents": 0,
+      "sourceStatus": "explicit_unchanged_plan_assumption"
+    }
+  },
+  "procedures": [
+    {
+      "id": "filling-1",
+      "label": "Filling one",
+      "category": "basic",
+      "network": "in",
+      "providerChargeCents": 25000,
+      "allowedCents": 25000,
+      "contractualWriteoffCents": 0,
+      "dentistEarliestDate": "2026-11-10",
+      "dentistLatestDate": "2026-11-10",
+      "timingSource": "fictional_dentist_instruction",
+      "prerequisiteIds": []
+    },
+    {
+      "id": "filling-2",
+      "label": "Filling two",
+      "category": "basic",
+      "network": "in",
+      "providerChargeCents": 25000,
+      "allowedCents": 25000,
+      "contractualWriteoffCents": 0,
+      "dentistEarliestDate": "2026-11-11",
+      "dentistLatestDate": "2026-11-11",
+      "timingSource": "fictional_dentist_instruction",
+      "prerequisiteIds": []
+    },
+    {
+      "id": "crown-1",
+      "label": "Crown",
+      "category": "major",
+      "network": "in",
+      "providerChargeCents": 100000,
+      "allowedCents": 100000,
+      "contractualWriteoffCents": 0,
+      "dentistEarliestDate": "2026-11-12",
+      "dentistLatestDate": "2027-01-15",
+      "timingSource": "fictional_dentist_confirmed_window",
+      "prerequisiteIds": []
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "baseline",
+      "schedule": [
+        { "procedureId": "filling-1", "date": "2026-11-10" },
+        { "procedureId": "filling-2", "date": "2026-11-11" },
+        { "procedureId": "crown-1", "date": "2026-11-12" }
+      ],
+      "expected": {
+        "providerChargeCents": 150000,
+        "insurerPaysCents": 30000,
+        "patientPaysCents": 120000,
+        "contractualWriteoffCents": 0,
+        "lines": [
+          { "procedureId": "filling-1", "deductibleAppliedCents": 5000, "insurerPaysCents": 16000, "patientPaysCents": 9000 },
+          { "procedureId": "filling-2", "deductibleAppliedCents": 0, "insurerPaysCents": 14000, "patientPaysCents": 11000 },
+          { "procedureId": "crown-1", "deductibleAppliedCents": 0, "insurerPaysCents": 0, "patientPaysCents": 100000 }
+        ],
+        "yearProjections": {
+          "2026": { "scenarioInsurerPaysCents": 30000, "projectedTotalInsurerPaidCents": 80000, "remainingMaximumCents": 0 }
+        }
+      }
+    },
+    {
+      "id": "split-across-reset",
+      "schedule": [
+        { "procedureId": "filling-1", "date": "2026-11-10" },
+        { "procedureId": "filling-2", "date": "2026-11-11" },
+        { "procedureId": "crown-1", "date": "2027-01-10" }
+      ],
+      "expected": {
+        "providerChargeCents": 150000,
+        "insurerPaysCents": 77500,
+        "patientPaysCents": 72500,
+        "contractualWriteoffCents": 0,
+        "differenceFromBaselineCents": 47500,
+        "lines": [
+          { "procedureId": "filling-1", "deductibleAppliedCents": 5000, "insurerPaysCents": 16000, "patientPaysCents": 9000 },
+          { "procedureId": "filling-2", "deductibleAppliedCents": 0, "insurerPaysCents": 14000, "patientPaysCents": 11000 },
+          { "procedureId": "crown-1", "deductibleAppliedCents": 5000, "insurerPaysCents": 47500, "patientPaysCents": 52500 }
+        ],
+        "yearProjections": {
+          "2026": { "scenarioInsurerPaysCents": 30000, "projectedTotalInsurerPaidCents": 80000, "remainingMaximumCents": 0 },
+          "2027": { "scenarioInsurerPaysCents": 47500, "projectedTotalInsurerPaidCents": 47500, "remainingMaximumCents": 32500 }
+        }
+      }
+    }
+  ],
+  "assumptions": [
+    "All figures and clinical timing instructions are fictional.",
+    "Billed equals allowed for these covered in-network procedures.",
+    "No other benefit claims consume the modeled balances.",
+    "2027 coverage and prices remain unchanged; this is an assumption, not a verified renewal.",
+    "The crown window is explicitly supplied by a fictional dentist; the model cannot create one.",
+    "Saving either scenario does not change reported insurer-paid usage."
+  ]
+}
