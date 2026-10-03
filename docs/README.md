@@ -14,9 +14,10 @@ This is a **documentation and implementation-planning package**, not a rebuilt a
 | [03_STACK_AWS_SETUP.md](03_STACK_AWS_SETUP.md) | Accounts, AWS setup, data acquisition, official links and deployment checks | AWS and data owners |
 | [04_MOBILE_UI_AND_EXPO.md](04_MOBILE_UI_AND_EXPO.md) | Screen migration, generative UI, data presentation, Expo setup and device QA | Mobile, design, QA |
 | [dental-regression.json](fixtures/dental-regression.json) | Explicitly fictional, numerically checked acceptance fixture (v2, see D-01/D-03) | Calculator, API and UI tests |
+| [05_INSURANCE_VOICE_UPGRADE.md](05_INSURANCE_VOICE_UPGRADE.md) | Upgrade: insured/self-pay comparison, coverage review, adaptive answers, voice and camera input, Cognito; U-01–U-09 | Everyone |
 | [DECISIONS.md](DECISIONS.md) | Technical decisions, Phase 0 register and organizer clarification log | Everyone |
 
-The five documents replace the generic referral-oriented planning documents for the Dental build. Do not mix old referral endpoints with the Dental contracts in this package. The current `DENTALPATH_BUILD_SPEC.md` was reviewed and reconciled: **ActionBridge Dental** is the chosen product name; its clinically constrained calculation principles are retained. Where deployment and reminder options differed, this package records the chosen target and explicit fallback instead of promising both paths.
+Documents 00–04 replace the generic referral-oriented planning documents for the Dental build; document 05 amends selected priorities and contracts (see D-10 to D-13 in DECISIONS.md). Do not mix old referral endpoints with the Dental contracts in this package. The current `DENTALPATH_BUILD_SPEC.md` was reviewed and reconciled: **ActionBridge Dental** is the chosen product name; its clinically constrained calculation principles are retained. Where deployment and reminder options differed, this package records the chosen target and explicit fallback instead of promising both paths.
 
 ## Decisions to keep stable
 

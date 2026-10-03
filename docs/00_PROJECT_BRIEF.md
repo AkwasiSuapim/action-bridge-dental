@@ -41,7 +41,8 @@ The original ActionBridge structure remains useful: intake, clarification, progr
 | Core challenge, P0 | Manual/text intake; confirmed plan fields; itemized cost estimate; clinically constrained two-year comparison; sources/assumptions; phone-to-AWS integration | Nothing in this row without recording a core gap |
 | Distinctive agent/UI, P0 | Bedrock-assisted understanding; actual tool calls; adaptive questions; real progress; cost reconciliation; evidence drawer | Voice, elaborate motion and decorative visual effects |
 | Bonuses, P1 | Annual benefit tracker, like-for-like network comparison, one opt-in reminder path | Finish individually; never advertise unfinished bonuses |
-| Stretch, P2 | Robust multi-page extraction, camera capture, voice, richer export, Expo Web | Cut first when a core gate is at risk |
+| Requested input scope (doc 05) | Voice recognition (U-07), then document upload and camera capture (U-06); insured/self-pay comparison (U-02) | Each integration is timeboxed with a typed fallback; if blocked, report it as incomplete rather than cut silently |
+| Stretch, P2 | Robust multi-page extraction, richer export, spoken responses, Expo Web | Cut first when a core gate is at risk |
 
 Prefer one documented plan and three procedures. Expand to a maximum of six procedures over two benefit years only after tests pass. Unsupported plan structures must return an explicit limitation rather than approximate silently. Do not build a general insurer marketplace, provider search engine, payment service, or appointment-booking product.
 
