@@ -11,8 +11,8 @@ Start with [docs/README.md](docs/README.md). Decisions and Phase 0 status are in
 | `docs/` | Brief, system design, build plan, AWS and mobile guides, regression fixture | Current |
 | `packages/contracts/` | Zod runtime schemas and shared types: case, plan years, procedures, provenance, estimates, scenarios, jobs, UI blocks, errors | Implemented (T1-02) |
 | `packages/benefits-engine/` | Pure integer-cent calculator and bounded schedule comparison | Implemented (Phase 2) |
-| `backend/` | Lambda handlers, application services, DynamoDB adapter, local server, smoke test — see [backend/README.md](backend/README.md) | Phase 3 implemented locally; agent (Phase 5) not started |
-| `infra/` | SAM template: HTTP API, three Lambdas, DynamoDB | Written and linted; not deployed |
+| `backend/` | Lambda handlers, application services, DynamoDB adapter, local server, smoke test — see [backend/README.md](backend/README.md) | Phase 3 deployed and verified live; agent (Phase 5) not started |
+| `infra/` | SAM template: HTTP API + Cognito JWT authorizer, three Lambdas, DynamoDB; live smoke script | Deployed to Ohio (`actionbridge-dental-dev`), live smoke 10/10 |
 | `mobile/` | Expo React Native app | Not started (Phase 4) |
 
 ## Commands
