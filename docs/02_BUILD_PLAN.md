@@ -214,7 +214,15 @@ Use one row per verified task; leave empty until evidence exists.
 
 | Task | Owner | Status | Commit/build | Test/device/evidence | Remaining issue |
 |---|---|---|---|---|---|
-| Unassigned | Assign before work | not_started | — | — | — |
+| T0-01…T0-06 | Assign before work | see [DECISIONS.md](DECISIONS.md) | — | — | Human tasks; T0-06 technical scope decided |
+| T1-01 | — | blocked | — | Original ZIP/starter not in this repo | Depends on T0-01 reuse answer (D-04) |
+| T1-02 | Unassigned; coding assistant implemented | verified | branch `feat/phase0-1-contracts-engine` | `npm run check` 2026-10-03, Node 24.21: `contracts/test/schemas.test.ts` — fixture parses; Q-12 rejections; nulls stay null; strict unknown-field rejection; UI blocks; job view; error envelope | Mobile and backend adapters not yet consuming it |
+| T1-03 | Unassigned; coding assistant implemented | in_progress | same | `boundaries.test.ts`: engine imports only contracts, no clock/randomness/env; contracts import only zod | `mobile/`, `backend/`, `infra/` not yet created |
+| T1-04 | — | not_started | — | — | Needs mobile/backend adapters |
+| T1-05 | Unassigned; coding assistant implemented | in_progress | same | Nested envelope, HTTP mapping (D-02), `Idempotency-Key`, bounded jittered retry policy tested | Adapter contract tests once adapters exist |
+| T1-06 | — | not_started | — | — | Mobile app not in repo |
+| T2-01…T2-05, T2-07 | Unassigned; coding assistant implemented | verified | same | 87/87 tests: Q-02–Q-11, Q-13, Q-17, contradictions → `invalid`; engine version and case revision on every result | Q-14–Q-16, Q-18+ belong to API/agent/UI phases |
+| T2-06 | Unassigned; coding assistant implemented | verified (automated) | same | `fixture.test.ts`: 120000 / 72500 / 47500 cents, every line, year and remaining balance | **Phase 2 exit needs a human reviewer to check the arithmetic independently** |
 
 For a new organizer requirement, record: time, exact clarification, authority, affected CH/BN IDs, contract/UI/backend impact, scope cut to pay for it, tests to rerun and approver. Protect the main workflow instead of adding an unbounded feature.
 

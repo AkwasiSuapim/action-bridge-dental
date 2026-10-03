@@ -141,7 +141,7 @@ Example question payload, illustrative target contract:
     {
       "id": "q-benefits-paid",
       "type": "money_input",
-      "fieldPath": "planYears.2026.insurerAlreadyPaidCents",
+      "fieldPath": "planYears.py-2026.insurerAlreadyPaidCents",
       "label": "How much has your insurer paid this benefit year?",
       "helperText": "Use the current plan balance if available, not the dentist's total charges.",
       "currency": "USD",

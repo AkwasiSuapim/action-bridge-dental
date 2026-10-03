@@ -8,12 +8,13 @@ This is a **documentation and implementation-planning package**, not a rebuilt a
 
 | File | Purpose | Main reader |
 |---|---|---|
-| [00_PROJECT_BRIEF.md](docs/00_PROJECT_BRIEF.md) | Problem, human story, scope, challenge and judging alignment | Everyone |
-| [01_SYSTEM_DESIGN.md](docs/01_SYSTEM_DESIGN.md) | Source audit, target architecture, contracts, calculation and data model | Backend, agent, mobile |
-| [02_BUILD_PLAN.md](docs/02_BUILD_PLAN.md) | Task IDs, dependencies, phase requirements, tests and release gates | Team lead and all implementers |
-| [03_STACK_AWS_SETUP.md](docs/03_STACK_AWS_SETUP.md) | Accounts, AWS setup, data acquisition, official links and deployment checks | AWS and data owners |
-| [04_MOBILE_UI_AND_EXPO.md](docs/04_MOBILE_UI_AND_EXPO.md) | Screen migration, generative UI, data presentation, Expo setup and device QA | Mobile, design, QA |
-| [dental-regression.json](docs/fixtures/dental-regression.json) | Explicitly fictional, numerically checked acceptance fixture | Calculator, API and UI tests |
+| [00_PROJECT_BRIEF.md](00_PROJECT_BRIEF.md) | Problem, human story, scope, challenge and judging alignment | Everyone |
+| [01_SYSTEM_DESIGN.md](01_SYSTEM_DESIGN.md) | Source audit, target architecture, contracts, calculation and data model | Backend, agent, mobile |
+| [02_BUILD_PLAN.md](02_BUILD_PLAN.md) | Task IDs, dependencies, phase requirements, tests and release gates | Team lead and all implementers |
+| [03_STACK_AWS_SETUP.md](03_STACK_AWS_SETUP.md) | Accounts, AWS setup, data acquisition, official links and deployment checks | AWS and data owners |
+| [04_MOBILE_UI_AND_EXPO.md](04_MOBILE_UI_AND_EXPO.md) | Screen migration, generative UI, data presentation, Expo setup and device QA | Mobile, design, QA |
+| [dental-regression.json](fixtures/dental-regression.json) | Explicitly fictional, numerically checked acceptance fixture (v2, see D-01/D-03) | Calculator, API and UI tests |
+| [DECISIONS.md](DECISIONS.md) | Technical decisions, Phase 0 register and organizer clarification log | Everyone |
 
 The five documents replace the generic referral-oriented planning documents for the Dental build. Do not mix old referral endpoints with the Dental contracts in this package. The current `DENTALPATH_BUILD_SPEC.md` was reviewed and reconciled: **ActionBridge Dental** is the chosen product name; its clinically constrained calculation principles are retained. Where deployment and reminder options differed, this package records the chosen target and explicit fallback instead of promising both paths.
 

@@ -1,0 +1,22 @@
+{
+  "name": "actionbridge-dental",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "build": "tsc -b packages/contracts packages/benefits-engine",
+    "typecheck": "tsc -b packages/contracts packages/benefits-engine && tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
+  }
+}
