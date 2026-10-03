@@ -1,26 +1,22 @@
 import type { EstimateResult, ScenarioComparisonResult } from '@actionbridge/contracts';
-import { Redirect } from 'expo-router';
 import { useState } from 'react';
-import { AppText, Badge, Button, Card, Gap, Notice, Row, Screen } from '../components/ui';
-import { useAuth } from '../features/auth/auth-context';
-import { sampleCaseRequest } from '../features/intake/sample-case';
-import { formatCents } from '../lib/format';
-import { ApiError } from '../services/api';
-import { useApi } from '../services/api-context';
+import { AppText, Badge, Button, Card, Gap, Notice, Row, Screen } from '../../components/ui';
+import { useAuth } from '../auth/auth-context';
+import { sampleCaseRequest } from '../intake/sample-case';
+import { formatCents } from '../../lib/format';
+import { ApiError } from '../../services/api';
+import { useApi } from '../../services/api-context';
 
 /**
- * Foundation home screen: proves the signed-in phone → live AWS API → engine path with the
- * synthetic fixture. The team's full UI replaces this screen; the services it uses stay.
+ * Live sample check: proves the signed-in phone → live AWS API → engine path with the synthetic
+ * fixture. Temporary destination of Home's "Try a sample" until the facts review screen lands.
  */
-export default function HomeScreen() {
+export function SampleCheckScreen() {
   const auth = useAuth();
   const api = useApi();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [result, setResult] = useState<{ caseId: string; estimate: EstimateResult; scenarios: ScenarioComparisonResult } | null>(null);
-
-  if (auth.status === 'loading') return <Screen><AppText muted>Restoring your session…</AppText></Screen>;
-  if (auth.status === 'signed_out') return <Redirect href="/welcome" />;
 
   const runSample = async () => {
     setBusy(true);
@@ -31,7 +27,7 @@ export default function HomeScreen() {
       setResult({ caseId, estimate, scenarios });
     } catch (caught) {
       setError(caught instanceof ApiError ? caught : new ApiError('INTERNAL', 'Something went wrong. Try again.'));
-      if (caught instanceof ApiError && caught.code === 'UNAUTHENTICATED') await auth.signOut();
+      if (caught instanceof ApiError && caught.code === 'UNAUTHENTICATED') await auth.signOut('expired');
     } finally {
       setBusy(false);
     }
@@ -41,9 +37,6 @@ export default function HomeScreen() {
 
   return (
     <Screen>
-      <AppText variant="title">Welcome back</AppText>
-      <AppText muted>Signed in as {auth.email}</AppText>
-
       <Card>
         <Badge label="Synthetic sample" tone="info" />
         <AppText variant="heading">Live connection check</AppText>
@@ -82,8 +75,6 @@ export default function HomeScreen() {
           </AppText>
         </Card>
       ) : null}
-
-      <Button label="Sign out" variant="ghost" onPress={() => auth.signOut()} />
     </Screen>
   );
 }

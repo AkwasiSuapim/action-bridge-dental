@@ -14,7 +14,6 @@ import { AuthProvider } from '../features/auth/auth-context';
 import { appConfig } from '../lib/config';
 import { ApiProvider } from '../services/api-context';
 import { ThemeProvider, useTheme } from '../theme/theme';
-import { fonts } from '../theme/tokens';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -50,18 +49,10 @@ function Root() {
     <AuthProvider config={appConfig.config}>
       <ApiProvider config={appConfig.config}>
         <StatusBar style={dark ? 'light' : 'dark'} />
-        <Stack
-          screenOptions={{
-            headerStyle: { backgroundColor: colors.background },
-            headerTintColor: colors.text,
-            headerTitleStyle: { fontFamily: fonts.semibold },
-            headerShadowVisible: false,
-            contentStyle: { backgroundColor: colors.background },
-          }}
-        >
-          <Stack.Screen name="index" options={{ title: 'ActionBridge Dental' }} />
-          <Stack.Screen name="welcome" options={{ headerShown: false, animation: 'fade' }} />
-          <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+          <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
+          <Stack.Screen name="sign-in" />
+          <Stack.Screen name="(app)" options={{ animation: 'fade' }} />
         </Stack>
       </ApiProvider>
     </AuthProvider>

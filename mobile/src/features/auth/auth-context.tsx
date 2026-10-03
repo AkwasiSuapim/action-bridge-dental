@@ -17,7 +17,8 @@ interface AuthValue {
   signedOutReason: SignedOutReason;
   signIn(email: string, password: string): Promise<SignInResult>;
   completeNewPassword(email: string, newPassword: string, session: string): Promise<void>;
-  signOut(): Promise<void>;
+  /** `expired` when the API rejected the session (Welcome then says so); defaults to a deliberate sign-out. */
+  signOut(reason?: 'signed_out' | 'expired'): Promise<void>;
   /** A valid access token, refreshed when within a minute of expiry; signs out if refresh fails. */
   getAccessToken(): Promise<string | null>;
 }
@@ -104,10 +105,10 @@ export function AuthProvider({ config, children }: { config: AppConfig; children
     async completeNewPassword(who, newPassword, session) {
       await accept(await cognito.completeNewPassword(who.trim(), newPassword, session), who.trim());
     },
-    async signOut() {
+    async signOut(reason = 'signed_out') {
       const refreshToken = tokens.current?.refreshToken;
       if (refreshToken) await cognito.revoke(refreshToken);
-      await clear('signed_out');
+      await clear(reason);
     },
     getAccessToken,
   };
