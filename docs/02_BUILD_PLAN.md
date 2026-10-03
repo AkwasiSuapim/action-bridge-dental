@@ -12,6 +12,8 @@ Assign a named owner to each phase/task before starting. Roles below are respons
 - Never check a task off because a coding assistant generated files. Run the relevant verification and record the result.
 - Status vocabulary: `not_started`, `in_progress`, `blocked`, `verified`, `cut`. “Cut” must not be marketed as implemented.
 
+Upgrade tasks U-01–U-09 are defined in [05_INSURANCE_VOICE_UPGRADE.md](05_INSURANCE_VOICE_UPGRADE.md) §7 and logged in section 14 below; they amend priorities but do not replace these phases.
+
 Documentation work completed in this package: [x] source audit; [x] Dental scope and story; [x] architecture/contracts proposal; [x] phased acceptance plan; [x] mobile/Expo and AWS/data guidance. No Dental implementation task is completed by writing these documents.
 
 ## 2. Dependency order and time discipline
@@ -85,7 +87,7 @@ Owner: Cloud + Domain. Requirement: phone sends actual input to actual backend a
 |---|---|---|
 | T3-01 | P0 | Implement Dental create/read/update case and estimate/scenario routes; persist owner/revision; reject stale edits |
 | T3-02 | P0 | Extend SAM only for needed routes, roles and storage. Validate/build locally, deploy a named demo stage and capture non-secret outputs |
-| T3-03 | P0 | Add managed authentication/authorization or isolated synthetic-only demo controls. Check case, job, document and ledger ownership at every lookup |
+| T3-03 | P0 | Add managed authentication/authorization (Cognito, U-03; D-10) or isolated synthetic-only demo controls. Check case, job, document and ledger ownership at every lookup |
 | T3-04 | P0 | Connect a physical phone with mocks disabled. Run regression inputs, change prior benefit usage, and confirm newly calculated values from AWS |
 | T3-05 | P0 | Show offline, incomplete input, timeout, rate limit and API error correctly; correlation IDs are visible in diagnostic UI/logs without exposing data |
 
@@ -133,9 +135,9 @@ Owner: Domain + Mobile + Cloud. Complete each selected addition end to end; cut 
 | T6-02 | P1 | Finish annual maximum tracker: reported paid, planned projection and remaining by year; replace selected scenario rather than accumulate every comparison |
 | T6-03 | P1 | Implement network comparison only when required allowed amounts/rates are supplied. Otherwise show unavailable/conditional result without pretending provider lookup |
 | T6-04 | P1 | Implement one opt-in reminder channel, cancellation and evidence of real delivery. Default local notification for speed; EventBridge plus channel only if verified and worth the integration |
-| T6-05 | P2 | Implement private upload, input limits, ownership, S3, supported text/OCR processing and extracted-field review. Unreadable documents fall back to manual entry |
+| T6-05 | Requested (U-06) | Implement private upload, camera capture, input limits, ownership, S3, supported text/OCR processing and extracted-field review. Unreadable documents fall back to manual entry |
 | T6-06 | P2 | Implement share/export through device share sheet with preview and field selection. “Share sheet opened” is not “delivered to dentist” |
-| T6-07 | P2 | Replace voice mock with permission-aware audio/transcription only after typed input passes; retain typed fallback |
+| T6-07 | Requested (U-07) | Replace voice mock with permission-aware recording and Amazon Transcribe for intake and follow-up answers; editable transcript; retain typed fallback |
 
 **Exit:** stored strategy survives reload; all enabled additions have measured proof. Local reminder fallback is a deliberate design decision, not an invisible claim of EventBridge execution.
 
@@ -226,6 +228,7 @@ Use one row per verified task; leave empty until evidence exists.
 | T3-01 | Unassigned; coding assistant implemented | verified (local) | same | `backend/test/api.test.ts` (in-memory store): create/read/patch, owner + revision persisted, stale and concurrent edits → 409, estimate/scenarios with fixture values, `needs_information`/`unsupported` 200, contradictions 422. Bundled local server: `npm run smoke` 9/9 PASS over HTTP, 2026-10-03 | Not yet run against DynamoDB in AWS |
 | T3-02 | Unassigned; coding assistant implemented | in_progress | same | `infra/template.yaml`: table with TTL/SSE, throttled HTTP API, three least-privilege Lambdas, 7-day log retention. `cfn-lint 1.57.1` (includes SAM transform): no findings | **Not deployed.** Needs SAM CLI, AWS account/Region (T0-04), `sam validate`, deploy and output capture |
 | T3-03 | Unassigned; coding assistant implemented | in_progress | same | Owner in every key and lookup; wrong-owner read/edit/estimate/scenarios → 404; demo device ID required; JWT `sub` mode tested; owner IDs URL-encoded in keys | Demo mode only in template (D-07); JWT authorizer/Cognito not configured |
+| U-01–U-09 | — | not_started | — | — | See doc 05 §7 and D-10–D-13 |
 | T3-04 | — | not_started | — | — | Needs deployed stage and physical phone with mocks disabled; mobile app not yet in repo |
 | T3-05 | Unassigned; coding assistant implemented | in_progress | same | Server side: 400 with field issues, oversized body, unknown route/malformed ID 404, generic 500 without internal detail, `x-request-id` = envelope `requestId`, logs limited to IDs/status/timing (tested) | Mobile offline/timeout/rate-limit display belongs to Phase 4 |
 
