@@ -4,9 +4,18 @@
 const path = require('path');
 const { getDefaultConfig } = require('expo/metro-config');
 
+const fs = require('fs');
+
 const config = getDefaultConfig(__dirname);
 const contracts = path.resolve(__dirname, '../packages/contracts');
 const fixtures = path.resolve(__dirname, '../docs/fixtures');
+
+if (!fs.existsSync(path.join(contracts, 'dist/index.js'))) {
+  throw new Error(
+    'Shared contracts are not built yet. From the repository root run: npm ci && npm run build ' +
+      '(or `npm run setup`), then start Expo again.',
+  );
+}
 
 config.watchFolders = [...(config.watchFolders ?? []), contracts, fixtures];
 

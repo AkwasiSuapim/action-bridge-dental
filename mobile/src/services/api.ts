@@ -4,12 +4,15 @@ import {
   DentalCaseSchema,
   ErrorEnvelopeSchema,
   EstimateResultSchema,
+  LedgerPageSchema,
   RETRY_POLICY,
   retryDelayMs,
+  SaveStrategyResponseSchema,
   ScenarioComparisonResultSchema,
   type CreateCaseRequest,
   type ErrorIssue,
   type PatchCaseRequest,
+  type SaveStrategyRequest,
 } from '@actionbridge/contracts';
 import type { z } from 'zod';
 
@@ -61,7 +64,13 @@ export function createApiClient({
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   random = Math.random,
 }: ApiClientOptions) {
-  async function once<S extends z.ZodType>(method: string, path: string, schema: S, body?: unknown): Promise<z.infer<S>> {
+  async function once<S extends z.ZodType>(
+    method: string,
+    path: string,
+    schema: S,
+    body?: unknown,
+    extraHeaders: Record<string, string> = {},
+  ): Promise<z.infer<S>> {
     const token = await getAccessToken();
     if (!token) throw new ApiError('UNAUTHENTICATED', 'Your session ended. Sign in again.');
 
@@ -71,7 +80,7 @@ export function createApiClient({
     try {
       response = await fetchImpl(`${baseUrl}${path}`, {
         method,
-        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', ...extraHeaders },
         signal: controller.signal,
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
@@ -137,6 +146,14 @@ export function createApiClient({
       once('POST', `${casePath(caseId)}/scenarios`, ScenarioComparisonResultSchema, { expectedRevision }),
     coverageComparison: (caseId: string, expectedRevision: number) =>
       once('POST', `${casePath(caseId)}/coverage-comparison`, CoverageComparisonSchema, { expectedRevision }),
+    /**
+     * Create the idempotency key once per user action (when Save is tapped) and reuse it for
+     * retries of that action, so a double tap or a retry is one logical save.
+     */
+    saveStrategy: (caseId: string, request: SaveStrategyRequest, idempotencyKey: string) =>
+      once('POST', `${casePath(caseId)}/strategies`, SaveStrategyResponseSchema, request, { 'idempotency-key': idempotencyKey }),
+    ledger: (caseId: string, cursor?: string) =>
+      read(`${casePath(caseId)}/ledger${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`, LedgerPageSchema),
   };
 }
 

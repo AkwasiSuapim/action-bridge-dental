@@ -10,12 +10,15 @@
     "node": ">=22.13"
   },
   "scripts": {
+    "setup": "npm ci && npm run build && npm --prefix mobile ci",
     "build": "tsc -b packages/contracts packages/benefits-engine",
     "typecheck": "npm run build && tsc -p tsconfig.test.json && tsc -p backend/tsconfig.json",
     "test": "vitest run",
     "check": "npm run typecheck && npm test",
     "build:lambda": "npm run build && npm run bundle -w backend",
-    "dev:api": "npm run build:lambda && node backend/.build/local/index.mjs"
+    "dev:api": "npm run build:lambda && node backend/.build/local/index.mjs",
+    "check:mobile": "npm --prefix mobile run typecheck && npx vitest run mobile",
+    "check:all": "npm run check && npm --prefix mobile run typecheck"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
