@@ -142,6 +142,8 @@ Compare only dentist-permitted candidate dates and verified dependencies; unknow
 
 MVP algorithm: validate an acyclic dependency graph; assign at most two meaningful permitted date candidates per procedure (current/next benefit year); enumerate at most `2^6 = 64` assignments; reject invalid windows/dependency order; sort procedures by date plus stable tie-breaker; call the same calculator; de-duplicate financially equivalent results; return baseline and up to two alternatives.
 
+Candidate dates (decision D-01): a procedure's baseline date is its `proposedDate`, or `dentistEarliestDate` when no proposed date was supplied. A procedure is flexible only when a dentist-supplied window has `dentistEarliestDate < dentistLatestDate`. Its second candidate is the earliest permitted date in the next supplied plan year, `max(dentistEarliestDate, nextPlanYear.startDate)`, if that is not after `dentistLatestDate`. Within-year date shifts are not modeled. Plan years are keyed by stable plan-year IDs such as `py-2026`, never by calendar year (decision D-03).
+
 If within-year order could change modeled costs, use the supplied clinical order or explicitly declare order fixed. Do not claim global optimization over arbitrary dates/orderings. Report “lowest estimated cost among the evaluated feasible options.” A next-year plan not supplied must be an explicit unchanged-plan assumption or block that comparison. No meaningful lower-cost alternative is a valid result.
 
 ## 6. Canonical target API
@@ -167,7 +169,7 @@ Base URL includes deployment stage, for example `https://<api-id>.execute-api.<r
 | `POST /v1/reminders` | Strategy, time, channel and explicit consent → scheduling result | 6, bonus |
 | `DELETE /v1/reminders/{reminderId}` | Authorized cancellation; report confirmation or pending state | 6, bonus |
 
-Do not add plan-shopping or referral endpoints. For fresh conversational intake, create a draft case with missing values allowed, then run `interpret`; estimate endpoints reject incomplete critical inputs. Answers are authoritative only after schema validation and confirmation. Responses consistently distinguish `needs_information`, `estimated`, and `unsupported`.
+Do not add plan-shopping or referral endpoints. For fresh conversational intake, create a draft case with missing values allowed, then run `interpret`. Estimate and scenario endpoints never calculate from incomplete critical inputs (decision D-02): an incomplete case returns 200 with `status: "needs_information"` and the missing field paths; an unsupported plan structure returns 200 with `status: "unsupported"` and its limitations; schema-malformed requests return 400; well-formed but contradictory inputs (allowed above billed, deductible met above deductible, dependency cycle, overlapping plan years) return 422. Answers are authoritative only after schema validation and confirmation.
 
 Error envelope, shared by client and server:
 

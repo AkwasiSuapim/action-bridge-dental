@@ -1,0 +1,22 @@
+{
+  "name": "@actionbridge/benefits-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pure, deterministic dental benefits calculator and bounded schedule comparison. No I/O, clock, network or cloud SDKs.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@actionbridge/contracts": "0.1.0"
+  }
+}
