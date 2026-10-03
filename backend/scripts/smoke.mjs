@@ -20,6 +20,7 @@ const body = { currency: fixture.currency, policy: fixture.policy, planYears: fi
 
 const bearer = process.env.SMOKE_BEARER_TOKEN;
 const identity = (who) => {
+  if (who === 'none') return {};
   if (bearer) {
     const token = who === 'other' ? process.env.SMOKE_OTHER_BEARER_TOKEN : bearer;
     return token ? { authorization: `Bearer ${token}` } : null;
@@ -54,6 +55,9 @@ function check(name, condition, detail) {
 
 const health = await call('GET', '/health');
 check('health', health.status === 200 && health.body.status === 'ok', `engine ${health.body?.engineVersion}, ${health.ms} ms`);
+
+const anonymous = await call('POST', '/v1/cases', body, 'none');
+check('unauthenticated request rejected', anonymous.status === 401, `status ${anonymous.status}`);
 
 const created = await call('POST', '/v1/cases', body);
 check('create case', created.status === 201 && created.body.caseRevision === 1, `status ${created.status}, request ${created.requestId}`);

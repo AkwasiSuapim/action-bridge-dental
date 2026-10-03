@@ -32,21 +32,19 @@ scripts/smoke.mjs        end-to-end checks against any running API
 
 ## Authentication
 
-- **`AUTH_MODE=demo`** (current template): each device sends a random `x-demo-user-id` (16–64 letters, digits or hyphens). This isolates demo sessions from each other but is **not authentication**. Use only synthetic data; the stage is throttled (burst 20, 10 req/s).
-- **`AUTH_MODE=jwt`**: owner is the `sub` claim from an API Gateway JWT authorizer. To enable, add to `HttpApi` in `infra/template.yaml` and set `AUTH_MODE: jwt`:
+- **Deployed stages use `AUTH_MODE=jwt` with Cognito (D-10).** The HTTP API JWT authorizer checks the token's issuer and audience before any Lambda runs; the handler uses the `sub` claim as the owner. `/health` is the only unauthenticated route. Demo users are created by an admin (no public sign-up) and hold synthetic data only. Send `Authorization: Bearer <access token>`.
+- **`AUTH_MODE=demo`** is used only by the local server and tests: each device sends a random `x-demo-user-id` (16–64 letters, digits or hyphens). This isolates sessions but is **not authentication**.
 
-  ```yaml
-  Auth:
-    DefaultAuthorizer: Jwt
-    Authorizers:
-      Jwt:
-        IdentitySource: $request.header.Authorization
-        JwtConfiguration:
-          issuer: https://cognito-idp.<region>.amazonaws.com/<user-pool-id>
-          audience: [<app-client-id>]
-  ```
+## Current deployment
 
-  and give `/health` `Auth: { Authorizer: NONE }`. Required before any real document or patient data.
+| | |
+|---|---|
+| Stack / Region | `actionbridge-dental-dev`, Ohio `us-east-2`, account 195469705669 |
+| API base URL | `https://ihcdqmzc6b.execute-api.us-east-2.amazonaws.com/dev` |
+| Cognito user pool / mobile client ID | `us-east-2_in8mqQVUv` / `kcpgj90ruhsav9tin680padr4` (public, not secrets) |
+| Managed login domain | `https://actionbridge-dental-dev-195469705669.auth.us-east-2.amazoncognito.com` |
+
+Read live values any time with `aws cloudformation describe-stacks --stack-name actionbridge-dental-dev --profile actionbridge --query "Stacks[0].Outputs"`.
 
 ## Run locally (no AWS)
 
@@ -57,18 +55,32 @@ API_BASE_URL=http://localhost:3000 npm run smoke -w backend
 
 A phone cannot reach `localhost` on your laptop. Use the laptop's LAN IP on a network without client isolation.
 
-## Deploy (requires SAM CLI and an authorized AWS profile)
+## Sign in to AWS (laptop)
 
-From the repository root, after confirming the account and Region (T0-04):
+The CLI profile `actionbridge` uses `aws login` (your AWS console sign-in, temporary credentials). When it expires:
+
+```bash
+aws login --profile actionbridge --region us-east-2
+aws sts get-caller-identity --profile actionbridge
+```
+
+## Deploy
+
+From the repository root (Git Bash; in PowerShell call `sam` the same way):
 
 ```bash
 npm run build:lambda
-aws sts get-caller-identity --profile actionbridge
-sam validate --lint --template-file infra/template.yaml
-sam deploy --guided --template-file infra/template.yaml \
-  --stack-name actionbridge-dental-dev --parameter-overrides AppEnv=dev \
-  --capabilities CAPABILITY_IAM --resolve-s3 --profile actionbridge
-API_BASE_URL=<ApiBaseUrl output> npm run smoke -w backend
+sam validate --lint --template-file infra/template.yaml --region us-east-2
+# 1. Create a change set and review it (nothing is deployed yet)
+sam deploy --template-file infra/template.yaml --stack-name actionbridge-dental-dev \
+  --parameter-overrides AppEnv=dev --capabilities CAPABILITY_IAM --resolve-s3 \
+  --region us-east-2 --profile actionbridge --no-execute-changeset
+# 2. After review, deploy it
+sam deploy --template-file infra/template.yaml --stack-name actionbridge-dental-dev \
+  --parameter-overrides AppEnv=dev --capabilities CAPABILITY_IAM --resolve-s3 \
+  --region us-east-2 --profile actionbridge
+# 3. Live smoke test: creates two synthetic Cognito users with fresh random passwords (never printed)
+bash infra/scripts/smoke-aws.sh
 ```
 
-Code is pre-bundled, so `sam build` is not used. Review the IAM changes in the deploy prompt. The table uses `DeletionPolicy: Delete`: deleting the stack deletes its demo data.
+Code is pre-bundled, so `sam build` is not used. The table and user pool use `DeletionPolicy: Delete`: `sam delete --stack-name actionbridge-dental-dev --region us-east-2 --profile actionbridge` removes the stack and its demo data.
