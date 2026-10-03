@@ -36,7 +36,8 @@ export default function SignedInLayout() {
         <Stack.Screen name="case/[caseId]/rules" options={{ title: 'Plan coverage' }} />
         <Stack.Screen name="case/[caseId]/facts" options={{ title: 'Check your details' }} />
         <Stack.Screen name="case/[caseId]/edit" options={{ title: 'Update a detail' }} />
-        <Stack.Screen name="case/[caseId]/results" options={{ title: 'Your estimate' }} />
+        <Stack.Screen name="case/[caseId]/options" options={{ title: 'Your options' }} />
+        <Stack.Screen name="case/[caseId]/self-pay" options={{ title: 'Self-pay quotes', presentation: 'modal' }} />
       </Stack>
     </CaseProvider>
   );
