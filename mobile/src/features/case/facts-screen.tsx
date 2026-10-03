@@ -27,7 +27,7 @@ export function FactsScreen() {
     <Screen
       footer={
         <>
-          <Button label="Looks right — calculate estimates" onPress={() => router.push(`/case/${record.caseId}/results`)} />
+          <Button label="Looks right — calculate estimates" onPress={() => router.push(`/case/${record.caseId}/options`)} />
           <AppText variant="caption" muted style={{ textAlign: 'center' }}>
             Calculating doesn’t save a plan or share anything.
           </AppText>
