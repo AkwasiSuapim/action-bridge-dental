@@ -16,7 +16,13 @@ if (!base) {
 }
 
 const fixture = JSON.parse(await readFile(new URL('../../docs/fixtures/dental-regression.json', import.meta.url), 'utf8'));
-const body = { currency: fixture.currency, policy: fixture.policy, planYears: fixture.planYears, procedures: fixture.procedures };
+const body = {
+  currency: fixture.currency,
+  coverageMode: fixture.coverageMode,
+  policy: fixture.policy,
+  planYears: fixture.planYears,
+  procedures: fixture.procedures,
+};
 
 const bearer = process.env.SMOKE_BEARER_TOKEN;
 const identity = (who) => {
@@ -30,11 +36,11 @@ const identity = (who) => {
 const device = `smoke-${randomUUID()}`;
 const otherDevice = `smoke-${randomUUID()}`;
 
-async function call(method, path, payload, who = 'self') {
+async function call(method, path, payload, who = 'self', extraHeaders = {}) {
   const started = Date.now();
   const response = await fetch(`${base}${path}`, {
     method,
-    headers: { 'content-type': 'application/json', ...identity(who) },
+    headers: { 'content-type': 'application/json', ...identity(who), ...extraHeaders },
     ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
   });
   const text = await response.text();
@@ -95,6 +101,21 @@ check('recalculated estimate = $900.00', estimate2.body?.totals?.patientPaysCent
 
 const stale = await call('POST', `${casePath}/estimates`, { expectedRevision: 1 });
 check('stale revision rejected', stale.status === 409 && stale.body?.error?.code === 'REVISION_CONFLICT', `status ${stale.status}`);
+
+const saveKey = { 'idempotency-key': `smoke-${randomUUID()}` };
+const saveBody = { scenarioId: 'baseline', expectedRevision: 2, consent: true };
+const saved = await call('POST', `${casePath}/strategies`, saveBody, 'self', saveKey);
+check('strategy saved', saved.status === 201 && saved.body?.strategy?.scenario?.estimate?.totals?.patientPaysCents === 90000, `status ${saved.status}`);
+const replayed = await call('POST', `${casePath}/strategies`, saveBody, 'self', saveKey);
+check(
+  'repeated save is one logical save',
+  replayed.status === 200 && replayed.body?.replayed === true && replayed.body?.strategy?.strategyId === saved.body?.strategy?.strategyId,
+  `status ${replayed.status}`,
+);
+
+const ledger = await call('GET', `${casePath}/ledger`);
+const actions = ledger.body?.events?.map((e) => e.action).join(' < ') ?? '';
+check('ledger records real events', actions === 'strategy_saved < case_updated < case_created', actions || `status ${ledger.status}`);
 
 console.log(failures === 0 ? '\nAll smoke checks passed.' : `\n${failures} smoke check(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);

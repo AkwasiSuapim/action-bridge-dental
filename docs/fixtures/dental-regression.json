@@ -3,6 +3,7 @@
   "schemaVersion": 1,
   "synthetic": true,
   "currency": "USD",
+  "coverageMode": "insured",
   "warning": "Fictional acceptance data. Not Lincoln plan terms, FAIR Health prices, medical advice, or a guaranteed payment estimate.",
   "caseRevision": 1,
   "policy": {

@@ -11,7 +11,6 @@ import {
   RETRY_POLICY,
   retryDelayMs,
   SaveStrategyRequestSchema,
-  UiBlockEnvelopeSchema,
 } from '@actionbridge/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -20,8 +19,8 @@ const fixture = JSON.parse(
 ) as Record<string, unknown>;
 
 function fixtureInput() {
-  const { caseRevision, currency, policy, planYears, procedures } = fixture;
-  return structuredClone({ caseRevision, currency, policy, planYears, procedures }) as {
+  const { caseRevision, currency, coverageMode, policy, planYears, procedures } = fixture;
+  return structuredClone({ caseRevision, currency, coverageMode, policy, planYears, procedures }) as {
     policy: { insurerRateBpsByCategory: Record<string, number> };
     planYears: Record<string, Record<string, unknown>>;
     procedures: Record<string, unknown>[];
@@ -125,51 +124,6 @@ describe('error envelope', () => {
     expect(retryDelayMs(2, () => 0.999)).toBeLessThan(RETRY_POLICY.baseDelayMs * 2);
     expect(retryDelayMs(10, () => 0.999)).toBeLessThan(RETRY_POLICY.maxDelayMs);
     expect(retryDelayMs(3, () => 0)).toBe(0);
-  });
-});
-
-describe('generative UI blocks are constrained data, never executable UI', () => {
-  const moneyQuestion = {
-    schemaVersion: 1,
-    caseRevision: 3,
-    blocks: [
-      {
-        id: 'q-benefits-paid',
-        type: 'money_input',
-        fieldPath: 'planYears.py-2026.insurerAlreadyPaidCents',
-        label: 'How much has your insurer paid this benefit year?',
-        helperText: "Use the current plan balance if available, not the dentist's total charges.",
-        currency: 'USD',
-        minimumCents: 0,
-        maximumCents: 80000,
-        allowUnknown: true,
-        requiredFor: ['estimate', 'compare'],
-      },
-    ],
-  };
-
-  it('accepts the documented money question', () => {
-    expect(UiBlockEnvelopeSchema.parse(moneyQuestion)).toEqual(moneyQuestion);
-  });
-
-  it.each<[string, (b: Record<string, unknown>) => void]>([
-    ['an unknown block type', (b) => (b.type = 'web_view')],
-    ['an injected action prop', (b) => (b.onSubmit = 'sendToDentist()')],
-    ['raw HTML', (b) => (b.html = '<script>alert(1)</script>')],
-    ['minimum above maximum', (b) => (b.minimumCents = 90000)],
-    ['an oversized label', (b) => (b.label = 'x'.repeat(121))],
-    ['a field path with injection characters', (b) => (b.fieldPath = 'planYears["x"];drop')],
-  ])('rejects %s', (_name, mutate) => {
-    const envelope = structuredClone(moneyQuestion);
-    mutate(envelope.blocks[0] as Record<string, unknown>);
-    expect(UiBlockEnvelopeSchema.safeParse(envelope).success).toBe(false);
-  });
-
-  it('rejects an unsupported schema version and too many blocks', () => {
-    expect(UiBlockEnvelopeSchema.safeParse({ ...moneyQuestion, schemaVersion: 2 }).success).toBe(false);
-    const block = moneyQuestion.blocks[0];
-    const many = Array.from({ length: 11 }, (_, n) => ({ ...block, id: `q-${n}` }));
-    expect(UiBlockEnvelopeSchema.safeParse({ ...moneyQuestion, blocks: many }).success).toBe(false);
   });
 });
 

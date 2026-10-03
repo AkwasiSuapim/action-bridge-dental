@@ -230,6 +230,14 @@ function findUnsupported(input: DentalCaseInput): Limitation[] {
       fieldPath: 'procedures',
     });
   }
+  if (input.coverageMode === 'self_pay') {
+    limitations.push({
+      code: 'NOT_INSURED',
+      message: 'This case is marked self-pay, so there is no insurance estimate. Compare the dentist’s cash quote instead.',
+      fieldPath: 'coverageMode',
+    });
+    return limitations;
+  }
   const policy = input.policy;
   if (policy === null) return limitations;
 
@@ -276,6 +284,13 @@ function findUnsupported(input: DentalCaseInput): Limitation[] {
 
 function findMissing(input: DentalCaseInput): MissingFact[] {
   const missing: MissingFact[] = [];
+  if (input.coverageMode === 'unknown') {
+    missing.push({
+      fieldPath: 'coverageMode',
+      code: 'COVERAGE_MODE_UNKNOWN',
+      message: 'Whether you have dental insurance for this treatment is needed.',
+    });
+  }
   if (input.policy === null) {
     missing.push({ fieldPath: 'policy', code: 'POLICY_NOT_SUPPLIED', message: 'Plan coverage rules are needed.' });
   }

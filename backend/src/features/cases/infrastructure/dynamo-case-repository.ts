@@ -1,26 +1,25 @@
-import { DentalCaseSchema, type DentalCase } from '@actionbridge/contracts';
-import { GetCommand, PutCommand, type DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import { DentalCaseSchema, type DentalCase, type LedgerEvent } from '@actionbridge/contracts';
+import { GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { caseKey, isConditionFailure, ttl, type DocumentClient } from '../../../shared/dynamo.js';
+import { ledgerItem } from '../../ledger/infrastructure/dynamo-ledger.js';
 import type { CaseRepository, ReplaceOutcome } from '../ports/case-repository.js';
 
-/** Only `send` is used, which keeps the adapter testable with a stub client. */
-export type DocumentClient = Pick<DynamoDBDocumentClient, 'send'>;
+export { caseKey, type DocumentClient } from '../../../shared/dynamo.js';
 
-/**
- * Single-table layout (system design §9): partition `USER#<owner>#CASE#<caseId>`, sort key `CASE`.
- * Owner is part of the key, so no query can reach another user's case. No scans.
- */
+/** Case item plus its ledger event, written in one transaction. */
 export class DynamoCaseRepository implements CaseRepository {
   constructor(
     private readonly client: DocumentClient,
     private readonly tableName: string,
   ) {}
 
-  async create(record: DentalCase, expiresAtEpochSeconds: number | null): Promise<void> {
+  async create(record: DentalCase, event: LedgerEvent, expiresAtEpochSeconds: number | null): Promise<void> {
     await this.client.send(
-      new PutCommand({
-        TableName: this.tableName,
-        Item: this.item(record, expiresAtEpochSeconds),
-        ConditionExpression: 'attribute_not_exists(pk)',
+      new TransactWriteCommand({
+        TransactItems: [
+          { Put: { TableName: this.tableName, Item: this.item(record, expiresAtEpochSeconds), ConditionExpression: 'attribute_not_exists(pk)' } },
+          { Put: { TableName: this.tableName, Item: ledgerItem(record.ownerId, event, expiresAtEpochSeconds) } },
+        ],
       }),
     );
   }
@@ -35,33 +34,36 @@ export class DynamoCaseRepository implements CaseRepository {
     return record.ownerId === ownerId ? record : null;
   }
 
-  async replace(record: DentalCase, expectedRevision: number, expiresAtEpochSeconds: number | null): Promise<ReplaceOutcome> {
+  async replace(
+    record: DentalCase,
+    event: LedgerEvent,
+    expectedRevision: number,
+    expiresAtEpochSeconds: number | null,
+  ): Promise<ReplaceOutcome> {
     try {
       await this.client.send(
-        new PutCommand({
-          TableName: this.tableName,
-          Item: this.item(record, expiresAtEpochSeconds),
-          ConditionExpression: 'attribute_exists(pk) AND caseRevision = :expected',
-          ExpressionAttributeValues: { ':expected': expectedRevision },
+        new TransactWriteCommand({
+          TransactItems: [
+            {
+              Put: {
+                TableName: this.tableName,
+                Item: this.item(record, expiresAtEpochSeconds),
+                ConditionExpression: 'attribute_exists(pk) AND caseRevision = :expected',
+                ExpressionAttributeValues: { ':expected': expectedRevision },
+              },
+            },
+            { Put: { TableName: this.tableName, Item: ledgerItem(record.ownerId, event, expiresAtEpochSeconds) } },
+          ],
         }),
       );
       return 'replaced';
     } catch (error) {
-      if (error instanceof Error && error.name === 'ConditionalCheckFailedException') return 'revision_conflict';
+      if (isConditionFailure(error, 0)) return 'revision_conflict';
       throw error;
     }
   }
 
   private item(record: DentalCase, expiresAtEpochSeconds: number | null): Record<string, unknown> {
-    return {
-      ...caseKey(record.ownerId, record.caseId),
-      caseRevision: record.caseRevision,
-      case: record,
-      ...(expiresAtEpochSeconds !== null ? { expiresAt: expiresAtEpochSeconds } : {}),
-    };
+    return { ...caseKey(record.ownerId, record.caseId), caseRevision: record.caseRevision, case: record, ...ttl(expiresAtEpochSeconds) };
   }
-}
-
-export function caseKey(ownerId: string, caseId: string): { pk: string; sk: string } {
-  return { pk: `USER#${encodeURIComponent(ownerId)}#CASE#${caseId}`, sk: 'CASE' };
 }

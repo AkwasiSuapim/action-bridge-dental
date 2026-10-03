@@ -41,6 +41,7 @@ export function loadFixture(): { input: DentalCaseInput; scenarios: FixtureScena
   const input = DentalCaseInputSchema.parse({
     caseRevision: raw.caseRevision,
     currency: raw.currency,
+    coverageMode: raw.coverageMode,
     policy: raw.policy,
     planYears: raw.planYears,
     procedures: raw.procedures,

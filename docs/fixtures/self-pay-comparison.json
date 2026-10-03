@@ -1,0 +1,62 @@
+{
+  "fixtureId": "self-pay-comparison-v1",
+  "schemaVersion": 1,
+  "synthetic": true,
+  "currency": "USD",
+  "coverageMode": "insured",
+  "warning": "Independent fictional example from doc 05 §3A. Not Lincoln terms or market prices, and not a replacement for the dental-regression timing fixture.",
+  "caseRevision": 1,
+  "policy": {
+    "id": "fictional-individual-ppo-v1",
+    "deductibleBeforeCoinsurance": true,
+    "deductibleAppliesByCategory": { "major": true },
+    "insurerRateBpsByCategory": { "major": 5000 },
+    "annualMaximumAppliesByCategory": { "major": true },
+    "rounding": "half_up_to_cent",
+    "allServicesCovered": true,
+    "waitingPeriods": [],
+    "exclusions": [],
+    "frequencyRestrictions": []
+  },
+  "planYears": {
+    "py-2026": {
+      "startDate": "2026-01-01",
+      "endDate": "2026-12-31",
+      "annualMaximumCents": 150000,
+      "insurerAlreadyPaidCents": 0,
+      "annualDeductibleCents": 5000,
+      "deductibleAlreadyMetCents": 0,
+      "sourceStatus": "synthetic_confirmed_input"
+    }
+  },
+  "procedures": [
+    {
+      "id": "crown-1",
+      "label": "Crown",
+      "cdtCode": null,
+      "category": "major",
+      "network": "in",
+      "providerChargeCents": 150000,
+      "allowedCents": 100000,
+      "contractualWriteoffCents": 50000,
+      "proposedDate": "2026-11-12",
+      "dentistEarliestDate": "2026-11-12",
+      "dentistLatestDate": "2026-11-12",
+      "timingSource": "fictional_dentist_supplied",
+      "prerequisiteIds": [],
+      "selfPayQuote": {
+        "amountCents": 120000,
+        "quotedOn": "2026-10-01",
+        "source": "synthetic",
+        "includedScope": "Crown including preparation and seat; same service as the treatment estimate"
+      }
+    }
+  ],
+  "expected": {
+    "insuredPatientPaysCents": 52500,
+    "insuredInsurerPaysCents": 47500,
+    "contractualWriteoffCents": 50000,
+    "selfPayTotalCents": 120000,
+    "selfPayMinusInsuredCents": 67500
+  }
+}

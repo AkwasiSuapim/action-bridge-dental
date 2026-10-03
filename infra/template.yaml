@@ -151,7 +151,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../backend/.build/cases
-      Description: Create, read and revision-checked update of owner-scoped cases
+      Description: Owner-scoped cases, strategy saves and the case ledger (transactional writes)
       Environment:
         Variables:
           TABLE_NAME: !Ref CasesTable
@@ -162,6 +162,8 @@ Resources:
               Action:
                 - dynamodb:GetItem
                 - dynamodb:PutItem
+                - dynamodb:ConditionCheckItem
+                - dynamodb:Query
               Resource: !GetAtt CasesTable.Arn
       Events:
         CreateCase:
@@ -182,6 +184,18 @@ Resources:
             ApiId: !Ref HttpApi
             Method: PATCH
             Path: /v1/cases/{caseId}
+        SaveStrategy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /v1/cases/{caseId}/strategies
+        GetLedger:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /v1/cases/{caseId}/ledger
 
   CalculationsFunction:
     Type: AWS::Serverless::Function
@@ -210,6 +224,12 @@ Resources:
             ApiId: !Ref HttpApi
             Method: POST
             Path: /v1/cases/{caseId}/scenarios
+        CoverageComparison:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /v1/cases/{caseId}/coverage-comparison
 
   HealthLogGroup:
     Type: AWS::Logs::LogGroup
