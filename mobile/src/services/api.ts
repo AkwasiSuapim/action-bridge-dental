@@ -158,3 +158,8 @@ export function createApiClient({
 }
 
 export type ApiClient = ReturnType<typeof createApiClient>;
+
+/** Normalizes anything thrown by an API call into an ApiError the UI can display. */
+export function asApiError(caught: unknown): ApiError {
+  return caught instanceof ApiError ? caught : new ApiError('INTERNAL', 'Something went wrong. Try again.');
+}

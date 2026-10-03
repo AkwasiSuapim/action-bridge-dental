@@ -1,6 +1,7 @@
 import { Redirect, Stack } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 import { useAuth } from '../../features/auth/auth-context';
+import { CaseProvider } from '../../features/case/case-store';
 import { useTheme } from '../../theme/theme';
 import { fonts } from '../../theme/tokens';
 
@@ -19,17 +20,21 @@ export default function SignedInLayout() {
   if (auth.status === 'signed_out') return <Redirect href="/welcome" />;
 
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.background },
-        headerTintColor: colors.text,
-        headerTitleStyle: { fontFamily: fonts.semibold },
-        headerShadowVisible: false,
-        contentStyle: { backgroundColor: colors.background },
-      }}
-    >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="sample" options={{ title: 'Sample estimate' }} />
-    </Stack>
+    <CaseProvider>
+      <Stack
+        screenOptions={{
+          headerStyle: { backgroundColor: colors.background },
+          headerTintColor: colors.text,
+          headerTitleStyle: { fontFamily: fonts.semibold },
+          headerShadowVisible: false,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="case/[caseId]/facts" options={{ title: 'Check your details' }} />
+        <Stack.Screen name="case/[caseId]/edit" options={{ title: 'Update a detail' }} />
+        <Stack.Screen name="case/[caseId]/results" options={{ title: 'Your estimate' }} />
+      </Stack>
+    </CaseProvider>
   );
 }

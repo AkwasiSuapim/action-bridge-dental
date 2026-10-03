@@ -19,19 +19,37 @@ import { fonts, layout, space } from '../theme/tokens';
 
 // ---- Layout -------------------------------------------------------------------------------
 
-/** `headerless` adds the top safe-area inset for screens shown without a navigation header. */
-export function Screen({ children, scroll = true, headerless = false }: { children: ReactNode; scroll?: boolean; headerless?: boolean }) {
+/**
+ * `headerless` adds the top safe-area inset for screens shown without a navigation header.
+ * `footer` stays pinned below the scrolling content, for the screen's main action.
+ */
+export function Screen({
+  children,
+  scroll = true,
+  headerless = false,
+  footer,
+}: {
+  children: ReactNode;
+  scroll?: boolean;
+  headerless?: boolean;
+  footer?: ReactNode;
+}) {
   const { colors } = useTheme();
   const body = <View style={styles.content}>{children}</View>;
   return (
     <SafeAreaView edges={headerless ? ['top', 'bottom', 'left', 'right'] : ['bottom', 'left', 'right']} style={{ flex: 1, backgroundColor: colors.background }}>
       {scroll ? (
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           {body}
         </ScrollView>
       ) : (
-        body
+        <View style={{ flex: 1 }}>{body}</View>
       )}
+      {footer ? (
+        <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
+          <View style={styles.footerInner}>{footer}</View>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -385,6 +403,8 @@ export function Row({ label, value, strong = false, muted = false }: { label: st
 
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1, alignItems: 'center' },
+  footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: space(5), paddingTop: space(3), paddingBottom: space(2), alignItems: 'center' },
+  footerInner: { width: '100%', maxWidth: layout.maxContentWidth, gap: space(2) },
   content: { width: '100%', maxWidth: layout.maxContentWidth, padding: space(5), gap: space(4) },
   card: { borderRadius: layout.radius, borderWidth: StyleSheet.hairlineWidth, padding: space(4), gap: space(3) },
   button: {
