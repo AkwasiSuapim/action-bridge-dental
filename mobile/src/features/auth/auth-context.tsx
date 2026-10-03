@@ -1,7 +1,7 @@
-import * as SecureStore from 'expo-secure-store';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AppConfig } from '../../lib/config';
 import { createCognitoClient, type SignInResult, type Tokens } from './cognito';
+import { sessionStorage } from './session-storage';
 
 /**
  * Session state. Only the refresh token and email are persisted, in platform secure storage;
@@ -39,7 +39,7 @@ export function AuthProvider({ config, children }: { config: AppConfig; children
 
   const clear = useCallback(async (reason: SignedOutReason) => {
     tokens.current = null;
-    await Promise.all([SecureStore.deleteItemAsync(REFRESH_KEY), SecureStore.deleteItemAsync(EMAIL_KEY)]);
+    await Promise.all([sessionStorage.remove(REFRESH_KEY), sessionStorage.remove(EMAIL_KEY)]);
     setEmail(null);
     setSignedOutReason(reason);
     setStatus('signed_out');
@@ -47,7 +47,7 @@ export function AuthProvider({ config, children }: { config: AppConfig; children
 
   const accept = useCallback(async (next: Tokens, who: string) => {
     tokens.current = next;
-    await Promise.all([SecureStore.setItemAsync(REFRESH_KEY, next.refreshToken), SecureStore.setItemAsync(EMAIL_KEY, who)]);
+    await Promise.all([sessionStorage.set(REFRESH_KEY, next.refreshToken), sessionStorage.set(EMAIL_KEY, who)]);
     setEmail(who);
     setSignedOutReason(null);
     setStatus('signed_in');
@@ -56,7 +56,7 @@ export function AuthProvider({ config, children }: { config: AppConfig; children
   const refresh = useCallback(async (): Promise<Tokens | null> => {
     if (!refreshing.current) {
       refreshing.current = (async () => {
-        const stored = tokens.current?.refreshToken ?? (await SecureStore.getItemAsync(REFRESH_KEY));
+        const stored = tokens.current?.refreshToken ?? (await sessionStorage.get(REFRESH_KEY));
         if (!stored) return null;
         try {
           const next = await cognito.refresh(stored);
@@ -76,14 +76,18 @@ export function AuthProvider({ config, children }: { config: AppConfig; children
 
   useEffect(() => {
     (async () => {
-      const storedEmail = await SecureStore.getItemAsync(EMAIL_KEY);
-      const restored = await refresh();
-      if (restored && storedEmail) {
-        setEmail(storedEmail);
-        setStatus('signed_in');
-      } else {
-        setStatus('signed_out');
+      try {
+        const storedEmail = await sessionStorage.get(EMAIL_KEY);
+        const restored = await refresh();
+        if (restored && storedEmail) {
+          setEmail(storedEmail);
+          setStatus('signed_in');
+          return;
+        }
+      } catch {
+        // Unreadable storage must not leave the app stuck on "loading": fall through to signed out.
       }
+      setStatus('signed_out');
     })();
   }, [refresh]);
 

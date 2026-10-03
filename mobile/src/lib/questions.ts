@@ -32,6 +32,7 @@ export function questionFor(fact: MissingFact, record: DentalCase): QuestionSpec
       options: [
         { id: 'insured', label: 'Yes, I have a plan', value: 'insured' },
         { id: 'self_pay', label: 'No, I’ll pay myself', value: 'self_pay' },
+        { id: 'unknown', label: 'Not sure', value: 'unknown' },
       ],
     };
   }
@@ -80,6 +81,7 @@ export function questionFor(fact: MissingFact, record: DentalCase): QuestionSpec
           options: [
             { id: 'in', label: 'In network', value: 'in' },
             { id: 'out', label: 'Out of network', value: 'out' },
+            { id: 'unknown', label: 'Not sure', value: 'unknown' },
           ],
         };
       case 'proposedDate':

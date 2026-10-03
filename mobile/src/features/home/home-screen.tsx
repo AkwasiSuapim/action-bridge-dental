@@ -1,12 +1,17 @@
 import { router } from 'expo-router';
 import { Camera, Keyboard, Mic, Upload, type LucideIcon } from 'lucide-react-native';
-import { Pressable, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import { BrandLockup } from '../../components/brand';
 import { AgentOrb } from '../../components/orb';
+import { ErrorNotice } from '../../components/states';
 import { AppText, Badge, Card, Screen } from '../../components/ui';
+import { asApiError, type ApiError } from '../../services/api';
+import { useApi } from '../../services/api-context';
 import { ThemeProvider, useTheme } from '../../theme/theme';
 import { useFocusStatusBar } from '../../theme/status-bar';
 import { fonts, layout, space } from '../../theme/tokens';
+import { sampleCaseRequest } from '../intake/sample-case';
 
 /**
  * Intake methods (design v3 "Home · multimodal start"). Voice, upload and photo need the job and
@@ -37,6 +42,24 @@ export function HomeScreen() {
 
 function HomeBody() {
   const { colors } = useTheme();
+  const api = useApi();
+  const [starting, setStarting] = useState(false);
+  const [failure, setFailure] = useState<ApiError | null>(null);
+
+  /** Creates the labeled synthetic case on the live API, then opens its facts review. */
+  const trySample = async () => {
+    if (starting) return;
+    setStarting(true);
+    setFailure(null);
+    try {
+      const { caseId } = await api.createCase(sampleCaseRequest());
+      router.push(`/case/${caseId}/facts`);
+    } catch (caught) {
+      setFailure(asApiError(caught));
+    } finally {
+      setStarting(false);
+    }
+  };
   const [speak, ...others] = METHODS;
   const anyUnavailable = METHODS.some((method) => !method.available);
 
@@ -73,7 +96,9 @@ function HomeBody() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Try a sample. Sample data."
-        onPress={() => router.push('/sample')}
+        accessibilityState={{ busy: starting }}
+        disabled={starting}
+        onPress={trySample}
         style={({ pressed }) => ({
           minHeight: layout.minHitArea + 8,
           borderRadius: layout.radius,
@@ -87,11 +112,13 @@ function HomeBody() {
           opacity: pressed ? 0.85 : 1,
         })}
       >
+        {starting ? <ActivityIndicator color={colors.primary} /> : null}
         <AppText variant="label" color={colors.primary} style={{ fontFamily: fonts.semibold, fontSize: 16 }}>
-          Try a sample
+          {starting ? 'Starting the sample…' : 'Try a sample'}
         </AppText>
         <Badge label="Sample data" tone="neutral" />
       </Pressable>
+      {failure ? <ErrorNotice error={failure} onRetry={trySample} /> : null}
 
       <Card>
         <AppText variant="heading">How it works</AppText>
