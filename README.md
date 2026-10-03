@@ -11,7 +11,8 @@ Start with [docs/README.md](docs/README.md). Decisions and Phase 0 status are in
 | `docs/` | Brief, system design, build plan, AWS and mobile guides, regression fixture | Current |
 | `packages/contracts/` | Zod runtime schemas and shared types: case, plan years, procedures, provenance, estimates, scenarios, jobs, UI blocks, errors | Implemented (T1-02) |
 | `packages/benefits-engine/` | Pure integer-cent calculator and bounded schedule comparison | Implemented (Phase 2) |
-| `backend/`, `infra/` | Lambda handlers, agent, SAM | Not started (Phase 3, 5) |
+| `backend/` | Lambda handlers, application services, DynamoDB adapter, local server, smoke test — see [backend/README.md](backend/README.md) | Phase 3 implemented locally; agent (Phase 5) not started |
+| `infra/` | SAM template: HTTP API, three Lambdas, DynamoDB | Written and linted; not deployed |
 | `mobile/` | Expo React Native app | Not started (Phase 4) |
 
 ## Commands
@@ -23,6 +24,8 @@ npm ci            # install
 npm run check     # strict typecheck (packages and tests) + all tests
 npm test          # tests only
 npm run build     # compile packages to dist/
+npm run dev:api   # local API on http://localhost:3000 (in-memory, demo auth)
+npm run build:lambda  # bundle Lambdas into backend/.build/ for SAM
 ```
 
 ## Using the engine

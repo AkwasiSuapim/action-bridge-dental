@@ -168,8 +168,7 @@ function findContradictions(input: DentalCaseInput): ErrorIssue[] {
 
     if (p.providerChargeCents !== null && p.allowedCents !== null && p.allowedCents > p.providerChargeCents) {
       issue(`${path}.allowedCents`, 'ALLOWED_EXCEEDS_CHARGE', 'Allowed amount is larger than the provider charge.');
-    }
-    if (
+    } else if (
       p.providerChargeCents !== null &&
       p.allowedCents !== null &&
       p.contractualWriteoffCents !== null &&

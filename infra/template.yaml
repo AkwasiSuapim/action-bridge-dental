@@ -1,0 +1,170 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  ActionBridge Dental API, Phase 3 vertical slice: cases, estimates and scenarios.
+  Demo auth mode (synthetic data only). Code is pre-bundled by `npm run build:lambda`.
+
+Parameters:
+  AppEnv:
+    Type: String
+    AllowedValues: [dev, demo]
+    Default: dev
+    Description: Stage name and APP_ENV. Deploy dev and the stable demo as separate stacks.
+  RetentionDays:
+    Type: Number
+    Default: 7
+    MinValue: 1
+    MaxValue: 90
+    Description: Demo case records expire via DynamoDB TTL (eventual deletion, not immediate).
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Architectures: [arm64]
+    Handler: index.handler
+    MemorySize: 512
+    Timeout: 10
+    Environment:
+      Variables:
+        APP_ENV: !Ref AppEnv
+        # Demo mode: per-device x-demo-user-id isolation, NOT authentication. Synthetic data only.
+        # Switch to `jwt` only together with a JWT authorizer on HttpApi (see backend/README.md).
+        AUTH_MODE: demo
+        NODE_OPTIONS: --enable-source-maps
+
+Resources:
+  CasesTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      SSESpecification:
+        SSEEnabled: true
+
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref AppEnv
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 20
+        ThrottlingRateLimit: 10
+
+  HealthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/.build/health
+      Description: GET /health — status and versions only
+      Events:
+        Health:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /health
+
+  CasesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/.build/cases
+      Description: Create, read and revision-checked update of owner-scoped cases
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref CasesTable
+          RETENTION_DAYS: !Ref RetentionDays
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+              Resource: !GetAtt CasesTable.Arn
+      Events:
+        CreateCase:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /v1/cases
+        GetCase:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /v1/cases/{caseId}
+        PatchCase:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: PATCH
+            Path: /v1/cases/{caseId}
+
+  CalculationsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/.build/calculations
+      Description: Estimates and schedule comparison from the pure benefits engine (read-only)
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref CasesTable
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource: !GetAtt CasesTable.Arn
+      Events:
+        Estimate:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /v1/cases/{caseId}/estimates
+        Scenarios:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /v1/cases/{caseId}/scenarios
+
+  HealthLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${HealthFunction}
+      RetentionInDays: 7
+
+  CasesLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${CasesFunction}
+      RetentionInDays: 7
+
+  CalculationsLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${CalculationsFunction}
+      RetentionInDays: 7
+
+Outputs:
+  ApiBaseUrl:
+    Description: Base URL including the stage. Set as EXPO_PUBLIC_API_BASE_URL and API_BASE_URL for the smoke test.
+    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/${AppEnv}
+  CasesTableName:
+    Description: DynamoDB table holding owner-scoped cases
+    Value: !Ref CasesTable
