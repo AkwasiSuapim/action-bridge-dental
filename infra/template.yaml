@@ -304,7 +304,7 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       # Longer than the worker timeout, so an in-flight job is not redelivered while it runs.
-      VisibilityTimeout: 180
+      VisibilityTimeout: 360
       MessageRetentionPeriod: 3600
       SqsManagedSseEnabled: true
       RedrivePolicy:
@@ -379,7 +379,7 @@ Resources:
     Properties:
       CodeUri: ../backend/.build/job-worker
       Description: Agent worker — bounded Bedrock tool loop over the deterministic engine (SQS, batch 1)
-      Timeout: 90
+      Timeout: 240
       MemorySize: 1024
       Environment:
         Variables:

@@ -116,7 +116,7 @@ export class TextractReader implements DocumentReader {
     }
     const sleep = this.options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
     const now = this.options.now ?? Date.now;
-    const deadline = now() + (this.options.maxWaitMs ?? 35_000);
+    const deadline = now() + (this.options.maxWaitMs ?? 60_000);
     const { JobId } = await this.client.send(new StartDocumentTextDetectionCommand({ DocumentLocation: { S3Object } }));
     for (;;) {
       await sleep(1500);

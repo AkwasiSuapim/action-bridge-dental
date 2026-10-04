@@ -11,15 +11,23 @@ if (!base || !token) {
 
 /** A minimal, valid single-page PDF with real text (no libraries). Fictional content only. */
 function samplePdf(lines) {
+  return multiPagePdf([lines]);
+}
+
+/** A minimal, valid PDF with one text page per entry (no libraries). Fictional content only. */
+function multiPagePdf(pages) {
   const escape = (s) => s.replace(/[\\()]/g, (c) => `\\${c}`);
-  const content = `BT /F1 14 Tf 72 740 Td ${lines.map((l, i) => `${i ? '0 -26 Td ' : ''}(${escape(l)}) Tj`).join(' ')} ET`;
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
-    `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`,
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-  ];
+  // Objects: 1 catalog, 2 pages, 3 font, then a page object and a content stream per page.
+  const objects = ['<< /Type /Catalog /Pages 2 0 R >>', null, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'];
+  const kids = [];
+  for (const lines of pages) {
+    const content = `BT /F1 14 Tf 72 740 Td ${lines.map((l, i) => `${i ? '0 -26 Td ' : ''}(${escape(l)}) Tj`).join(' ')} ET`;
+    const pageId = objects.length + 1;
+    kids.push(`${pageId} 0 R`);
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${pageId + 1} 0 R >>`);
+    objects.push(`<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`);
+  }
+  objects[1] = `<< /Type /Pages /Kids [${kids.join(' ')}] /Count ${pages.length} >>`;
   let pdf = '%PDF-1.4\n';
   const offsets = [];
   objects.forEach((body, i) => {
@@ -136,6 +144,31 @@ check(
 for (const e of composerView?.events ?? []) console.log(`      event ${e.sequence}: ${e.stage} ${e.status} — ${e.summary}`);
 for (const b of composerConfirms) console.log(`      confirm: ${b.candidateValue}\n               ${b.reason}`);
 if (composerView?.status === 'failed') console.log(`      error: ${composerView.error?.message}`);
+
+// A three-page PDF: the instant Textract API rejects it, so the worker reads it asynchronously.
+const LONG_PDF = multiPagePdf([
+  ['SAMPLE - Fictional Dental Office - Treatment Plan', 'Prepared for a fictional patient', 'Page 1 of 3'],
+  ['Crown (D2740) fee $1,000.00', 'Office is in network for your plan.', 'Page 2 of 3'],
+  ['Payment terms and office policies (fictional)', 'Page 3 of 3'],
+]);
+const longCase = await call('POST', '/v1/cases', { currency: 'USD', coverageMode: 'unknown', policy: null, planYears: {}, procedures: [] });
+const longId = await uploadPdf(longCase.body?.caseId, LONG_PDF, 'treatment-plan.pdf');
+const longJob = await call('POST', `/v1/cases/${longCase.body?.caseId}/jobs`, { expectedRevision: 1, operation: 'interpret', input: { documentIds: longId ? [longId] : [] } });
+const longStarted = Date.now();
+let longView;
+for (;;) {
+  longView = (await call('GET', `/v1/jobs/${longJob.body?.jobId}`)).body;
+  if (!['queued', 'running'].includes(longView?.status) || Date.now() - longStarted > 120_000) break;
+  await new Promise((r) => setTimeout(r, 1500));
+}
+const longConfirms = longView?.questions?.blocks?.filter((b) => b.inputType === 'fact_review') ?? [];
+check(
+  'multi-page PDF read (costs found on page 2)',
+  longView?.status === 'needs_information' && longConfirms.some((b) => /1,000/.test(String(b.candidateValue))),
+  `${longView?.status}, ${longConfirms.length} confirmations, ${Date.now() - longStarted} ms`,
+);
+for (const b of longConfirms) console.log(`      confirm: ${b.candidateValue}\n               ${b.reason}`);
+if (longView?.status === 'failed') console.log(`      error: ${longView.error?.message}`);
 
 console.log(failures === 0 ? '\nAll input smoke checks passed.' : `\n${failures} input smoke check(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);
