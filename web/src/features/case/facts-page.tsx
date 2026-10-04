@@ -1,14 +1,6 @@
-﻿import {
-  Check,
-  ClipboardList,
-  FileText,
-  Mic,
-  Pencil,
-  ShieldCheck,
-} from 'lucide-react';
+import { Check, ClipboardList, FileText, Mic, Pencil } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { DentalCaseInput } from '@actionbridge/contracts';
 import {
   Badge,
   Button,
@@ -23,44 +15,28 @@ import {
   Row,
 } from '../../components/ui';
 import { Evidence } from '../../components/evidence';
-import { dateLabel, money, parseMoney } from '../../domain/model';
+import {
+  amountLabel,
+  currentYear,
+  dateLabel,
+  parseMoney,
+  treatmentTitle,
+} from '../../domain/model';
+import { fieldValue, nextQuestion, setField } from '../../domain/case-fields';
 import { useDemo } from '../../state/demo-store';
+import { CaseEditor } from '../intake/manual-page';
+import { validateCase } from '../intake/case-forms';
+import { sampleInput } from '../../services/dental-service';
 
-type EditField =
-  | 'paid'
-  | 'coverage'
-  | 'network'
-  | 'crown-date'
-  | 'deductible'
-  | 'maximum'
-  | 'filling-1'
-  | 'filling-2'
-  | 'crown-1';
-const labels: Record<EditField, string> = {
-  paid: 'Insurer payments this year',
-  coverage: 'Insurance status',
-  network: 'Provider network',
-  'crown-date': 'Proposed crown date',
-  deductible: 'Annual deductible',
-  maximum: 'Annual insurer maximum',
-  'filling-1': 'Filling one fee',
-  'filling-2': 'Filling two fee',
-  'crown-1': 'Crown fee',
-};
-export function missingQuestion(
-  input: DentalCaseInput,
-): 'coverage' | 'network' | 'paid' | null {
-  if (input.coverageMode === 'unknown') return 'coverage';
-  if (input.coverageMode === 'self_pay') return null;
-  if (input.procedures.some((p) => p.network === 'unknown')) return 'network';
-  if (input.planYears['py-2026'].insurerAlreadyPaidCents === null)
-    return 'paid';
-  return null;
-}
+export const missingQuestion = nextQuestion;
 export function FactsPage() {
-  const { state, confirm, edit } = useDemo();
+  const { state, confirm, edit, setCaseFlags } = useDemo();
   const navigate = useNavigate();
-  const [editing, setEditing] = useState<EditField | null>(null);
+  const [editing, setEditing] = useState<{
+    path: string;
+    label: string;
+  } | null>(null);
+  const [section, setSection] = useState<'treatment' | 'coverage' | null>(null);
   const [sources, setSources] = useState(false);
   if (!state.input)
     return (
@@ -74,12 +50,59 @@ export function FactsPage() {
       </div>
     );
   const input = state.input;
-  const year = input.planYears['py-2026'];
-  const missing = missingQuestion(input);
+  const missing = nextQuestion(input);
+  const badge = (path: string) => {
+    const value = fieldValue(input, path);
+    const unknown = value == null || value === 'unknown';
+    const assumed =
+      path.startsWith('planYears.') &&
+      input.planYears[path.split('.')[1]]?.sourceStatus ===
+        'explicit_unchanged_plan_assumption';
+    return (
+      <Badge
+        tone={
+          unknown
+            ? 'warning'
+            : state.provenance[path]
+              ? 'green'
+              : assumed
+                ? 'assumed'
+                : undefined
+        }
+      >
+        {unknown
+          ? 'Needs an answer'
+          : state.provenance[path]
+            ? 'Provided by you'
+            : assumed
+              ? 'Assumed for comparison'
+              : state.origin === 'sample'
+                ? 'From sample document'
+                : 'Provided by you'}
+      </Badge>
+    );
+  };
+  const editable = (path: string, label: string, value: string) => (
+    <div className="fact-edit-row" key={path}>
+      <div>
+        <span className="small muted">{label}</span>
+        <strong>{value}</strong>
+        {badge(path)}
+      </div>
+      <Button
+        variant="ghost"
+        icon={Pencil}
+        aria-label={`Edit ${label.toLowerCase()}`}
+        onClick={() => setEditing({ path, label })}
+      >
+        Edit
+      </Button>
+    </div>
+  );
   return (
     <div className="page">
       <PageHeading
-        eyebrow="Sample case · Review before calculating"
+        eyebrow={`${state.origin === 'sample' ? 'Sample case' : 'Manual demo case'} · Review before calculating`}
         title="Here is what we'll use"
         description="Check the treatment, benefits and dates. You can correct any detail."
         actions={
@@ -98,8 +121,15 @@ export function FactsPage() {
             <div className="section-title">
               <ClipboardList size={20} />
               <h3>Treatment</h3>
-              <Badge>From sample document</Badge>
+              <Button
+                variant="secondary"
+                icon={Pencil}
+                onClick={() => setSection('treatment')}
+              >
+                Edit treatment
+              </Button>
             </div>
+            <p className="muted small">{treatmentTitle(input)}</p>
             {input.procedures.map((p) => (
               <Disclosure
                 key={p.id}
@@ -107,140 +137,140 @@ export function FactsPage() {
                   <div className="fact-summary">
                     <strong>{p.label}</strong>
                     <span className="muted small">
-                      {money(p.providerChargeCents ?? 0)} ·{' '}
-                      {dateLabel(p.proposedDate ?? p.dentistEarliestDate!)} ·{' '}
-                      {p.category === 'basic'
-                        ? 'Basic service'
-                        : 'Major service'}
+                      {amountLabel(p.providerChargeCents)} ·{' '}
+                      {p.proposedDate
+                        ? dateLabel(p.proposedDate)
+                        : 'Date not answered'}{' '}
+                      · {p.category} service
                     </span>
                   </div>
                 }
               >
-                <div className="fact-edit-row">
-                  <Row
-                    label="Billed and allowed fee"
-                    value={money(p.providerChargeCents ?? 0)}
-                  />
-                  <Button
-                    variant="secondary"
-                    icon={Pencil}
-                    aria-label={`Edit ${p.label.toLowerCase()} fee`}
-                    onClick={() => setEditing(p.id as EditField)}
-                  >
-                    Edit
-                  </Button>
-                </div>
+                {editable(
+                  `procedures.${p.id}.providerChargeCents`,
+                  `${p.label} fee`,
+                  amountLabel(p.providerChargeCents),
+                )}
+                {editable(
+                  `procedures.${p.id}.allowedCents`,
+                  `${p.label} allowed amount`,
+                  amountLabel(p.allowedCents),
+                )}
+                {editable(
+                  `procedures.${p.id}.contractualWriteoffCents`,
+                  `${p.label} write-off`,
+                  amountLabel(p.contractualWriteoffCents),
+                )}
+                {editable(
+                  `procedures.${p.id}.network`,
+                  `${p.label} network`,
+                  p.network === 'in'
+                    ? 'In network'
+                    : p.network === 'out'
+                      ? 'Out of network'
+                      : 'Not sure',
+                )}
+                {editable(
+                  `procedures.${p.id}.proposedDate`,
+                  p.id === 'crown-1'
+                    ? 'Proposed crown date'
+                    : `${p.label} planned date`,
+                  p.proposedDate ? dateLabel(p.proposedDate) : 'Not answered',
+                )}
                 <Row
                   label="Insurer rate after deductible"
-                  value={`${p.category === 'basic' ? 80 : 50}%`}
+                  value={
+                    input.policy?.insurerRateBpsByCategory[p.category] ===
+                    undefined
+                      ? 'Not answered'
+                      : `${input.policy.insurerRateBpsByCategory[p.category] / 100}%`
+                  }
                 />
                 <Row
-                  label="Timing source"
-                  value="Fictional dentist instruction"
+                  label="Dentist’s timing window"
+                  value={
+                    p.dentistEarliestDate && p.dentistLatestDate
+                      ? `${dateLabel(p.dentistEarliestDate)} – ${dateLabel(p.dentistLatestDate)}`
+                      : 'Not provided — dates will not be moved'
+                  }
                 />
-                {p.id === 'crown-1' && (
-                  <>
-                    <Row
-                      label="Permitted crown window"
-                      value="Nov 12, 2026 – Jan 15, 2027"
-                    />
-                    <Button
-                      variant="secondary"
-                      icon={Pencil}
-                      onClick={() => setEditing('crown-date')}
-                    >
-                      Edit proposed crown date
-                    </Button>
-                  </>
-                )}
               </Disclosure>
             ))}
           </Card>
           <Card>
             <div className="section-title">
-              <ShieldCheck size={20} />
               <h3>Your current plan</h3>
-              <Badge>Sample individual PPO</Badge>
+              <Button
+                variant="secondary"
+                onClick={() => setSection('coverage')}
+              >
+                Edit coverage rules
+              </Button>
             </div>
-            {(
-              [
-                {
-                  field: 'coverage',
-                  label: 'Insurance status',
-                  value:
-                    input.coverageMode === 'insured'
-                      ? 'Insured'
-                      : input.coverageMode === 'self_pay'
-                        ? 'Self-pay'
-                        : 'Not sure',
-                },
-                {
-                  field: 'network',
-                  label: 'Provider network',
-                  value:
-                    input.procedures[0].network === 'in'
-                      ? 'In network'
-                      : input.procedures[0].network === 'out'
-                        ? 'Out of network'
-                        : 'Not sure',
-                },
-                {
-                  field: 'maximum',
-                  label: 'Annual insurer maximum',
-                  value: money(year.annualMaximumCents!),
-                },
-                {
-                  field: 'deductible',
-                  label: 'Annual deductible',
-                  value: money(year.annualDeductibleCents!),
-                },
-                {
-                  field: 'paid',
-                  label: 'Insurer already paid this year',
-                  value:
-                    year.insurerAlreadyPaidCents === null
-                      ? 'Needs confirmation'
-                      : money(year.insurerAlreadyPaidCents),
-                },
-              ] as const
-            ).map((row) => (
-              <div className="fact-edit-row" key={row.field}>
-                <div>
-                  <span className="small muted">{row.label}</span>
-                  <strong
-                    className={
-                      row.field === 'paid' &&
-                      year.insurerAlreadyPaidCents === null
-                        ? 'warning-text'
-                        : ''
-                    }
-                  >
-                    {row.value}
-                  </strong>
-                </div>
+            {editable(
+              'coverageMode',
+              'Insurance status',
+              input.coverageMode === 'insured'
+                ? 'Insured'
+                : input.coverageMode === 'self_pay'
+                  ? 'Self-pay'
+                  : 'Not sure',
+            )}
+            {input.coverageMode !== 'self_pay' && (
+              <>
                 <Button
-                  variant="ghost"
-                  icon={Pencil}
-                  aria-label={`Edit ${row.label.toLowerCase()}`}
-                  onClick={() => setEditing(row.field)}
+                  variant="secondary"
+                  onClick={() =>
+                    setEditing({
+                      path: 'all-network',
+                      label: 'Provider network',
+                    })
+                  }
                 >
-                  Edit
+                  Edit provider network
                 </Button>
-              </div>
-            ))}
-            <p className="small muted">
-              2026 benefit year: January 1–December 31. Reported payments stay
-              separate from projected treatment.
-            </p>
-          </Card>
-          <Card>
-            <h3>Next benefit year</h3>
-            <Row label="2027 maximum / fresh deductible" value="$800 / $50" />
-            <Badge tone="assumed">Assumed for comparison</Badge>
-            <p className="muted small">
-              Coverage and prices are assumed unchanged. Confirm your renewal
-              before relying on the split estimate.
-            </p>
+                {Object.entries(input.planYears)
+                  .sort((a, b) => a[1].startDate.localeCompare(b[1].startDate))
+                  .map(([id, y], i) => (
+                    <section className="rule-group" key={id}>
+                      <h4>
+                        {i === 0 ? 'Current' : 'Next'} benefit year ·{' '}
+                        {dateLabel(y.startDate)} – {dateLabel(y.endDate)}
+                      </h4>
+                      {y.sourceStatus ===
+                        'explicit_unchanged_plan_assumption' && (
+                        <Badge tone="assumed">Assumed for comparison</Badge>
+                      )}
+                      {(
+                        [
+                          ['annualMaximumCents', 'Annual insurer maximum'],
+                          ['annualDeductibleCents', 'Annual deductible'],
+                          [
+                            'insurerAlreadyPaidCents',
+                            'Insurer already paid this year',
+                          ],
+                          [
+                            'deductibleAlreadyMetCents',
+                            'Deductible already met',
+                          ],
+                        ] as const
+                      ).map(([field, label]) =>
+                        editable(
+                          `planYears.${id}.${field}`,
+                          i === 0 ? label : `Next year ${label.toLowerCase()}`,
+                          amountLabel(y[field]),
+                        ),
+                      )}
+                    </section>
+                  ))}
+                {!currentYear(input) && (
+                  <Notice tone="warning">
+                    Benefit-year dates and balances are still needed. We’ll ask
+                    for the start date next.
+                  </Notice>
+                )}
+              </>
+            )}
           </Card>
         </div>
         <aside className="stack facts-aside">
@@ -256,7 +286,7 @@ export function FactsPage() {
                   <strong className="break-word">{a.name}</strong>
                   <span className="small muted">
                     {a.kind === 'file'
-                      ? 'Local file · Sample analysis only'
+                      ? 'Local file · Not interpreted'
                       : 'Sample document'}
                   </span>
                 </div>
@@ -290,47 +320,31 @@ export function FactsPage() {
               available. We'll ask a focused question next.
             </Notice>
           )}
-          <Card>
-            <h3>Prefer the original sample?</h3>
-            <p className="small muted">
-              Restore the fictional plan, fees and timing. Previous results will
-              need recalculation.
-            </p>
-            <Button
-              variant="secondary"
-              onClick={() =>
-                edit((draft) => {
-                  const revision = draft.caseRevision;
-                  const restored = structuredClone(input);
-                  restored.planYears['py-2026'] = {
-                    ...restored.planYears['py-2026'],
-                    annualMaximumCents: 80000,
-                    annualDeductibleCents: 5000,
-                    insurerAlreadyPaidCents: 50000,
-                  };
-                  restored.coverageMode = 'insured';
-                  restored.procedures = restored.procedures.map((p) => ({
-                    ...p,
-                    network: 'in',
-                    providerChargeCents: p.id === 'crown-1' ? 100000 : 25000,
-                    allowedCents: p.id === 'crown-1' ? 100000 : 25000,
-                    proposedDate:
-                      p.id === 'crown-1'
-                        ? '2026-11-12'
-                        : p.id === 'filling-1'
-                          ? '2026-11-10'
-                          : '2026-11-11',
-                  }));
-                  Object.assign(draft, restored, { caseRevision: revision });
-                })
-              }
-            >
-              Restore sample values
-            </Button>
-          </Card>
+          {state.origin === 'sample' && (
+            <Card>
+              <h3>Prefer the original sample?</h3>
+              <p className="small muted">
+                Restore fictional plan, fees and timing. Previous results need
+                recalculation.
+              </p>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  edit((d) => Object.assign(d, sampleInput(50000)));
+                  setCaseFlags({
+                    documentNeeded: false,
+                    documentDeclined: false,
+                    deductibleConflict: false,
+                  });
+                }}
+              >
+                Restore sample values
+              </Button>
+            </Card>
+          )}
         </aside>
       </div>
-      <FooterActions note="These are fictional sample facts, not verified insurer terms.">
+      <FooterActions note="These demo facts are not verified insurer terms.">
         <Button variant="secondary" onClick={() => navigate('/')}>
           Finish later
         </Button>
@@ -338,7 +352,12 @@ export function FactsPage() {
           icon={Check}
           onClick={() => {
             if (input.coverageMode === 'self_pay') navigate('/self-pay');
-            else if (missing) navigate('/questions');
+            else if (
+              missing ||
+              state.documentNeeded ||
+              state.deductibleConflict
+            )
+              navigate('/questions');
             else {
               confirm();
               navigate('/working');
@@ -351,6 +370,9 @@ export function FactsPage() {
       {editing && (
         <FactEditor field={editing} onClose={() => setEditing(null)} />
       )}
+      {section && (
+        <CaseEditor section={section} onClose={() => setSection(null)} />
+      )}
       {sources && <Evidence onClose={() => setSources(false)} />}
     </div>
   );
@@ -359,105 +381,96 @@ function FactEditor({
   field,
   onClose,
 }: {
-  field: EditField;
+  field: { path: string; label: string };
   onClose: () => void;
 }) {
   const { state, edit } = useDemo();
   const input = state.input!;
-  const year = input.planYears['py-2026'];
+  const choice =
+    field.path === 'coverageMode' ||
+    field.path === 'all-network' ||
+    field.path.endsWith('.network');
+  const date = field.path.endsWith('.proposedDate');
   const initial =
-    field === 'paid'
-      ? year.insurerAlreadyPaidCents
-      : field === 'maximum'
-        ? year.annualMaximumCents
-        : field === 'deductible'
-          ? year.annualDeductibleCents
-          : input.procedures.find((p) => p.id === field)?.providerChargeCents;
+    field.path === 'all-network'
+      ? input.procedures[0]?.network
+      : fieldValue(input, field.path);
   const [value, setValue] = useState(
-    field === 'coverage'
-      ? input.coverageMode
-      : field === 'network'
-        ? input.procedures[0].network
-        : field === 'crown-date'
-          ? input.procedures.find((p) => p.id === 'crown-1')!.proposedDate!
-          : initial === null || initial === undefined
-            ? ''
-            : String(initial / 100),
+    initial == null
+      ? ''
+      : typeof initial === 'number'
+        ? String(initial / 100)
+        : String(initial),
   );
   const [error, setError] = useState('');
-  const save = () => {
-    const cents = parseMoney(value);
-    if (
-      !['coverage', 'network', 'crown-date'].includes(field) &&
-      cents === null
-    ) {
-      setError('Enter a valid amount with up to two decimal places.');
-      return;
-    }
-    if (field === 'paid' && cents! > year.annualMaximumCents!) {
-      setError('Reported payments cannot exceed this sample plan maximum.');
-      return;
-    }
-    if (field === 'maximum' && cents! < (year.insurerAlreadyPaidCents ?? 0)) {
-      setError('The maximum must cover reported payments.');
-      return;
-    }
-    if (
-      field === 'crown-date' &&
-      (!value || value < '2026-11-12' || value > '2027-01-15')
-    ) {
-      setError('Choose a date within the sample dentist window.');
-      return;
-    }
-    edit((draft) => {
-      const current = draft.planYears['py-2026'];
-      if (field === 'coverage')
-        draft.coverageMode = value as DentalCaseInput['coverageMode'];
-      else if (field === 'network')
-        draft.procedures.forEach((p) => {
-          p.network = value as 'in' | 'out' | 'unknown';
-        });
-      else if (field === 'crown-date')
-        draft.procedures.find((p) => p.id === 'crown-1')!.proposedDate = value;
-      else if (field === 'paid') current.insurerAlreadyPaidCents = cents;
-      else if (field === 'maximum') current.annualMaximumCents = cents;
-      else if (field === 'deductible') current.annualDeductibleCents = cents;
-      else {
-        const procedure = draft.procedures.find((p) => p.id === field)!;
-        procedure.providerChargeCents = cents;
-        procedure.allowedCents = cents;
-      }
-    });
-    onClose();
-  };
+  const p = input.procedures.find((p) =>
+    field.path.startsWith(`procedures.${p.id}.`),
+  );
+  const options =
+    field.path === 'coverageMode'
+      ? [
+          { value: 'insured', label: 'Insured' },
+          { value: 'self_pay', label: 'Self-pay' },
+          { value: 'unknown', label: 'Not sure' },
+        ]
+      : [
+          { value: 'in', label: 'In network' },
+          { value: 'out', label: 'Out of network' },
+          { value: 'unknown', label: 'Not sure' },
+        ];
+  const label = field.path.endsWith('insurerAlreadyPaidCents')
+    ? 'Insurer payments this year'
+    : field.label;
   return (
-    <Dialog title={`Edit ${labels[field].toLowerCase()}`} onClose={onClose}>
+    <Dialog title={`Edit ${field.label.toLowerCase()}`} onClose={onClose}>
       <form
         className="stack"
         onSubmit={(e) => {
           e.preventDefault();
-          save();
+          const cents = parseMoney(value);
+          if (!choice && !date && value.trim() !== '' && cents === null) {
+            setError('Enter a valid amount with up to two decimal places.');
+            return;
+          }
+          const draft = structuredClone(input);
+          if (field.path === 'all-network')
+            draft.procedures.forEach(
+              (p) => (p.network = value as 'in' | 'out' | 'unknown'),
+            );
+          else
+            setField(
+              draft,
+              field.path,
+              choice ? value : date ? value || null : cents,
+            );
+          const error = validateCase(draft);
+          if (error) {
+            setError(error);
+            return;
+          }
+          edit((d) => Object.assign(d, draft));
+          onClose();
         }}
       >
-        <Field label={labels[field]} error={error}>
-          {field === 'coverage' ? (
+        <Field
+          label={label}
+          error={error}
+          hint={!choice && !date ? 'Leave blank if unknown.' : undefined}
+        >
+          {choice ? (
             <select value={value} onChange={(e) => setValue(e.target.value)}>
-              <option value="insured">Insured</option>
-              <option value="self_pay">Self-pay</option>
-              <option value="unknown">Not sure</option>
+              {options.map((o) => (
+                <option value={o.value} key={o.value}>
+                  {o.label}
+                </option>
+              ))}
             </select>
-          ) : field === 'network' ? (
-            <select value={value} onChange={(e) => setValue(e.target.value)}>
-              <option value="in">In network</option>
-              <option value="out">Out of network</option>
-              <option value="unknown">Not sure</option>
-            </select>
-          ) : field === 'crown-date' ? (
+          ) : date ? (
             <input
               type="date"
-              min="2026-11-12"
-              max="2027-01-15"
               value={value}
+              min={p?.dentistEarliestDate ?? undefined}
+              max={p?.dentistLatestDate ?? undefined}
               onChange={(e) => setValue(e.target.value)}
             />
           ) : (
@@ -473,7 +486,7 @@ function FactEditor({
         </Field>
         <Notice>
           Editing invalidates the current estimate. New amounts are calculated
-          by the shared benefits engine. This remains a fictional sample policy.
+          by the shared benefits engine.
         </Notice>
         <div className="actions">
           <Button variant="secondary" onClick={onClose}>

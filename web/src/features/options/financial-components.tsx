@@ -1,5 +1,7 @@
 import { CalendarDays } from 'lucide-react';
-import type { Scenario } from '@actionbridge/contracts';
+import type { Scenario, DentalCaseInput } from '@actionbridge/contracts';
+import { useDemo } from '../../state/demo-store';
+import { treatmentTitle } from '../../domain/model';
 import { Badge, Button, Card, Disclosure, Row } from '../../components/ui';
 import {
   dateLabel,
@@ -19,7 +21,8 @@ export function ScenarioCard({
   onSelect: () => void;
   onSources: () => void;
 }) {
-  const crown = scenario.schedule.find((s) => s.procedureId === 'crown-1');
+  const { state } = useDemo();
+  const input = state.input!;
   return (
     <article className={`scenario-card ${selected ? 'selected' : ''}`}>
       <label className="scenario-select">
@@ -35,7 +38,7 @@ export function ScenarioCard({
             <p className="small muted">
               {scenario.kind === 'baseline'
                 ? 'Complete care in the current benefit year'
-                : 'Fillings now, crown after your plan resets'}
+                : 'Compare dates permitted by your dentist'}
             </p>
           </div>
           {selected && <Badge tone="green">Selected</Badge>}
@@ -54,30 +57,58 @@ export function ScenarioCard({
                 {money(scenario.estimate.totals.insurerPaysCents)}
                 <small>
                   {scenario.kind === 'baseline'
-                    ? 'In 2026'
+                    ? 'Original treatment dates'
                     : 'Across both benefit years'}
                 </small>
               </>
             }
           />
-          <Row label="Fillings" value="Nov 10 and 11, 2026" />
-          <Row label="Crown" value={dateLabel(crown?.date ?? '2026-11-12')} />
-          <Row label="Procedure scope" value="2 fillings, 1 crown" />
+          {scenario.schedule.map((s) => (
+            <Row
+              key={s.procedureId}
+              label={procedureLabel(s.procedureId, input)}
+              value={dateLabel(s.date)}
+            />
+          ))}
+          <Row label="Procedure scope" value={treatmentTitle(input)} />
         </div>
         <div className="assumptions">
           <strong className="small">Assumptions</strong>
           <div>
-            <span>Covered, in network; billed equals allowed</span>
-            <Badge>Sample</Badge>
+            <span>
+              {input.procedures.every((p) => p.network === 'in')
+                ? 'In network'
+                : input.procedures.every((p) => p.network === 'out')
+                  ? 'Out of network'
+                  : 'Mixed provider networks'}
+              ;{' '}
+              {input.procedures.every(
+                (p) => p.providerChargeCents === p.allowedCents,
+              )
+                ? 'billed equals allowed'
+                : 'allowed amounts differ from billed fees'}
+            </span>
+            <Badge>
+              {Object.keys(state.provenance).length
+                ? 'Includes your answers'
+                : 'Sample'}
+            </Badge>
           </div>
           {scenario.kind === 'alternative' && (
             <>
               <div>
-                <span>Next year's coverage and fees unchanged</span>
-                <Badge tone="assumed">Assumed</Badge>
+                <span>
+                  {Object.values(input.planYears).some(
+                    (y) =>
+                      y.sourceStatus === 'explicit_unchanged_plan_assumption',
+                  )
+                    ? "Next year's coverage and fees unchanged"
+                    : 'Future plan terms entered; confirm before acting'}
+                </span>
+                <Badge tone="assumed">Unverified</Badge>
               </div>
               <div>
-                <span>Crown is within the dentist's window</span>
+                <span>Dates are within dentist-supplied windows</span>
                 <Badge>Sample</Badge>
               </div>
             </>
@@ -96,7 +127,15 @@ export function ScenarioCard({
     </article>
   );
 }
-export function BenefitYears({ scenario }: { scenario: Scenario }) {
+export function BenefitYears({
+  scenario,
+  input: supplied,
+}: {
+  scenario: Scenario;
+  input?: DentalCaseInput;
+}) {
+  const { state } = useDemo();
+  const input = supplied ?? state.input;
   return (
     <Card className="benefit-card">
       <h3>Benefit-year usage</h3>
@@ -106,11 +145,20 @@ export function BenefitYears({ scenario }: { scenario: Scenario }) {
       {Object.values(scenario.estimate.yearProjections).map((year) => (
         <div className="year-usage" key={year.planYearId}>
           <div className="year-heading">
-            <strong>{year.planYearId.replace('py-', '')}</strong>
+            <strong>
+              {input?.planYears[year.planYearId]?.startDate.slice(0, 4) ??
+                year.planYearId.replace('py-', '')}
+            </strong>
             <span className="small muted">
               {money(year.annualMaximumCents)} maximum
             </span>
           </div>
+          {input?.planYears[year.planYearId] && (
+            <p className="small muted">
+              {dateLabel(input.planYears[year.planYearId].startDate)} –{' '}
+              {dateLabel(input.planYears[year.planYearId].endDate)}
+            </p>
+          )}
           <div className="benefit-bar" aria-hidden="true">
             <span
               className="reported"
@@ -170,10 +218,14 @@ export function BenefitYears({ scenario }: { scenario: Scenario }) {
 export function ProcedureTable({
   scenario,
   onSources,
+  input: supplied,
 }: {
   scenario: Scenario;
   onSources: () => void;
+  input?: DentalCaseInput;
 }) {
+  const { state } = useDemo();
+  const input = supplied ?? state.input;
   return (
     <Card className="procedure-table-card">
       <div className="section-title">
@@ -201,7 +253,7 @@ export function ProcedureTable({
           <tbody>
             {scenario.estimate.lines.map((line) => (
               <tr key={line.procedureId}>
-                <th scope="row">{procedureLabel(line.procedureId)}</th>
+                <th scope="row">{procedureLabel(line.procedureId, input)}</th>
                 <td>{dateLabel(line.date)}</td>
                 <td>{money(line.providerChargeCents)}</td>
                 <td>{money(line.insurerPaysCents)}</td>
@@ -223,12 +275,20 @@ export function ProcedureTable({
         </table>
       </div>
       <Button variant="ghost" onClick={onSources}>
-        Fees from sample document · View source
+        Treatment fees and sources · View source
       </Button>
     </Card>
   );
 }
-export function TreatmentTimeline({ scenario }: { scenario: Scenario }) {
+export function TreatmentTimeline({
+  scenario,
+  input: supplied,
+}: {
+  scenario: Scenario;
+  input?: DentalCaseInput;
+}) {
+  const { state } = useDemo();
+  const input = supplied ?? state.input;
   return (
     <Card>
       <div className="section-title">
@@ -251,7 +311,7 @@ export function TreatmentTimeline({ scenario }: { scenario: Scenario }) {
               <span className="timeline-dot" />
               <div>
                 <span className="small muted">{dateLabel(line.date)}</span>
-                <strong>{procedureLabel(line.procedureId)}</strong>
+                <strong>{procedureLabel(line.procedureId, input)}</strong>
               </div>
               <span>
                 You pay <strong>{money(line.patientPaysCents)}</strong>
@@ -266,10 +326,14 @@ export function TreatmentTimeline({ scenario }: { scenario: Scenario }) {
 export function ProcedureDetails({
   scenario,
   onSources,
+  input: supplied,
 }: {
   scenario: Scenario;
   onSources: () => void;
+  input?: DentalCaseInput;
 }) {
+  const { state } = useDemo();
+  const input = supplied ?? state.input;
   return (
     <Card>
       <h3>Costs by procedure</h3>
@@ -280,7 +344,7 @@ export function ProcedureDetails({
           title={
             <div className="procedure-summary">
               <div>
-                <strong>{procedureLabel(line.procedureId)}</strong>
+                <strong>{procedureLabel(line.procedureId, input)}</strong>
                 <span className="small muted">{dateLabel(line.date)}</span>
               </div>
               <span className="small muted">
@@ -338,8 +402,8 @@ export function Conditions() {
       <h3>Important conditions</h3>
       <ul className="condition-list">
         <li>
-          2027 coverage and fees are <strong>assumed unchanged</strong>. Confirm
-          the renewal with your insurer.
+          Confirm future coverage, benefit balances and treatment fees with your
+          insurer and dentist. Any unchanged-plan assumption remains unverified.
         </li>
         <li>
           Moving treatment requires a dentist-supplied window. Your dentist

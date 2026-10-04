@@ -2917,3 +2917,64 @@ tfoot td {
     scroll-behavior: auto !important;
   }
 }
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.dark input[type='date'] {
+  color-scheme: dark;
+}
+.dialog input[type='date'] {
+  color-scheme: light;
+}
+.form-grid > * {
+  min-width: 0;
+}
+.rule-group {
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+  margin-top: 20px;
+}
+.rule-group h4 {
+  margin: 0 0 16px;
+  font-size: 15px;
+}
+.voice-confirmation {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0;
+}
+.history-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+.history-list p {
+  margin: 0;
+}
+.case-history-card .section-title {
+  align-items: flex-start;
+}
+.case-history-card h3 {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .rule-group .fact-edit-row {
+    align-items: flex-start;
+  }
+}

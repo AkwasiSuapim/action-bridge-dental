@@ -198,6 +198,7 @@ test('unknown answers recover, changed inputs invalidate saved results', async (
   ).toBeVisible();
   await page.getByRole('button', { name: 'Answer this detail' }).click();
   await page.getByRole('button', { name: 'Sample voice answer' }).click();
+  await page.getByRole('button', { name: 'Yes, use $500' }).click();
   await expect(page.getByLabel('Insurer already paid in 2026')).toHaveValue(
     '500',
   );

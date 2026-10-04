@@ -29,6 +29,7 @@ import {
 } from './features/account/account-pages';
 import { DemoProvider } from './state/demo-store';
 import { JobProvider } from './state/job-store';
+import { ManualPage } from './features/intake/manual-page';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -40,6 +41,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <Route element={<Shell />}>
               <Route index element={<HomePage />} />
               <Route path="intake/type" element={<TypePage />} />
+              <Route path="intake/manual" element={<ManualPage />} />
               <Route path="intake/speak" element={<SpeakPage />} />
               <Route path="intake/upload" element={<UploadPage />} />
               <Route path="intake/photo" element={<PhotoPage />} />

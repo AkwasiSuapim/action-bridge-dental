@@ -16,8 +16,61 @@ import {
   type Attachment,
   type DemoState,
   type Session,
+  type CaseSnapshot,
 } from '../domain/model';
 import { sampleInput } from '../services/dental-service';
+import { fieldLabel, inputFacts } from '../domain/case-fields';
+
+export function snapshot(s: DemoState): CaseSnapshot {
+  const {
+    caseId,
+    input,
+    confirmed,
+    comparedRevision,
+    selectedId,
+    saved,
+    quote,
+    reminder,
+    provenance,
+    origin,
+    documentNeeded,
+    documentDeclined,
+    deductibleConflict,
+  } = s;
+  return {
+    caseId,
+    input,
+    confirmed,
+    comparedRevision,
+    selectedId,
+    saved,
+    quote,
+    reminder,
+    provenance,
+    origin,
+    documentNeeded,
+    documentDeclined,
+    deductibleConflict,
+    updatedAt:
+      s.events.find((e) => e.caseId === caseId)?.timestamp ??
+      new Date().toISOString(),
+  };
+}
+export function recentCases(s: DemoState): CaseSnapshot[] {
+  return (
+    s.input
+      ? [snapshot(s), ...s.cases.filter((c) => c.caseId !== s.caseId)]
+      : s.cases
+  ).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+function archive(s: DemoState) {
+  return s.input
+    ? [snapshot(s), ...s.cases.filter((c) => c.caseId !== s.caseId)].slice(
+        0,
+        20,
+      )
+    : s.cases;
+}
 
 const KEY = 'actionbridge.web.demo.v1';
 function read(): DemoState {
@@ -36,8 +89,23 @@ function read(): DemoState {
     if (data.saved) {
       ScenarioSchema.parse(data.saved.scenario);
       DentalCaseInputSchema.parse(data.saved.input);
+      data.saved.provenance ??= {};
     }
-    return { ...initialState(), ...data, attachments: [] };
+    for (const c of data.cases ?? []) {
+      if (!c.caseId || !c.input) return initialState();
+      DentalCaseInputSchema.parse(c.input);
+      if (c.saved) {
+        ScenarioSchema.parse(c.saved.scenario);
+        DentalCaseInputSchema.parse(c.saved.input);
+        c.saved.provenance ??= {};
+      }
+    }
+    return {
+      ...initialState(),
+      ...data,
+      caseId: data.caseId ?? (data.input ? 'legacy-demo' : null),
+      attachments: [],
+    };
   } catch {
     return initialState();
   }
@@ -58,6 +126,16 @@ type Store = {
   setQuote: (quote: DemoState['quote']) => void;
   setReminder: (date: string | null) => void;
   rename: (name: string) => void;
+  createCase: (input: DentalCaseInput) => void;
+  openCase: (id: string) => void;
+  setCaseFlags: (
+    flags: Partial<
+      Pick<
+        DemoState,
+        'documentNeeded' | 'documentDeclined' | 'deductibleConflict'
+      >
+    >,
+  ) => void;
 };
 const Context = createContext<Store | null>(null);
 export function DemoProvider({ children }: { children: ReactNode }) {
@@ -71,6 +149,9 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         title,
         detail,
         timestamp: new Date().toISOString(),
+        caseId: s.caseId ?? undefined,
+        routine:
+          title === 'Case details updated' || title === 'Details confirmed',
       },
       ...s.events,
     ].slice(0, 100),
@@ -96,11 +177,61 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         session,
       })),
     signOut: () => change(() => initialState()),
+    createCase: (input) =>
+      change((s) => {
+        const next = {
+          ...initialState(),
+          session: s.session,
+          events: s.events,
+          cases: archive(s),
+          caseId: crypto.randomUUID(),
+          input: structuredClone(input),
+          origin: 'manual' as const,
+          documentNeeded: true,
+        };
+        const now = new Date().toISOString();
+        for (const [path, value] of Object.entries(inputFacts(input)))
+          if (value !== 'Not answered' && value !== 'Not sure')
+            next.provenance[path] = {
+              label: fieldLabel(input, path),
+              value,
+              recordedAt: now,
+            };
+        return event(
+          next,
+          'Estimate started',
+          'Manual demo treatment entered. No information sent to a server.',
+        );
+      }),
+    openCase: (id) =>
+      change((s) => {
+        if (id === s.caseId) return s;
+        const found = s.cases.find((c) => c.caseId === id);
+        if (!found) return s;
+        return {
+          ...s,
+          ...found,
+          cases: archive(s).filter((c) => c.caseId !== id),
+          transcript: '',
+          attachments: [],
+        };
+      }),
+    setCaseFlags: (flags) =>
+      change((s) => ({
+        ...s,
+        ...flags,
+        confirmed: false,
+        comparedRevision: null,
+      })),
     startSample: () =>
       change((s) =>
         event(
           {
-            ...s,
+            ...initialState(),
+            session: s.session,
+            events: s.events,
+            cases: archive(s),
+            caseId: crypto.randomUUID(),
             input: sampleInput(),
             attachments: [
               { name: 'Jordan-treatment-estimate.pdf', kind: 'sample' },
@@ -121,6 +252,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             input: s.input
               ? { ...s.input, caseRevision: s.input.caseRevision + 1 }
               : sampleInput(),
+            caseId: s.caseId ?? crypto.randomUUID(),
+            documentNeeded: attachment
+              ? false
+              : s.documentNeeded || (!!text && s.attachments.length === 0),
             transcript: text ?? s.transcript,
             attachments: attachment
               ? [
@@ -150,9 +285,44 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         if (!s.input) return s;
         const input = structuredClone(s.input);
         mutate(input);
-        input.caseRevision += 1;
+        const before = inputFacts(s.input);
+        const after = inputFacts(input);
+        const provenance = { ...s.provenance };
+        for (const [path, value] of Object.entries(after))
+          if (before[path] !== value)
+            provenance[path] = {
+              label: fieldLabel(input, path),
+              value,
+              recordedAt: new Date().toISOString(),
+            };
+        for (const path of Object.keys(provenance))
+          if (!(path in after)) delete provenance[path];
+        input.caseRevision = s.input.caseRevision + 1;
+        for (const [id, y] of Object.entries(input.planYears))
+          if (
+            Object.keys(after).some(
+              (path) =>
+                path.startsWith(`planYears.${id}.`) &&
+                before[path] !== after[path],
+            )
+          )
+            y.sourceStatus = 'user_entered';
+        const scopeChanged =
+          s.input.procedures
+            .map((p) => `${p.id}:${p.label}:${p.category}`)
+            .join('|') !==
+          input.procedures
+            .map((p) => `${p.id}:${p.label}:${p.category}`)
+            .join('|');
         return event(
-          { ...s, input, confirmed: false, comparedRevision: null },
+          {
+            ...s,
+            input,
+            provenance,
+            quote: scopeChanged ? null : s.quote,
+            confirmed: false,
+            comparedRevision: null,
+          },
           'Case details updated',
           `Revision ${input.caseRevision}. Previous estimates need recalculation.`,
         );
@@ -201,6 +371,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
               scenario: structuredClone(scenario),
               input: structuredClone(s.input),
               savedAt: new Date().toISOString(),
+              provenance: structuredClone(s.provenance),
             },
           },
           'Plan saved',

@@ -103,14 +103,21 @@ export function DetailsPage() {
       </Card>
       <div className="financial-grid">
         <div className="stack">
-          <TreatmentTimeline scenario={scenario} />
+          <TreatmentTimeline
+            scenario={scenario}
+            input={saved ? state.saved!.input : state.input!}
+          />
           <ProcedureDetails
             scenario={scenario}
+            input={saved ? state.saved!.input : state.input!}
             onSources={() => setSources(true)}
           />
         </div>
         <div className="stack">
-          <BenefitYears scenario={scenario} />
+          <BenefitYears
+            scenario={scenario}
+            input={saved ? state.saved!.input : state.input!}
+          />
           <Conditions />
           <Card>
             <h3>How to read the labels</h3>
@@ -151,7 +158,13 @@ export function DetailsPage() {
           {stale ? 'Recompare current details' : 'Review this plan'}
         </Button>
       </FooterActions>
-      {sources && <Evidence onClose={() => setSources(false)} />}
+      {sources && (
+        <Evidence
+          input={saved ? state.saved!.input : state.input!}
+          provenance={saved ? state.saved!.provenance : state.provenance}
+          onClose={() => setSources(false)}
+        />
+      )}
     </div>
   );
 }
