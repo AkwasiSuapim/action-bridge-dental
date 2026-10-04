@@ -1,7 +1,7 @@
-import type { DentalCase, ScenarioComparison, ScenarioComparisonResult } from '@actionbridge/contracts';
+import type { DentalCase, ScenarioComparison } from '@actionbridge/contracts';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Check, X } from 'lucide-react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { AccessibilityInfo, Pressable, View } from 'react-native';
 import { AgentOrb } from '../../components/orb';
 import { ErrorNotice, ErrorState, LoadingState } from '../../components/states';
@@ -14,6 +14,7 @@ import { ThemeProvider, useTheme } from '../../theme/theme';
 import { fonts, layout, space } from '../../theme/tokens';
 import { useCase, useSavedStrategy } from '../case/case-store';
 import { buildFactGroups, isSampleCase } from '../case/facts';
+import { useRevisionResult } from '../case/use-revision-result';
 import { buildOptions } from '../options/options-model';
 import { findScenario } from '../plan/plan-model';
 import { classifySaveFailure } from './save-flow';
@@ -23,25 +24,7 @@ export function ReviewScreen() {
   const { caseId, scenario: scenarioId } = useLocalSearchParams<{ caseId: string; scenario: string }>();
   const { record, loading, error, reload } = useCase(caseId);
   const api = useApi();
-  const [result, setResult] = useState<{ revision: number; scenarios: ScenarioComparisonResult } | null>(null);
-  const [failure, setFailure] = useState<ApiError | null>(null);
-
-  const revision = record?.caseRevision;
-  const load = useCallback(async () => {
-    if (!caseId || revision === undefined) return;
-    setFailure(null);
-    try {
-      setResult({ revision, scenarios: await api.scenarios(caseId, revision) });
-    } catch (caught) {
-      const apiError = asApiError(caught);
-      if (apiError.code === 'REVISION_CONFLICT') await reload();
-      else setFailure(apiError);
-    }
-  }, [api, caseId, revision, reload]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { current, failure, retry: load } = useRevisionResult(caseId, record?.caseRevision, reload, api.scenarios);
 
   if (loading) return <LoadingState label="Loading your plan" />;
   if (!record) return error ? <ErrorState error={error} onRetry={reload} /> : <LoadingState label="Loading your plan" />;
@@ -52,7 +35,6 @@ export function ReviewScreen() {
       </Screen>
     );
   }
-  const current = result && result.revision === record.caseRevision ? result.scenarios : null;
   if (!current) return <LoadingState label="Loading your plan" />;
   if (current.status !== 'estimated' || !findScenario(current, scenarioId)) return <Stale caseId={record.caseId} />;
   return <ReviewFlow record={record} comparison={current} scenarioId={scenarioId!} />;

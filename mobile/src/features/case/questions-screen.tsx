@@ -1,4 +1,3 @@
-import type { EstimateResult } from '@actionbridge/contracts';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
@@ -7,12 +6,12 @@ import { ErrorNotice, ErrorState, LoadingState } from '../../components/states';
 import { AppText, Button, Card, Screen } from '../../components/ui';
 import { valueAt } from '../../lib/edits';
 import { questionFor } from '../../lib/questions';
-import { asApiError, type ApiError } from '../../services/api';
 import { useApi } from '../../services/api-context';
 import { space } from '../../theme/tokens';
 import { useCase } from './case-store';
 import { QuestionForm } from './question-form';
 import { nextStep } from './question-loop';
+import { useRevisionResult } from './use-revision-result';
 
 /**
  * Adaptive question loop (doc 05): the engine decides what is missing; the user answers one
@@ -22,32 +21,13 @@ export function QuestionsScreen() {
   const { caseId } = useLocalSearchParams<{ caseId: string }>();
   const { record, loading, error, reload } = useCase(caseId);
   const api = useApi();
-  const [estimate, setEstimate] = useState<EstimateResult | null>(null);
-  const [failure, setFailure] = useState<ApiError | null>(null);
   const [skipped, setSkipped] = useState<ReadonlySet<string>>(new Set());
-
-  const revision = record?.caseRevision;
-  const check = useCallback(async () => {
-    if (!caseId || revision === undefined) return;
-    setFailure(null);
-    try {
-      setEstimate(await api.estimate(caseId, revision));
-    } catch (caught) {
-      const apiError = asApiError(caught);
-      if (apiError.code === 'REVISION_CONFLICT') await reload();
-      else setFailure(apiError);
-    }
-  }, [api, caseId, revision, reload]);
-
-  useEffect(() => {
-    void check();
-  }, [check]);
+  const { current, failure, retry: check } = useRevisionResult(caseId, record?.caseRevision, reload, api.estimate);
 
   const finish = useCallback(() => {
     if (caseId) router.replace(`/case/${caseId}/facts`);
   }, [caseId]);
 
-  const current = estimate && record && estimate.caseRevision === record.caseRevision ? estimate : null;
   const step = current ? nextStep(current.status === 'needs_information' ? current.missing : [], skipped) : null;
 
   useEffect(() => {
