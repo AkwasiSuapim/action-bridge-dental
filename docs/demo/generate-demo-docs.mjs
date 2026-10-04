@@ -58,7 +58,7 @@ const estimate = pdf([
   ['gap', ''],
   ['heading', 'Timing from your dentist'],
   ['text', 'The fillings should be done in November 2026 as planned.'],
-  ['text', 'The crown can safely be done any time between 2026-11-12 and 2027-01-15.'],
+  ['text', 'Crown, tooth 30 (D2740) timing: your dentist says it can safely be done any time from 2026-11-12 to 2027-01-15.'],
   ['gap', ''],
   ['small', 'Cash price: what you pay without insurance, for the same service.'],
   ['gap', ''],

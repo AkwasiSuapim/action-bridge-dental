@@ -9,7 +9,7 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>
 endobj
 4 0 obj
-<< /Length 1550 >>
+<< /Length 1591 >>
 stream
 BT /F1 9 Tf 56 735 Td (SAMPLE DOCUMENT - FICTIONAL OFFICE AND PATIENT - FOR DEMONSTRATION ONLY) Tj ET
 BT /F2 17 Tf 56 705 Td (Bright Harbor Dental \(fictional\) - Treatment Estimate) Tj ET
@@ -24,7 +24,7 @@ BT /F1 11 Tf 56 563 Td (Total quoted treatment: $1,500.00) Tj ET
 BT /F2 12 Tf 56 529 Td (Timing from your dentist) Tj ET
 56 523 m 556 523 l 0.8 G S
 BT /F1 11 Tf 56 511 Td (The fillings should be done in November 2026 as planned.) Tj ET
-BT /F1 11 Tf 56 493 Td (The crown can safely be done any time between 2026-11-12 and 2027-01-15.) Tj ET
+BT /F1 11 Tf 56 493 Td (Crown, tooth 30 \(D2740\) timing: your dentist says it can safely be done any time from 2026-11-12 to 2027-01-15.) Tj ET
 BT /F1 9 Tf 56 468 Td (Cash price: what you pay without insurance, for the same service.) Tj ET
 BT /F1 9 Tf 56 443 Td (This estimate is not a guarantee of payment. Your insurer decides final benefits.) Tj ET
 BT /F1 9 Tf 56 428 Td (SAMPLE DOCUMENT - no real person, office or plan.) Tj ET
@@ -43,10 +43,10 @@ xref
 0000000058 00000 n 
 0000000115 00000 n 
 0000000251 00000 n 
-0000001853 00000 n 
-0000001923 00000 n 
+0000001894 00000 n 
+0000001964 00000 n 
 trailer
 << /Size 7 /Root 1 0 R >>
 startxref
-1998
+2039
 %%EOF

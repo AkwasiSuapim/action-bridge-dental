@@ -3470,3 +3470,11 @@ tfoot td {
     animation: none;
   }
 }
+.voice-heard {
+  font-weight: 500;
+  color: var(--text);
+  margin-left: 4px;
+}
+a.button {
+  text-decoration: none;
+}

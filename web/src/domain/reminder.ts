@@ -51,3 +51,26 @@ export function reminderIcs({
     '',
   ].join('\r\n');
 }
+
+/**
+ * A Google Calendar "add event" link with the reminder filled in. Nothing is sent to Google until
+ * the user presses Save in their own Google Calendar; no sign-in or API key is involved here.
+ */
+export function googleCalendarUrl({
+  leftCents,
+  yearEnd,
+  today,
+}: {
+  leftCents: number;
+  yearEnd: string;
+  today: string;
+}): string {
+  const on = reminderDate(yearEnd, today).replace(/-/g, '');
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: `Use your dental benefits: ${plainMoney(leftCents)} left until ${plainDate(yearEnd)}`,
+    dates: `${on}T090000/${on}T091500`,
+    details: `Your dental plan has about ${plainMoney(leftCents)} of its yearly maximum left. Unused benefits don't carry over after ${plainDate(yearEnd)}. Ask your dentist whether planned treatment can be scheduled before then. (Reminder from ActionBridge Dental; estimates only.)`,
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}

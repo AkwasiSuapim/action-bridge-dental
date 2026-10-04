@@ -255,3 +255,40 @@ export function spokenChoice(transcript: string, options: { id: string; label: s
   const [best, second] = scored;
   return best && best.score > 0 && (!second || best.score > second.score) ? best.id : null;
 }
+
+const SMALL: Record<string, number> = {
+  zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+  twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+};
+
+/**
+ * A spoken amount in cents: "$500", "1,200 dollars", "two hundred fifty", "nothing" → 0.
+ * Null when no amount was said, so the app asks again instead of guessing.
+ */
+export function spokenMoney(transcript: string): number | null {
+  const said = transcript.toLowerCase().replace(/-/g, ' ').trim();
+  if (/\b(nothing|none|zero|no money|nil)\b/.test(said) && !/\d/.test(said)) return 0;
+  const digits = said.match(/\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/);
+  if (digits?.[1]) {
+    const value = Number(digits[1].replace(/,/g, ''));
+    if (Number.isFinite(value)) return Math.round(value * 100);
+  }
+  let total = 0;
+  let group = 0;
+  let found = false;
+  for (const word of said.split(/[^a-z]+/)) {
+    if (word in SMALL) {
+      group += SMALL[word]!;
+      found = true;
+    } else if (word === 'hundred') {
+      group = (group || 1) * 100;
+      found = true;
+    } else if (word === 'thousand') {
+      total += (group || 1) * 1000;
+      group = 0;
+      found = true;
+    }
+  }
+  return found ? (total + group) * 100 : null;
+}
