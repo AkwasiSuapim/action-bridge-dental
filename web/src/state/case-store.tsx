@@ -174,8 +174,9 @@ export function CaseProvider({ children }: { children: ReactNode }) {
   const loadResults = useCallback(
     (force = false) => {
       if (!record || !resultsKey) return;
-      if (!force && results?.key === resultsKey && results.status !== 'error')
-        return;
+      // One automatic load per revision. A failure stays on screen until the user retries or the
+      // case changes; retrying automatically here caused a request loop on a 422.
+      if (!force && results?.key === resultsKey) return;
       const key = resultsKey;
       setResults({ key, status: 'loading', data: null, error: null });
       void Promise.all([

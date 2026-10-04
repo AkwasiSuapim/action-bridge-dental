@@ -308,3 +308,30 @@ for (const width of [360, 390, 768, 1024, 1440]) {
     expect(await noOverflow()).toBe(true);
   });
 }
+
+test('contradictory details: one request, a clear message and a way to fix it — never a retry loop', async ({
+  page,
+}) => {
+  const api = await mockBackend(page);
+  await signIn(page);
+  await startSample(page);
+  // The stored case says the deductible met ($60) is more than the deductible ($50).
+  const [record] = [...api.cases.values()];
+  record!.planYears['py-2026']!.deductibleAlreadyMetCents = 6000;
+  await page.goto('/options');
+  await expect(
+    page.getByRole('heading', { name: 'Two details don’t add up' }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByText('Deductible already met is larger than the annual deductible.')
+      .first(),
+  ).toBeVisible();
+  await page.waitForTimeout(1500);
+  const calls = api.requests.filter((r) => r.path.endsWith('/scenarios'));
+  expect(calls.length).toBeLessThanOrEqual(2);
+  await page.getByRole('button', { name: 'Fix your details' }).click();
+  await expect(
+    page.getByText('Two details don’t add up — fix one to continue:'),
+  ).toBeVisible();
+});

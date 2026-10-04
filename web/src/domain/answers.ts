@@ -4,7 +4,7 @@ import type {
   UiBlockEnvelope,
 } from '@actionbridge/contracts';
 import { validDate } from './case-fields';
-import { parseMoney } from './model';
+import { money, parseMoney } from './model';
 
 /**
  * What the user has entered for one assistant question before validation (same model as the
@@ -106,7 +106,7 @@ export function buildAnswers(
         else if (q.maximumCents !== undefined && cents > q.maximumCents)
           problems.push({
             questionId: q.questionId,
-            message: 'That amount is higher than this question allows.',
+            message: `It can’t be more than ${money(q.maximumCents)} — that would contradict your other details.`,
           });
         else
           answers.push({

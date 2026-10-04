@@ -328,6 +328,19 @@ export function FactsPage() {
             Only a dentist-supplied window permits moving treatment.
             ActionBridge doesn't decide whether care can wait.
           </Notice>
+          {results.error?.code === 'INCONSISTENT_INPUT' && (
+            <Notice tone="danger">
+              <strong>Two details don’t add up — fix one to continue:</strong>
+              <ul className="hint-list small">
+                {(results.error.options.issues?.length
+                  ? results.error.options.issues.map((i) => i.message)
+                  : [results.error.message]
+                ).map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            </Notice>
+          )}
           {missing.length > 0 && (
             <Notice tone="warning">
               {missing.length === 1

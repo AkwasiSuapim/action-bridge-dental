@@ -1,5 +1,5 @@
 import type { JobAnswersRequest, MissingFieldBlock, UiBlockEnvelope } from '@actionbridge/contracts';
-import { isIsoDate, parseDollarsToCents } from '../../lib/format';
+import { formatCents, isIsoDate, parseDollarsToCents } from '../../lib/format';
 
 /**
  * What the user has entered for one assistant question, before it is validated:
@@ -57,7 +57,7 @@ export function buildAnswers(
       case 'currency': {
         const cents = draft.kind === 'text' ? parseDollarsToCents(draft.text) : null;
         if (cents === null) problems.push({ questionId: q.questionId, message: 'Enter dollars and cents, for example 1200.00.' });
-        else if (q.maximumCents !== undefined && cents > q.maximumCents) problems.push({ questionId: q.questionId, message: 'That amount is higher than this question allows.' });
+        else if (q.maximumCents !== undefined && cents > q.maximumCents) problems.push({ questionId: q.questionId, message: `It can’t be more than ${formatCents(q.maximumCents)} — that would contradict your other details.` });
         else answers.push({ ...base, value: cents, unknown: false, responseMode: 'type' });
         break;
       }

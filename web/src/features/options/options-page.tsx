@@ -58,7 +58,19 @@ export function OptionsPage() {
       </div>
     );
   if (status === 'error' && error)
-    return (
+    return error.code === 'INCONSISTENT_INPUT' ? (
+      // Contradictory numbers: retrying can't help, fixing the detail can.
+      <div className="page narrow">
+        <PageHeading
+          title="Two details don’t add up"
+          description="I can’t calculate until this is fixed. Nothing was guessed."
+        />
+        <ApiNotice error={error} />
+        <FooterActions>
+          <Button onClick={() => navigate('/facts')}>Fix your details</Button>
+        </FooterActions>
+      </div>
+    ) : (
       <div className="page narrow">
         <ApiNotice error={error} onRetry={retry} />
       </div>

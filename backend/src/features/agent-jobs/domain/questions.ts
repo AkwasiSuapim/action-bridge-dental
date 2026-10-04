@@ -114,7 +114,7 @@ export function questionBlocks(
       expectedRevision,
     };
     if (spec.inputType === 'currency') {
-      blocks.push({ ...base, inputType: 'currency', options: [], allowedResponseModes: ['type'], currency: 'USD', minimumCents: 0, maximumCents: MAX_CENTS });
+      blocks.push({ ...base, inputType: 'currency', options: [], allowedResponseModes: ['type'], currency: 'USD', minimumCents: 0, maximumCents: maxCentsFor(fact.fieldPath, input) });
     } else if (spec.inputType === 'single_select') {
       blocks.push({ ...base, inputType: 'single_select', options: spec.options.map(({ id, label }) => ({ id, label })), allowedResponseModes: ['tap'] });
     } else {
@@ -124,11 +124,32 @@ export function questionBlocks(
   return { blocks: blocks.slice(0, 9), unanswerable };
 }
 
+/**
+ * The largest answer that can't contradict what the case already says: deductible met ≤ the
+ * deductible, insurer already paid ≤ the annual maximum, allowed amount ≤ the dentist's charge,
+ * write-off ≤ the charge minus the allowed amount. Both apps check this before sending.
+ */
+export function maxCentsFor(fieldPath: string, input: DentalCaseInput): number {
+  const [root, id, field] = fieldPath.split('.');
+  if (root === 'planYears' && id) {
+    const year = input.planYears[id];
+    if (field === 'deductibleAlreadyMetCents' && year?.annualDeductibleCents != null) return year.annualDeductibleCents;
+    if (field === 'insurerAlreadyPaidCents' && year?.annualMaximumCents != null) return year.annualMaximumCents;
+  }
+  if (root === 'procedures' && id) {
+    const procedure = input.procedures.find((p) => p.id === id);
+    if (field === 'allowedCents' && procedure?.providerChargeCents != null) return procedure.providerChargeCents;
+    if (field === 'contractualWriteoffCents' && procedure?.providerChargeCents != null)
+      return Math.max(0, procedure.providerChargeCents - (procedure.allowedCents ?? 0));
+  }
+  return MAX_CENTS;
+}
+
 /** Maps a submitted answer for a question block to the typed value stored in the case, or null if invalid. */
 export function valueForAnswer(block: MissingFieldBlock, value: unknown, input: DentalCaseInput): { ok: true; value: unknown } | { ok: false } {
   switch (block.inputType) {
     case 'currency':
-      return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_CENTS ? { ok: true, value } : { ok: false };
+      return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= (block.maximumCents ?? MAX_CENTS) ? { ok: true, value } : { ok: false };
     case 'date':
       return typeof value === 'string' && isValidIsoDate(value) ? { ok: true, value } : { ok: false };
     case 'single_select': {
