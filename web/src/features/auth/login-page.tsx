@@ -71,8 +71,8 @@ export function LoginPage() {
     <div className="login dark">
       <section className="login-art" aria-label="About ActionBridge Dental">
         <img
-          src="/assets/dental-room.jpg"
-          alt="An inviting dental treatment room with a padded chair in soft daylight"
+          src="/assets/welcome.jpg"
+          alt="A model tooth and dental mirror on a table in a bright clinic"
         />
         <div className="login-overlay" />
         <div className="login-art-content">
@@ -83,7 +83,6 @@ export function LoginPage() {
               Compare treatment timing against your benefits, and take a clear
               question back to your dentist.
             </p>
-            <small>Photo: Ozkan Guner on Unsplash</small>
           </div>
         </div>
       </section>
