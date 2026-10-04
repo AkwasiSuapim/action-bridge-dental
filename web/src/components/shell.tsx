@@ -10,15 +10,10 @@ import {
   UserRound,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import {
-  NavLink,
-  Navigate,
-  Outlet,
-  useLocation,
-  useNavigate,
-} from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useDemo } from '../state/demo-store';
 import { useJob } from '../state/job-store';
+import { useEndSession } from '../state/session';
 import { Badge, Brand, Button, Dialog } from './ui';
 
 const pages: Record<string, string> = {
@@ -40,7 +35,8 @@ const pages: Record<string, string> = {
   '/saved': 'Saved plan',
 };
 export function Shell() {
-  const { state, signOut, reset, startSample, edit } = useDemo();
+  const { state, reset, startSample, edit } = useDemo();
+  const endSession = useEndSession();
   const { job, controls, setControl, cancel } = useJob();
   const navigate = useNavigate();
   const location = useLocation();
@@ -56,12 +52,8 @@ export function Shell() {
     window.scrollTo({ top: 0 });
     document.title = `${pages[location.pathname] ?? 'Home'} · ActionBridge Dental`;
   }, [location.pathname]);
-  if (!state.session) return <Navigate to="/login" replace />;
-  const leave = () => {
-    cancel();
-    signOut();
-    navigate('/login', { replace: true });
-  };
+  if (!state.session) return null;
+  const leave = () => endSession();
   return (
     <div className={`app-shell ${dark ? 'dark' : 'light'}`}>
       <a href="#main" className="skip-link">
@@ -258,14 +250,7 @@ export function Shell() {
           >
             Show empty state
           </Button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              cancel();
-              signOut();
-              navigate('/login', { state: { expired: true } });
-            }}
-          >
+          <Button variant="secondary" onClick={() => endSession('expired')}>
             Expire session
           </Button>
           <Button

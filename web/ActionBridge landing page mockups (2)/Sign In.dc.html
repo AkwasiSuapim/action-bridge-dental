@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F6F8F7;color:#07110D;font-family:'Plus Jakarta Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#0E6B4D;text-decoration:none}
+a:hover{color:#0A5A40}
+:focus-visible{outline:2px solid #0E6B4D;outline-offset:3px;border-radius:8px}
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex;flex-direction:column;font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#F6F8F7">
+  <header style="max-width:1280px;width:100%;margin:0 auto;padding:24px clamp(20px,4vw,40px);display:flex;justify-content:space-between;align-items:center;gap:16px">
+    <a href="ActionBridge%20Landing.dc.html" aria-label="ActionBridge Dental home" style="display:flex;align-items:center;gap:12px;color:#07110D">
+      <span style="width:8px;height:8px;border-radius:999px;background:#31E981;box-shadow:0 0 0 3px rgba(49,233,129,.18)"></span>
+      <span style="font-size:17px;font-weight:700;letter-spacing:-0.02em">ActionBridge</span>
+      <span style="width:1px;height:18px;background:rgba(7,17,13,.18)"></span>
+      <span style="font-size:17px;font-weight:500;color:#3D4B45">Dental</span>
+    </a>
+    <a href="ActionBridge%20Landing.dc.html" style="font-size:14.5px;font-weight:500;color:#3D4B45" style-hover="color:#07110D">← Back to home</a>
+  </header>
+  <main style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px clamp(16px,4vw,40px) 64px">
+    <div style="width:100%;max-width:440px;background:#fff;border:1px solid rgba(7,17,13,.08);border-radius:24px;padding:clamp(28px,5vw,40px);box-shadow:0 1px 2px rgba(7,17,13,.04),0 24px 56px rgba(10,50,60,.08);display:flex;flex-direction:column;gap:28px">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <h1 style="margin:0;font-size:28px;font-weight:700;letter-spacing:-0.03em">{{ title }}</h1>
+        <p style="margin:0;font-size:16px;line-height:1.55;color:#3D4B45">{{ sub }}</p>
+      </div>
+      <sc-if value="{{ showForm }}" hint-placeholder-val="{{ true }}">
+        <form onSubmit="{{ submit }}" style="display:flex;flex-direction:column;gap:20px">
+          <label style="display:flex;flex-direction:column;gap:8px;font-size:14px;font-weight:600">Email
+            <input type="email" required="" autocomplete="email" placeholder="you@example.com" style="height:48px;padding:0 14px;border:1px solid rgba(7,17,13,.16);border-radius:12px;font:inherit;font-size:16px;font-weight:400;color:#07110D;background:#fff;outline:none;transition:border-color 160ms,box-shadow 160ms" style-focus="border-color:#0E6B4D;box-shadow:0 0 0 3px rgba(14,107,77,.14)">
+          </label>
+          <sc-if value="{{ needsPassword }}" hint-placeholder-val="{{ true }}">
+            <label style="display:flex;flex-direction:column;gap:8px;font-size:14px;font-weight:600">
+              <span style="display:flex;justify-content:space-between;align-items:baseline">Password
+                <sc-if value="{{ isSignIn }}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{ goForgot }}" style="background:none;border:0;padding:0;font:inherit;font-size:13.5px;font-weight:600;color:#0E6B4D;cursor:pointer">Forgot password?</button></sc-if>
+              </span>
+              <input type="password" required="" minlength="8" autocomplete="{{ pwAuto }}" style="height:48px;padding:0 14px;border:1px solid rgba(7,17,13,.16);border-radius:12px;font:inherit;font-size:16px;font-weight:400;color:#07110D;background:#fff;outline:none;transition:border-color 160ms,box-shadow 160ms" style-focus="border-color:#0E6B4D;box-shadow:0 0 0 3px rgba(14,107,77,.14)">
+            </label>
+          </sc-if>
+          <button type="submit" style="height:52px;border:0;border-radius:14px;background:#0E6B4D;color:#fff;font:inherit;font-size:16px;font-weight:600;cursor:pointer;transition:background 180ms,transform 120ms" style-hover="background:#0A5A40" style-active="transform:scale(.98)">{{ cta }}</button>
+        </form>
+      </sc-if>
+      <sc-if value="{{ isVerify }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;gap:14px;align-items:flex-start;padding:16px;border-radius:12px;background:#E7F2EC;color:#0E6B4D;font-size:14.5px;line-height:1.5">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3.5 6.5l8.5 6 8.5-6"></path></svg>
+          <span style="color:#07110D">Open the link in that email to finish setting up your account. It may take a minute to arrive.</span>
+        </div>
+      </sc-if>
+      <div style="padding-top:20px;border-top:1px solid rgba(7,17,13,.08);font-size:14.5px;color:#3D4B45;display:flex;gap:6px;flex-wrap:wrap">
+        <span>{{ switchText }}</span>
+        <button type="button" onClick="{{ switchMode }}" style="background:none;border:0;padding:0;font:inherit;font-size:14.5px;font-weight:600;color:#0E6B4D;cursor:pointer">{{ switchCta }}</button>
+      </div>
+    </div>
+  </main>
+  <footer style="padding:0 24px 32px;text-align:center;font-size:13px;color:#5C6B64">Estimates only. Your dentist and insurer decide final costs.</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { mode: (typeof location !== 'undefined' && /mode=create/.test(location.search)) ? 'create' : 'signin' };
+  renderVals() {
+    const m = this.state.mode;
+    const copy = {
+      signin: ['Welcome back', 'Sign in to return to your saved plans.', 'Sign in', 'New to ActionBridge?', 'Create an account'],
+      create: ['Create your account', 'Save plans and come back to them anytime.', 'Create account', 'Already have an account?', 'Sign in'],
+      forgot: ['Reset your password', 'Enter your email and we’ll send a reset link.', 'Send reset link', 'Remembered it?', 'Back to sign in'],
+      verify: ['Check your email', 'We sent a verification link to confirm your address.', '', 'Wrong address?', 'Start over']
+    }[m];
+    return {
+      title: copy[0], sub: copy[1], cta: copy[2], switchText: copy[3], switchCta: copy[4],
+      showForm: m !== 'verify', isVerify: m === 'verify', isSignIn: m === 'signin',
+      needsPassword: m === 'signin' || m === 'create',
+      pwAuto: m === 'create' ? 'new-password' : 'current-password',
+      goForgot: () => this.setState({ mode: 'forgot' }),
+      switchMode: () => this.setState({ mode: m === 'signin' ? 'create' : (m === 'verify' ? 'create' : 'signin') }),
+      submit: e => { e.preventDefault(); if (m === 'create') this.setState({ mode: 'verify' }); else if (m === 'forgot') this.setState({ mode: 'signin' }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

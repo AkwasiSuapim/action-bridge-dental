@@ -1,10 +1,74 @@
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
-async function login(page: Page) {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Fill demo credentials' }).click();
+const TEST_EMAIL = 'test.user@example.com';
+const TEST_PASSWORD = 'Test-password-1';
+
+/**
+ * Stands in for the Cognito user pool (any region): the test account signs in, everything else
+ * is rejected. `newPassword` makes the account ask for a new password first, like an
+ * admin-created user. Returns the Cognito operations that were called.
+ */
+async function mockCognito(page: Page, { newPassword = false } = {}) {
+  const calls: string[] = [];
+  const cors = {
+    'access-control-allow-origin': '*',
+    'access-control-allow-headers': '*',
+    'access-control-allow-methods': 'POST, OPTIONS',
+  };
+  await page.route('https://cognito-idp.*.amazonaws.com/', async (route) => {
+    const request = route.request();
+    if (request.method() === 'OPTIONS')
+      return route.fulfill({ status: 204, headers: cors });
+    const target = (request.headers()['x-amz-target'] ?? '').split('.').pop();
+    const body = request.postDataJSON();
+    calls.push(target ?? '');
+    const reply = (status: number, json: object) =>
+      route.fulfill({
+        status,
+        headers: { ...cors, 'content-type': 'application/x-amz-json-1.1' },
+        body: JSON.stringify(json),
+      });
+    const tokens = {
+      AccessToken: 'test-access',
+      RefreshToken: 'test-refresh',
+      ExpiresIn: 3600,
+    };
+    if (target === 'InitiateAuth' && body.AuthFlow === 'REFRESH_TOKEN_AUTH')
+      return body.AuthParameters.REFRESH_TOKEN === 'test-refresh'
+        ? reply(200, {
+            AuthenticationResult: {
+              AccessToken: 'test-access',
+              ExpiresIn: 3600,
+            },
+          })
+        : reply(400, { __type: 'NotAuthorizedException' });
+    if (target === 'InitiateAuth') {
+      const { USERNAME, PASSWORD } = body.AuthParameters;
+      if (USERNAME !== TEST_EMAIL || PASSWORD !== TEST_PASSWORD)
+        return reply(400, { __type: 'NotAuthorizedException' });
+      return newPassword
+        ? reply(200, { ChallengeName: 'NEW_PASSWORD_REQUIRED', Session: 's' })
+        : reply(200, { AuthenticationResult: tokens });
+    }
+    if (target === 'RespondToAuthChallenge')
+      return reply(200, { AuthenticationResult: tokens });
+    if (target === 'RevokeToken') return reply(200, {});
+    return reply(400, { __type: 'UnknownOperationException' });
+  });
+  return calls;
+}
+
+async function signInForm(page: Page, email: string, password: string) {
+  await page.getByLabel('Email', { exact: true }).fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+}
+
+async function login(page: Page) {
+  await mockCognito(page);
+  await page.goto('/sign-in');
+  await signInForm(page, TEST_EMAIL, TEST_PASSWORD);
   await expect(
     page.getByRole('heading', {
       name: "Let's make sense of your dental costs.",
@@ -30,40 +94,106 @@ async function compare(page: Page) {
   ).toBeVisible();
 }
 
-test('login validation, keyboard submit, local signup and reset-password simulations', async ({
+test('landing page leads to sign-in; create account and reset explain the demo', async ({
   page,
 }) => {
-  await page.goto('/login');
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page.getByText('Enter a valid email address.')).toBeVisible();
-  await page.getByLabel('Email', { exact: true }).fill('wrong@example.com');
-  await page.getByLabel('Your password', { exact: true }).fill('incorrect');
-  await page.getByLabel('Your password', { exact: true }).press('Enter');
-  await expect(page.getByText(/Demo credentials did not match/)).toBeVisible();
-  await page.getByRole('button', { name: 'Forgot password?' }).click();
-  await page.getByRole('button', { name: 'Send reset link' }).click();
+  await mockCognito(page);
+  await page.goto('/');
   await expect(
     page.getByRole('heading', {
-      name: 'Demo reset confirmation. No email was sent.',
+      name: 'Turn a confusing dental estimate into a clear plan.',
     }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Back to sign in' }).click();
   await page
-    .getByRole('button', { name: 'Create account', exact: true })
+    .getByRole('button', { name: 'Is ActionBridge a dentist or an insurer?' })
     .click();
-  await page.getByLabel('Name', { exact: true }).fill('Taylor');
-  await page.getByLabel('Email', { exact: true }).fill('taylor@example.com');
-  await page.getByLabel('Choose a password').fill('DemoPassword1!');
-  await page.getByLabel('Confirm password').fill('DemoPassword1!');
-  await page.getByRole('button', { name: 'Create demo account' }).click();
-  await expect(page.getByText('Hi, Taylor')).toBeVisible();
-  const stored = await page.evaluate(() =>
-    localStorage.getItem('actionbridge.web.demo.v1'),
-  );
-  expect(stored).not.toContain('DemoPassword1!');
-  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(
-    page.getByRole('heading', { name: 'Welcome to ActionBridge Dental' }),
+    page.getByRole('button', {
+      name: 'Is ActionBridge a dentist or an insurer?',
+    }),
+  ).toHaveAttribute('aria-expanded', 'false');
+  await page
+    .getByRole('navigation', { name: 'Primary' })
+    .getByRole('link', { name: 'Get started' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Accounts are set up by our team.' }),
+  ).toBeVisible();
+  await expect(page.getByText(/ActionBridge Dental is a demo/)).toBeVisible();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.getByRole('button', { name: 'Forgot password?' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Ask the team to reset your password.' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Back to sign in' }).click();
+  await expect(
+    page.getByRole('heading', {
+      name: 'Sign in to continue your saved plans.',
+    }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Back to site' }).click();
+  await expect(page).toHaveURL('/');
+});
+
+test('sign-in validation, Cognito errors, keyboard submit and sign-out', async ({
+  page,
+}) => {
+  const calls = await mockCognito(page);
+  await page.goto('/sign-in');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByText('Enter a valid email address.')).toBeVisible();
+  await signInForm(page, TEST_EMAIL, 'wrong-password');
+  await expect(page.getByRole('alert')).toHaveText(
+    'Email or password is incorrect.',
+  );
+  await page.getByLabel('Password', { exact: true }).fill(TEST_PASSWORD);
+  await page.getByLabel('Password', { exact: true }).press('Enter');
+  await expect(page.getByText('Hi, Test')).toBeVisible();
+  const stored = await page.evaluate(() => ({
+    local: JSON.stringify(localStorage),
+    session: JSON.stringify(sessionStorage),
+  }));
+  expect(stored.local + stored.session).not.toContain(TEST_PASSWORD);
+  expect(stored.local).not.toContain('test-refresh');
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page.getByText('You’re signed out.')).toBeVisible();
+  expect(
+    await page.evaluate(() =>
+      sessionStorage.getItem('actionbridge.web.refreshToken'),
+    ),
+  ).toBeNull();
+  await expect.poll(() => calls.includes('RevokeToken')).toBe(true);
+  await page.goto('/my-plan');
+  await expect(page).toHaveURL('/sign-in');
+});
+
+test('first sign-in asks for a new password; reload keeps the session', async ({
+  page,
+}) => {
+  await mockCognito(page, { newPassword: true });
+  await page.goto('/profile');
+  await expect(page).toHaveURL('/sign-in');
+  await signInForm(page, TEST_EMAIL, TEST_PASSWORD);
+  await expect(
+    page.getByRole('heading', {
+      name: 'Choose a new password to finish signing in.',
+    }),
+  ).toBeVisible();
+  await page.getByLabel('New password').fill('short');
+  await page.getByRole('button', { name: 'Set password and continue' }).click();
+  await expect(page.getByRole('alert')).toContainText('At least 12 characters');
+  await page.getByLabel('New password').fill('A-new-password-1');
+  await page.getByRole('button', { name: 'Set password and continue' }).click();
+  await expect(page).toHaveURL('/profile');
+  await page.reload();
+  await expect(page).toHaveURL('/profile');
+  await expect(page.getByText('Demo mode · Sample data')).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Demo controls', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Expire session' }).click();
+  await expect(
+    page.getByText('Your session expired. Sign in again to continue.'),
   ).toBeVisible();
 });
 
@@ -287,6 +417,15 @@ for (const width of [1440, 1280, 1024, 768, 390, 360]) {
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 });
+    for (const path of ['/', '/sign-in']) {
+      await page.goto(path);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth > innerWidth,
+        ),
+        `${path} overflow`,
+      ).toBe(false);
+    }
     await login(page);
     const homeOverflow = await page.evaluate(
       () => document.documentElement.scrollWidth > innerWidth,
@@ -352,19 +491,25 @@ test('page accessibility, assets and visual review of the main journey', async (
       fullPage: true,
     });
   }
-  await page.goto('/login');
-  await expect(page.locator('.login-art img')).toBeVisible();
+  await mockCognito(page);
+  // Reduced motion turns off the scroll fade-in, so every section is checked fully visible.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  await capture('landing');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/sign-in');
+  await expect(page.locator('.si-aside img')).toBeVisible();
   await expect
     .poll(() =>
       page
-        .locator('.login-art img')
+        .locator('.si-aside img')
         .evaluate(
           (image: HTMLImageElement) => image.complete && image.naturalWidth > 0,
         ),
     )
     .toBe(true);
-  await capture('login');
-  await login(page);
+  await capture('sign-in');
+  await signInForm(page, TEST_EMAIL, TEST_PASSWORD);
   await capture('home');
   await page.getByRole('button', { name: 'Try a sample case' }).click();
   await capture('facts');
