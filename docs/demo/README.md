@@ -18,13 +18,11 @@ Each fact sits on one line, so the reader returns it whole and the assistant can
 - Benefit year 2026-01-01 to 2026-12-31: annual maximum $800, already paid $500, deductible $50 (none met yet).
 - Plan pays: preventive 100%, basic 80% after the deductible, major 50% after the deductible.
 
-**Expected results (live check, 2026-10-04):**
-- Six groups confirmed with quotes.
-- One or two quick questions: network, and whether services count toward the maximum.
-- **You pay $1,200** if everything is done this year; the plan pays $300.
-- **Self-pay total $1,300.**
-
-The **$725** "move the crown into January" option needs next year's plan terms; see *Known gap* below.
+**Expected results (live check, 2026-10-04, three runs in a row):**
+- Confirmations quoted from the documents, including the crown's timing window (November 12, 2026 to January 15, 2027).
+- Up to three quick questions (network, deductible applies, counts toward the maximum): answer In network / Yes / Yes.
+- One more: *"Will your plan renew on January 1, 2027 with the same yearly maximum ($800) and deductible ($50)?"* Answer **Yes, the same**.
+- **You pay $1,200** doing everything now, or **$725 with the crown in January (save $475)**. Self-pay total **$1,300**.
 
 ## Demo walkthrough (about 3 minutes)
 
@@ -58,6 +56,6 @@ Use this with any AI writing tool to create variations (keep it fictional):
 
 > Create a fictional, clearly labeled SAMPLE dental treatment estimate and a matching SAMPLE dental plan benefits summary for a software demo. Use a made-up office, plan and patient ("SAMPLE PATIENT"); no real names, member IDs or health history. Write each fact on its own single line, in this style: "Crown, tooth 30 (D2740): fee $1,000.00, allowed $1,000.00, write-off $0.00, cash price $900.00, planned 2026-11-12". The estimate must include 2–4 procedures with CDT codes, fee, allowed amount, write-off, cash price and planned date (YYYY-MM-DD), whether the office is in network, and one sentence giving the dentist's safe timing window for one procedure (for example "The crown can safely be done any time between 2026-11-12 and 2027-01-15"). The benefits summary must include, on one line, the benefit year dates, the annual maximum and the annual deductible; on one line, how much the insurer already paid this year and how much of the deductible is met; one line per service type saying what percentage the plan pays and whether the deductible applies (preventive, basic, major); one line saying the annual maximum applies to basic and major services; and one line describing next year's benefit year dates and terms. Do not write sentences that mention limits only to say they don't apply (for example "No waiting periods apply"). Keep both documents to one page each.
 
-## Known gap
+## Notes
 
-The assistant records only the current benefit year, so the timing comparison into next year (the $725 option) isn't offered from uploaded documents yet. The calculator reports `NEXT_PLAN_YEAR_NOT_SUPPLIED`. The sample case includes next year, which is why it shows the comparison.
+The assistant reads documents with AI, so wording on screen can vary slightly between runs; the numbers come from the calculator and are the same every time. If anything is slow during a live demo, Home → **Try a sample case** shows the same comparison instantly.
