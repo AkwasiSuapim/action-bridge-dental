@@ -137,6 +137,54 @@ describe('T5 adaptive agent loop, end to end with a scripted model', () => {
     expect(dropped.map((d) => d.reason).sort()).toEqual(['amount_not_in_quote', 'quote_not_in_description']);
   });
 
+  it('Q-07: a stated waiting period is recorded, and after confirmation the case is unsupported — never falsely covered', async () => {
+    const { applyGroups } = await import('../src/features/agent-jobs/domain/extraction.js');
+    const { estimateCase } = await import('@actionbridge/benefits-engine');
+    const text = 'Crown $1,000, in network, planned 2026-11-12. My plan pays 50% for major services. There is a 12-month waiting period for crowns.';
+    const extraction: Extraction = {
+      coverageRules: [{ category: 'major', insurerPaysPercent: 50, deductibleApplies: true, quote: 'My plan pays 50% for major services.' }],
+      planRestrictions: [{ kind: 'waiting_period', description: '12-month waiting period for crowns', quote: 'There is a 12-month waiting period for crowns.' }],
+      procedures: [{ label: 'Crown', category: 'major', providerChargeCents: 100000, network: 'in', proposedDate: '2026-11-12', quote: 'Crown $1,000, in network, planned 2026-11-12.' }],
+    };
+    const empty = { caseRevision: 1, currency: 'USD' as const, coverageMode: 'insured' as const, policy: null, planYears: {}, procedures: [] };
+    const { groups } = groupsFromExtraction(extraction, text, empty, '2026-10-03');
+    expect(groups.map((g) => g.kind)).toEqual(['coverageRules', 'restrictions', 'procedure']);
+
+    let n = 0;
+    const { input, facts } = applyGroups(empty, groups, (fieldPath, value, quote, origin) => ({
+      id: `f-${++n}`, fieldPath, value, sourceId: null, location: quote ? { page: null, section: null, snippet: quote } : null, origin,
+      extractionStatus: 'extracted', userConfirmed: true, insurerVerification: { status: 'not_verified' }, conflict: false, recordedAt: '2026-10-03T00:00:00.000Z',
+    }));
+    expect(input.policy).toMatchObject({ allServicesCovered: false, waitingPeriods: [{ description: '12-month waiting period for crowns' }] });
+    expect(facts.some((f) => f.fieldPath === 'policy.allServicesCovered')).toBe(false);
+    expect(estimateCase(input)).toMatchObject({
+      status: 'unsupported',
+      limitations: expect.arrayContaining([expect.objectContaining({ code: 'WAITING_PERIOD_UNSUPPORTED' })]),
+    });
+  });
+
+  it('a quote may join exact fragments with "…", but every fragment must be in the description', async () => {
+    const { quoteAppears } = await import('../src/features/agent-jobs/domain/extraction.js');
+    const text = 'Two fillings at $250 each. The office is in network. The dentist does not write off anything.';
+    expect(quoteAppears('Two fillings at $250 each … the dentist does not write off anything', text)).toBe(true);
+    expect(quoteAppears('Two fillings at $250 each ... The office is in network.', text)).toBe(true);
+    expect(quoteAppears('Two fillings at $250 each … the dentist writes off $50', text)).toBe(false);
+    expect(quoteAppears(' … … ', text)).toBe(false);
+  });
+
+  it('keeps verified fragments of a partly paraphrased quote, but only amounts stated in them', () => {
+    const text = 'My dentist recommends a crown at $1,000. The allowed amount is $250 for each filling and $900 for the crown.';
+    const empty = { caseRevision: 1, currency: 'USD' as const, coverageMode: 'unknown' as const, policy: null, planYears: {}, procedures: [] };
+    const { groups, dropped } = groupsFromExtraction(
+      { procedures: [{ label: 'Crown', category: 'major', providerChargeCents: 100000, allowedCents: 90000, quote: 'a crown at $1,000 … The allowed amount is $900 for the crown' }] },
+      text,
+      empty,
+      '2026-10-03',
+    );
+    expect(groups[0]).toMatchObject({ quote: 'a crown at $1,000', procedure: { providerChargeCents: 100000, allowedCents: null } });
+    expect(dropped).toEqual([{ group: 'procedure', field: 'Crown.allowedCents', reason: 'amount_not_in_quote' }]);
+  });
+
   it('timing heard from the user never unlocks the optimizer; only a dentist window does', () => {
     const text = 'The crown at $1,000. The dentist said the crown can be done any time until 2027-01-15. I would rather wait until January.';
     const base = { label: 'Crown', category: 'major' as const, providerChargeCents: 100000, proposedDate: '2026-11-12', dentistEarliestDate: '2026-11-12', dentistLatestDate: '2027-01-15' };

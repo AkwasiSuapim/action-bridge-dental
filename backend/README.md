@@ -2,7 +2,7 @@
 
 HTTP API for cases, estimates and scenarios. Handlers validate with `@actionbridge/contracts` and calculate only through `@actionbridge/benefits-engine`.
 
-## Routes (Phase 3)
+## Routes
 
 | Route | Lambda | Result |
 |---|---|---|
@@ -10,8 +10,24 @@ HTTP API for cases, estimates and scenarios. Handlers validate with `@actionbrid
 | `POST /v1/cases` | cases | 201 `{caseId, caseRevision}`; missing values allowed as `null` (status `draft`) |
 | `GET /v1/cases/{caseId}` | cases | Owner's case, or 404 |
 | `PATCH /v1/cases/{caseId}` | cases | `{expectedRevision, changes}` → new revision; stale → 409 |
+| `POST /v1/cases/{caseId}/strategies` | cases | `Idempotency-Key` + `{scenarioId, expectedRevision, consent: true}` → 201 saved / 200 replay |
+| `GET /v1/cases/{caseId}/ledger` | cases | Real case events, newest first, `?cursor=` paging |
 | `POST /v1/cases/{caseId}/estimates` | calculations | `{expectedRevision}` → 200 `estimated \| needs_information \| unsupported`; 409 stale; 422 contradictory |
 | `POST /v1/cases/{caseId}/scenarios` | calculations | Same statuses; baseline plus up to two permitted lower-cost alternatives |
+| `POST /v1/cases/{caseId}/coverage-comparison` | calculations | Insured estimate vs explicit cash quotes |
+| `POST /v1/cases/{caseId}/jobs` | jobs | `{expectedRevision, operation: 'interpret', input: {text}}` → 202 `{jobId}` |
+| `GET /v1/jobs/{jobId}` | jobs | Status, real stage events, `questions` or `resultBlocks` |
+| `POST /v1/jobs/{jobId}/answers` | jobs | Confirmations/answers → new case revision + follow-up job → 202 `{jobId}` |
+| `POST /v1/jobs/{jobId}/retry`, `/cancel` | jobs | Body `{}` |
+
+## Agent jobs (Phase 5, D-17)
+
+1. **Describe** — `createJob(caseId, { expectedRevision, operation: 'interpret', input: { text } })`, then poll `getJob(jobId)` every 1–2 s until the status is not `queued`/`running`. Show `events` as the progress list (real stages, no percentages).
+2. **Confirm** — status `needs_information` with `fact_review` blocks: show each as "Is this right?" with `candidateValue` as the text and `reason` (the user's own quote) beneath; answer `true` (yes) or `false` (no). Nothing is applied until answered.
+3. **Answer** — `answerJob(jobId, { expectedRevision: job.caseRevision, answers: [{ questionId, value, unknown, responseMode: 'tap', attachmentId: null }] })` returns the follow-up `jobId`; poll it. Follow-up jobs ask engine questions (`currency` value = cents, `single_select` value = option `id`, `date` value = `YYYY-MM-DD`) or finish `completed` with `cost_summary`, `cost_comparison` and an explanation `notice`.
+4. **Failure** — `failed` with `error.retryable` → offer `retryJob`; otherwise offer manual entry. Cancel with `cancelJob`.
+
+The worker (SQS, batch 1, max 2 concurrent) calls Claude Haiku 4.5 through Bedrock. Its role may invoke only that model and needs `aws-marketplace:ViewSubscriptions` and `aws-marketplace:Subscribe`, which Bedrock requires for Marketplace-billed models. Logs carry job IDs, error names and AWS error text — never the user's description.
 
 Errors always use the nested envelope `{ error: { code, message, retryable, requestId, issues? } }`. Every response has an `x-request-id` header.
 

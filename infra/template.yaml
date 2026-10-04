@@ -18,11 +18,13 @@ Parameters:
     Description: Demo case records expire via DynamoDB TTL (eventual deletion, not immediate).
   BedrockModelId:
     Type: String
-    Default: us.anthropic.claude-haiku-4-5-20251001-v1:0
+    # Amazon Nova 2 Lite: first-party model, no AWS Marketplace subscription or card check (D-18).
+    # Claude Haiku 4.5 (us.anthropic.claude-haiku-4-5-20251001-v1:0) works once the account has a valid payment method.
+    Default: us.amazon.nova-2-lite-v1:0
     Description: Bedrock inference profile the agent worker calls.
   BedrockFoundationModel:
     Type: String
-    Default: anthropic.claude-haiku-4-5-20251001-v1:0
+    Default: amazon.nova-2-lite-v1:0
     Description: Foundation model behind the inference profile (IAM scope).
   AuthCallbackUrls:
     Type: CommaDelimitedList

@@ -181,6 +181,7 @@ const GROUP_LABEL: Record<FactGroup['kind'], string> = {
   coverageMode: 'Is this right? Your coverage',
   benefitYear: 'Is this right? Your benefit year',
   coverageRules: 'Is this right? Your plan’s coverage rules',
+  restrictions: 'Is this right? Limits in your plan',
   procedure: 'Is this right? A recommended procedure',
 };
 
