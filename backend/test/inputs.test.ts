@@ -306,3 +306,30 @@ describe('composer: one analysis over the user’s words and several pages', () 
     expect((await h.call('POST /v1/cases/{caseId}/jobs', { caseId }, { expectedRevision: 1, operation: 'interpret', input: { text: 'x', documentIds: ids } })).status).toBe(400);
   });
 });
+
+describe('web voice: browser recordings', () => {
+  const WEBM = new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42, 0x86, 0x81, 0x01, 0, 0, 0, 0, 0, 0, 0]);
+  const OGG = new Uint8Array(Buffer.from('OggS\0\x02\0\0\0\0\0\0\0\0\0\0'));
+
+  it('recognizes WebM and Ogg by their first bytes', () => {
+    expect(fileTypeOf(WEBM)).toBe('webm');
+    expect(fileTypeOf(OGG)).toBe('ogg');
+  });
+
+  it('accepts a WebM upload slot and tells Transcribe the real format', async () => {
+    const store = new FakeUploads();
+    const formats: (string | undefined)[] = [];
+    const transcriber = new FakeTranscriber(['COMPLETED'], 'A crown at $1,000.');
+    const original = transcriber.start.bind(transcriber);
+    transcriber.start = async (name: string, uri: string, format?: string) => {
+      formats.push(format);
+      return original(name, uri);
+    };
+    const h = createAgentHarness(new ScriptedModel([]), { uploads: store, transcriber });
+    const caseId = await caseFor(h);
+    const uploadId = await uploaded(h, store, caseId, 'audio', 'audio/webm', WEBM);
+    const job = await startJob(h, caseId, 'transcribe_audio', uploadId);
+    expect(job).toMatchObject({ status: 'completed', transcript: 'A crown at $1,000.' });
+    expect(formats).toEqual(['webm']);
+  });
+});

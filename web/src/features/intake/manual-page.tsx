@@ -10,7 +10,9 @@ import {
   PageHeading,
 } from '../../components/ui';
 import { emptyPolicy, emptyProcedure } from '../../domain/case-fields';
-import { useDemo } from '../../state/demo-store';
+import { asApiError, type ApiError } from '../../services/api';
+import { useCase } from '../../state/case-store';
+import { ApiNotice } from '../assistant/assistant-page';
 import {
   CoverageFields,
   CoverageStatus,
@@ -19,8 +21,10 @@ import {
 } from './case-forms';
 
 export function ManualPage() {
-  const { createCase } = useDemo();
+  const { create } = useCase();
   const navigate = useNavigate();
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState<ApiError | null>(null);
   const [input, setInput] = useState<DentalCaseInput>(() => ({
     caseRevision: 1,
     currency: 'USD',
@@ -33,21 +37,35 @@ export function ManualPage() {
   return (
     <div className="page medium">
       <PageHeading
-        eyebrow="Manual entry · Demo mode"
-        title="Tell us about your treatment"
-        description="Add what you know. We’ll ask for missing details next. Use fictional data while backend services are being connected."
+        eyebrow="Manual entry"
+        title="Enter your details"
+        description="Add what you know. Leave anything else empty and I’ll ask for it next. Use made-up details in this demo."
       />
       <form
         className="stack"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
+          if (saving) return;
           const error = validateCase(input);
           if (error) {
             setError(error);
             return;
           }
-          createCase(input);
-          navigate('/facts');
+          setError('');
+          setSaving(true);
+          setFailure(null);
+          try {
+            const { caseRevision: _revision, ...request } = input;
+            await create({
+              ...request,
+              policy: input.coverageMode === 'insured' ? input.policy : null,
+            });
+            navigate('/facts');
+          } catch (caught) {
+            setFailure(asApiError(caught));
+          } finally {
+            setSaving(false);
+          }
         }}
       >
         <Card>
@@ -58,11 +76,14 @@ export function ManualPage() {
           <CoverageFields input={input} onChange={setInput} />
         )}
         {error && <Notice tone="danger">{error}</Notice>}
-        <FooterActions note="Prices and rules you enter are unverified. No information is sent to a server.">
+        {failure && <ApiNotice error={failure} />}
+        <FooterActions note="Prices and rules you enter are saved to your account and are not verified with your insurer.">
           <Button variant="secondary" onClick={() => navigate('/')}>
             Cancel
           </Button>
-          <Button type="submit">Continue to review</Button>
+          <Button type="submit" busy={saving}>
+            Continue to review
+          </Button>
         </FooterActions>
       </form>
     </div>
@@ -75,9 +96,13 @@ export function CaseEditor({
   section: 'treatment' | 'coverage';
   onClose: () => void;
 }) {
-  const { state, edit } = useDemo();
-  const [input, setInput] = useState(() => structuredClone(state.input!));
+  const { record, update } = useCase();
+  const [input, setInput] = useState<DentalCaseInput>(() =>
+    structuredClone(record!),
+  );
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState<ApiError | null>(null);
   return (
     <Dialog
       title={
@@ -88,19 +113,30 @@ export function CaseEditor({
     >
       <form
         className="stack"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
+          if (saving) return;
           const error = validateCase(input);
           if (error) {
             setError(error);
             return;
           }
-          edit((draft) => Object.assign(draft, input));
-          onClose();
+          setError('');
+          setSaving(true);
+          setFailure(null);
+          try {
+            await update(input);
+            onClose();
+          } catch (caught) {
+            setFailure(asApiError(caught));
+          } finally {
+            setSaving(false);
+          }
         }}
       >
         <p className="muted small">
-          Changes invalidate the current estimate. Unknown values stay unknown.
+          Saving updates your case and recalculates. Unknown values stay
+          unknown.
         </p>
         {section === 'treatment' ? (
           <TreatmentFields input={input} onChange={setInput} />
@@ -113,11 +149,14 @@ export function CaseEditor({
           </>
         )}
         {error && <Notice tone="danger">{error}</Notice>}
+        {failure && <ApiNotice error={failure} />}
         <div className="actions">
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit">Save changes</Button>
+          <Button type="submit" busy={saving}>
+            Save changes
+          </Button>
         </div>
       </form>
     </Dialog>

@@ -61,9 +61,12 @@ export const CreateJobResponseSchema = z.strictObject({
 /** Body of `POST /v1/jobs/{jobId}/retry` and `/cancel`. */
 export const EmptyRequestSchema = z.strictObject({});
 
-/** Upload limits (doc 03 §7): short voice notes and single-page documents or photos. */
+/**
+ * Upload limits (doc 03 §7): short voice notes and single-page documents or photos. Audio is M4A
+ * from the phone app, or WebM/Ogg (Opus) as browsers record it.
+ */
 export const UPLOAD_LIMITS = {
-  audio: { maxBytes: 5 * 1024 * 1024, mimeTypes: ['audio/mp4', 'audio/m4a', 'audio/x-m4a'] },
+  audio: { maxBytes: 5 * 1024 * 1024, mimeTypes: ['audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/webm', 'audio/ogg'] },
   document: { maxBytes: 5 * 1024 * 1024, mimeTypes: ['application/pdf', 'image/jpeg', 'image/png'] },
 } as const;
 

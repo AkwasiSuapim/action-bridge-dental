@@ -1,4 +1,4 @@
-import type { LedgerEvent, SavedStrategy, SaveStrategyRequest, SaveStrategyResponse } from '@actionbridge/contracts';
+import type { LedgerEvent, SavedStrategy, SaveStrategyRequest, SaveStrategyResponse, StrategyList } from '@actionbridge/contracts';
 import { compareSchedules } from '@actionbridge/benefits-engine';
 import { expiresAtFrom } from '../../../shared/dynamo.js';
 import { HttpError } from '../../../shared/http.js';
@@ -65,6 +65,13 @@ export class StrategyService {
       throw new HttpError('IDEMPOTENCY_CONFLICT', 'This save is already being processed. Try again in a moment.');
     }
     return { strategy, replayed: false };
+  }
+
+  /** Saved plans for a case the caller owns, newest first, so a reloaded page can show them again. */
+  async list(ownerId: string, caseId: string): Promise<StrategyList> {
+    await this.deps.cases.get(ownerId, caseId);
+    const strategies = await this.deps.strategies.listForCase(ownerId, caseId);
+    return { strategies: strategies.sort((a, b) => b.savedAt.localeCompare(a.savedAt)).slice(0, 20) };
   }
 }
 

@@ -1,4 +1,4 @@
-import { Check, ClipboardList, FileText, Mic, Pencil } from 'lucide-react';
+import { Check, ClipboardList, FileText, Pencil, Quote } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -22,15 +22,23 @@ import {
   parseMoney,
   treatmentTitle,
 } from '../../domain/model';
-import { fieldValue, nextQuestion, setField } from '../../domain/case-fields';
-import { useDemo } from '../../state/demo-store';
+import { fieldValue, setField } from '../../domain/case-fields';
+import {
+  evidenceGroups,
+  isSampleCase,
+  SOURCE_LABEL,
+  SOURCE_TONE,
+  sourceFor,
+} from '../../domain/provenance';
+import { asApiError, type ApiError } from '../../services/api';
+import { useCase, useResults } from '../../state/case-store';
+import { ApiNotice } from '../assistant/assistant-page';
 import { CaseEditor } from '../intake/manual-page';
 import { validateCase } from '../intake/case-forms';
-import { sampleInput } from '../../services/dental-service';
 
-export const missingQuestion = nextQuestion;
 export function FactsPage() {
-  const { state, confirm, edit, setCaseFlags } = useDemo();
+  const { record, loading, error, reload } = useCase();
+  const results = useResults();
   const navigate = useNavigate();
   const [editing, setEditing] = useState<{
     path: string;
@@ -38,7 +46,19 @@ export function FactsPage() {
   } | null>(null);
   const [section, setSection] = useState<'treatment' | 'coverage' | null>(null);
   const [sources, setSources] = useState(false);
-  if (!state.input)
+  if (!record && loading)
+    return (
+      <div className="page narrow centered" role="status">
+        <p className="muted">Loading your case…</p>
+      </div>
+    );
+  if (!record && error)
+    return (
+      <div className="page narrow">
+        <ApiNotice error={error} onRetry={() => void reload()} />
+      </div>
+    );
+  if (!record || record.procedures.length === 0)
     return (
       <div className="page">
         <EmptyState
@@ -49,37 +69,23 @@ export function FactsPage() {
         />
       </div>
     );
-  const input = state.input;
-  const missing = nextQuestion(input);
+  const input = record;
+  const sample = isSampleCase(record);
+  const missing =
+    results.data?.estimate.status === 'needs_information'
+      ? results.data.estimate.missing
+      : [];
+  const evidence = evidenceGroups(record);
   const badge = (path: string) => {
-    const value = fieldValue(input, path);
-    const unknown = value == null || value === 'unknown';
-    const assumed =
-      path.startsWith('planYears.') &&
-      input.planYears[path.split('.')[1]]?.sourceStatus ===
-        'explicit_unchanged_plan_assumption';
+    const source = sourceFor(record, path, fieldValue(input, path));
+    const tone = SOURCE_TONE[source.kind];
     return (
-      <Badge
-        tone={
-          unknown
-            ? 'warning'
-            : state.provenance[path]
-              ? 'green'
-              : assumed
-                ? 'assumed'
-                : undefined
-        }
-      >
-        {unknown
-          ? 'Needs an answer'
-          : state.provenance[path]
-            ? 'Provided by you'
-            : assumed
-              ? 'Assumed for comparison'
-              : state.origin === 'sample'
-                ? 'From sample document'
-                : 'Provided by you'}
-      </Badge>
+      <span className="fact-source">
+        <Badge tone={tone === 'neutral' ? undefined : tone}>
+          {SOURCE_LABEL[source.kind]}
+        </Badge>
+        {source.quote && <q className="small muted">{source.quote}</q>}
+      </span>
     );
   };
   const editable = (path: string, label: string, value: string) => (
@@ -102,7 +108,7 @@ export function FactsPage() {
   return (
     <div className="page">
       <PageHeading
-        eyebrow={`${state.origin === 'sample' ? 'Sample case' : 'Manual demo case'} · Review before calculating`}
+        eyebrow={`${sample ? 'Sample case' : 'Your case'} · Review before calculating`}
         title="Here is what we'll use"
         description="Check the treatment, benefits and dates. You can correct any detail."
         actions={
@@ -273,78 +279,61 @@ export function FactsPage() {
             )}
           </Card>
         </div>
-        <aside className="stack facts-aside">
+        <aside
+          className="stack facts-aside"
+          aria-label="About your information"
+        >
           <Card>
-            <h3>Your information</h3>
-            <p className="muted small">
-              Attachments and descriptions stay in this browser tab.
-            </p>
-            {state.attachments.map((a) => (
-              <div className="document-item" key={a.name}>
-                <FileText size={22} />
-                <div>
-                  <strong className="break-word">{a.name}</strong>
-                  <span className="small muted">
-                    {a.kind === 'file'
-                      ? 'Local file · Not interpreted'
-                      : 'Sample document'}
-                  </span>
-                </div>
-              </div>
-            ))}
-            {state.transcript && <blockquote>{state.transcript}</blockquote>}
-            <div className="actions">
-              <Button
-                variant="secondary"
-                icon={FileText}
-                onClick={() => navigate('/intake/upload')}
-              >
-                Add document
-              </Button>
-              <Button
-                variant="secondary"
-                icon={Mic}
-                onClick={() => navigate('/intake/speak')}
-              >
-                Add voice note
-              </Button>
-            </div>
+            <h3>Where this came from</h3>
+            {evidence.quoted.length > 0 ? (
+              <>
+                <p className="muted small">
+                  Words you confirmed, quoted exactly from what you shared.
+                  Uploaded files were deleted after reading.
+                </p>
+                {evidence.quoted.slice(0, 6).map((q) => (
+                  <div className="document-item" key={q.kind + '|' + q.quote}>
+                    <Quote size={20} aria-hidden="true" />
+                    <div>
+                      <q className="break-word">{q.quote}</q>
+                      <span className="small muted">
+                        {SOURCE_LABEL[q.kind]}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <p className="muted small">
+                {sample
+                  ? 'Fictional sample estimate and benefits summary.'
+                  : 'Details you entered yourself.'}
+              </p>
+            )}
+            <Button
+              variant="secondary"
+              icon={FileText}
+              onClick={() => setSources(true)}
+            >
+              View all sources
+            </Button>
           </Card>
           <Notice>
             Only a dentist-supplied window permits moving treatment.
             ActionBridge doesn't decide whether care can wait.
           </Notice>
-          {missing && (
+          {missing.length > 0 && (
             <Notice tone="warning">
-              A detail needs an answer before the insured comparison is
-              available. We'll ask a focused question next.
+              {missing.length === 1
+                ? 'One detail needs'
+                : missing.length + ' details need'}{' '}
+              an answer before the comparison is available. I’ll ask for them
+              next.
             </Notice>
-          )}
-          {state.origin === 'sample' && (
-            <Card>
-              <h3>Prefer the original sample?</h3>
-              <p className="small muted">
-                Restore fictional plan, fees and timing. Previous results need
-                recalculation.
-              </p>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  edit((d) => Object.assign(d, sampleInput(50000)));
-                  setCaseFlags({
-                    documentNeeded: false,
-                    documentDeclined: false,
-                    deductibleConflict: false,
-                  });
-                }}
-              >
-                Restore sample values
-              </Button>
-            </Card>
           )}
         </aside>
       </div>
-      <FooterActions note="These demo facts are not verified insurer terms.">
+      <FooterActions note="Nothing here is verified with your insurer.">
         <Button variant="secondary" onClick={() => navigate('/')}>
           Finish later
         </Button>
@@ -352,16 +341,8 @@ export function FactsPage() {
           icon={Check}
           onClick={() => {
             if (input.coverageMode === 'self_pay') navigate('/self-pay');
-            else if (
-              missing ||
-              state.documentNeeded ||
-              state.deductibleConflict
-            )
-              navigate('/questions');
-            else {
-              confirm();
-              navigate('/working');
-            }
+            else if (missing.length > 0) navigate('/questions');
+            else navigate('/options');
           }}
         >
           Confirm and compare
@@ -384,8 +365,10 @@ function FactEditor({
   field: { path: string; label: string };
   onClose: () => void;
 }) {
-  const { state, edit } = useDemo();
-  const input = state.input!;
+  const { record, update } = useCase();
+  const input = record!;
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState<ApiError | null>(null);
   const choice =
     field.path === 'coverageMode' ||
     field.path === 'all-network' ||
@@ -425,8 +408,9 @@ function FactEditor({
     <Dialog title={`Edit ${field.label.toLowerCase()}`} onClose={onClose}>
       <form
         className="stack"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
+          if (saving) return;
           const cents = parseMoney(value);
           if (!choice && !date && value.trim() !== '' && cents === null) {
             setError('Enter a valid amount with up to two decimal places.');
@@ -448,8 +432,16 @@ function FactEditor({
             setError(error);
             return;
           }
-          edit((d) => Object.assign(d, draft));
-          onClose();
+          setSaving(true);
+          setFailure(null);
+          try {
+            await update(draft);
+            onClose();
+          } catch (caught) {
+            setFailure(asApiError(caught));
+          } finally {
+            setSaving(false);
+          }
         }}
       >
         <Field
@@ -485,14 +477,17 @@ function FactEditor({
           )}
         </Field>
         <Notice>
-          Editing invalidates the current estimate. New amounts are calculated
-          by the shared benefits engine.
+          Saving updates your case. New amounts are calculated on the server by
+          the benefits engine.
         </Notice>
+        {failure && <ApiNotice error={failure} />}
         <div className="actions">
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit">Save changes</Button>
+          <Button type="submit" busy={saving}>
+            Save changes
+          </Button>
         </div>
       </form>
     </Dialog>

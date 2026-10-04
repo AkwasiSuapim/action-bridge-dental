@@ -1,6 +1,6 @@
-﻿import { BookOpen, ClipboardList, Pencil } from 'lucide-react';
+import { BookOpen, ClipboardList, Pencil } from 'lucide-react';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Evidence } from '../../components/evidence';
 import {
   Badge,
@@ -10,52 +10,132 @@ import {
   EmptyState,
   FooterActions,
   Notice,
+  Orb,
   PageHeading,
   Row,
 } from '../../components/ui';
 import { money, treatmentTitle } from '../../domain/model';
-import { useDemo } from '../../state/demo-store';
+import { isSampleCase } from '../../domain/provenance';
+import { useCase, useResults } from '../../state/case-store';
+import { ApiNotice } from '../assistant/assistant-page';
 import {
   BenefitYears,
   ProcedureTable,
   ScenarioCard,
 } from './financial-components';
-import { useComparison } from './use-comparison';
 import { SelfPay } from './self-pay';
 
+/**
+ * Server-calculated timing options for the current revision, plus the self-pay comparison.
+ * Results for an older revision are never shown as current.
+ */
 export function OptionsPage() {
-  const { state, select } = useDemo();
-  const { comparison, error, scenarios } = useComparison();
+  const { record, loading, select } = useCase();
+  const { status, error, data, comparison, scenarios, selected, retry } =
+    useResults();
   const navigate = useNavigate();
   const [sources, setSources] = useState(false);
-  const [mode, setMode] = useState<'insured' | 'self-pay'>('insured');
-  const selected =
-    scenarios.find((s) => s.scenarioId === state.selectedId) ?? scenarios[0];
-  if (!comparison || !selected)
-    return (
+  // The view lives in the URL so it survives the recalculation after a quote is saved.
+  const [params, setParams] = useSearchParams();
+  const mode: 'insured' | 'self-pay' =
+    params.get('view') === 'self-pay' ? 'self-pay' : 'insured';
+  const setMode = (next: 'insured' | 'self-pay') =>
+    setParams(next === 'self-pay' ? { view: 'self-pay' } : {}, {
+      replace: true,
+    });
+
+  if (!record)
+    return loading ? (
+      <Calculating />
+    ) : (
       <div className="page">
         <EmptyState
           icon={ClipboardList}
-          title={state.input ? 'Recalculation needed' : 'No comparison yet'}
-          description={
-            error ??
-            'Review your information and confirm the missing details before comparing costs.'
-          }
-          action={
-            <Button onClick={() => navigate(state.input ? '/facts' : '/')}>
-              {state.input ? 'Review information' : 'Start on Home'}
-            </Button>
-          }
+          title="No comparison yet"
+          description="Start a case on Home, then confirm your details to compare costs."
+          action={<Button onClick={() => navigate('/')}>Start on Home</Button>}
         />
       </div>
     );
+  if (status === 'error' && error)
+    return (
+      <div className="page narrow">
+        <ApiNotice error={error} onRetry={retry} />
+      </div>
+    );
+  if (!data) return <Calculating />;
+
+  if (data.estimate.status === 'needs_information')
+    return (
+      <div className="page medium">
+        <PageHeading
+          title="A few details are missing"
+          description="I need these before I can estimate. Anything you don’t know, I’ll turn into a question for your dentist or insurer."
+        />
+        <Card>
+          <ul className="hint-list">
+            {data.estimate.missing.map((fact) => (
+              <li key={fact.fieldPath}>{fact.message}</li>
+            ))}
+          </ul>
+        </Card>
+        <FooterActions>
+          <Button variant="secondary" onClick={() => navigate('/facts')}>
+            Review your information
+          </Button>
+          <Button onClick={() => navigate('/questions')}>
+            Answer the missing details
+          </Button>
+        </FooterActions>
+      </div>
+    );
+
+  if (!comparison || !selected) {
+    const limitations =
+      data.estimate.status === 'unsupported'
+        ? data.estimate.limitations
+        : data.scenarios.status === 'unsupported'
+          ? data.scenarios.limitations
+          : [];
+    const notInsured =
+      limitations.some((l) => l.code === 'NOT_INSURED') ||
+      record.coverageMode === 'self_pay';
+    return (
+      <div className="page medium">
+        <PageHeading
+          title={
+            notInsured
+              ? 'Your self-pay estimate'
+              : 'I can’t estimate this plan yet'
+          }
+          description={treatmentTitle(record)}
+        />
+        {!notInsured && (
+          <Notice tone="warning">
+            {limitations.map((l) => l.message).join(' ') ||
+              'Some plan rules aren’t supported yet.'}
+          </Notice>
+        )}
+        <SelfPay coverage={data.coverage} />
+        <FooterActions>
+          <Button variant="secondary" onClick={() => navigate('/facts')}>
+            Edit details
+          </Button>
+        </FooterActions>
+      </div>
+    );
+  }
+
   const alternative = comparison.alternatives[0];
+  const assumedNextYear = Object.values(record.planYears).some(
+    (y) => y.sourceStatus === 'explicit_unchanged_plan_assumption',
+  );
   return (
     <div className="page options-page">
       <PageHeading
-        eyebrow={`Sample case · ${state.session?.name}`}
-        title={treatmentTitle(state.input)}
-        description="Compare treatment timing against your benefit years. Estimates only."
+        eyebrow={`${isSampleCase(record) ? 'Sample case' : 'Your case'} · Estimated`}
+        title={treatmentTitle(record)}
+        description="Compare treatment timing against your benefit years."
         actions={
           <>
             <div className="segmented" aria-label="How you'll pay">
@@ -113,8 +193,8 @@ export function OptionsPage() {
                 Using the alternative permitted schedule could lower your
                 estimated cost.{' '}
                 <strong>
-                  This depends on the dentist-supplied window and the entered
-                  future coverage and prices.
+                  This depends on the dentist-supplied window and next year’s
+                  coverage and prices.
                 </strong>{' '}
                 ActionBridge doesn't decide whether care can wait.
               </p>
@@ -122,10 +202,15 @@ export function OptionsPage() {
           ) : (
             <Notice>
               {comparison.outcome === 'no_flexible_timing'
-                ? 'No dentist-supplied flexible window is available. We show your original dates without moving treatment.'
+                ? 'No dentist-supplied flexible window is available. I show your original dates without moving treatment.'
                 : comparison.outcome === 'comparison_incomplete'
                   ? 'The original estimate is available, but an alternative could not be compared. Check future benefit dates and balances.'
-                  : 'No lower-cost feasible alternative was found for these details. The original estimate still helps you understand coverage.'}
+                  : 'No lower-cost permitted alternative was found for these details. The original estimate still shows what your plan covers.'}
+            </Notice>
+          )}
+          {comparison.limitations.length > 0 && (
+            <Notice>
+              {comparison.limitations.map((l) => l.message).join(' ')}
             </Notice>
           )}
           <div className="financial-grid">
@@ -141,10 +226,7 @@ export function OptionsPage() {
                 label="Next year's coverage and fees"
                 value={
                   <Badge tone="assumed">
-                    {Object.values(state.input!.planYears).some(
-                      (y) =>
-                        y.sourceStatus === 'explicit_unchanged_plan_assumption',
-                    )
+                    {assumedNextYear
                       ? 'Assumed unchanged'
                       : 'Entered terms · Unverified'}
                   </Badge>
@@ -154,9 +236,9 @@ export function OptionsPage() {
                 label="Dentist-permitted treatment dates"
                 value={
                   <Badge>
-                    {state.origin === 'sample'
+                    {isSampleCase(record)
                       ? 'Sample instruction'
-                      : 'No new window inferred'}
+                      : 'Only dates your dentist gave'}
                   </Badge>
                 }
               />
@@ -168,7 +250,7 @@ export function OptionsPage() {
                 label="Network, eligibility and allowed amount"
                 value={
                   <Badge>
-                    {state.origin === 'sample'
+                    {isSampleCase(record)
                       ? 'Sample plan and your edits'
                       : 'Provided by you'}
                   </Badge>
@@ -176,7 +258,7 @@ export function OptionsPage() {
               />
             </Disclosure>
           </Card>
-          <FooterActions note="Same procedure scope. Financial differences depend on timing and assumptions.">
+          <FooterActions note="Same procedure scope. Differences depend on timing and assumptions.">
             <Button variant="secondary" onClick={() => navigate('/details')}>
               View details
             </Button>
@@ -191,9 +273,22 @@ export function OptionsPage() {
           </FooterActions>
         </>
       ) : (
-        <SelfPay scenarios={scenarios} />
+        <SelfPay coverage={data.coverage} scenarios={scenarios} />
       )}
       {sources && <Evidence onClose={() => setSources(false)} />}
+    </div>
+  );
+}
+
+function Calculating() {
+  return (
+    <div
+      className="page narrow centered"
+      role="status"
+      aria-label="Calculating estimated costs"
+    >
+      <Orb size={140} active />
+      <p className="muted">Calculating estimated costs…</p>
     </div>
   );
 }

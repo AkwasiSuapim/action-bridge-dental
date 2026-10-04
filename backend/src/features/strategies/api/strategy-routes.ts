@@ -25,5 +25,9 @@ export function strategyRoutes({ strategies, authMode }: StrategyRouteDeps): Rec
       const result = await strategies.save(ownerId, caseIdFrom(event), key.data, parseBody(event, SaveStrategyRequestSchema));
       return jsonResult(result.replayed ? 200 : 201, result, event.requestContext.requestId);
     },
+    'GET /v1/cases/{caseId}/strategies': async (event) => {
+      const ownerId = resolveOwnerId(event, authMode);
+      return jsonResult(200, await strategies.list(ownerId, caseIdFrom(event)), event.requestContext.requestId);
+    },
   };
 }

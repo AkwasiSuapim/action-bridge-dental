@@ -1,90 +1,5 @@
 import type { DentalCaseInput, Scenario } from '@actionbridge/contracts';
 
-export type Session = { name: string; email: string };
-export type Attachment = {
-  name: string;
-  kind: 'sample' | 'file' | 'photo';
-  preview?: string;
-};
-export type ActivityEvent = {
-  id: string;
-  title: string;
-  detail: string;
-  timestamp: string;
-  caseId?: string;
-  routine?: boolean;
-};
-export type Provenance = Record<
-  string,
-  { label: string; value: string; recordedAt: string }
->;
-export type SavedPlan = {
-  scenario: Scenario;
-  input: DentalCaseInput;
-  savedAt: string;
-  provenance?: Provenance;
-};
-export type CaseSnapshot = Pick<
-  DemoState,
-  | 'caseId'
-  | 'input'
-  | 'confirmed'
-  | 'comparedRevision'
-  | 'selectedId'
-  | 'saved'
-  | 'quote'
-  | 'reminder'
-  | 'provenance'
-  | 'origin'
-  | 'documentNeeded'
-  | 'documentDeclined'
-  | 'deductibleConflict'
-> & { updatedAt: string };
-export type DemoState = {
-  caseId: string | null;
-  origin: 'sample' | 'manual';
-  provenance: Provenance;
-  cases: CaseSnapshot[];
-  documentNeeded: boolean;
-  documentDeclined: boolean;
-  deductibleConflict: boolean;
-  session: Session | null;
-  input: DentalCaseInput | null;
-  transcript: string;
-  attachments: Attachment[];
-  confirmed: boolean;
-  comparedRevision: number | null;
-  selectedId: string;
-  saved: SavedPlan | null;
-  events: ActivityEvent[];
-  quote: {
-    cents: number;
-    source: 'sample' | 'user';
-    perProcedure?: Record<string, number>;
-    scopeConfirmed?: boolean;
-  } | null;
-  reminder: string | null;
-};
-export const initialState = (): DemoState => ({
-  caseId: null,
-  origin: 'sample',
-  provenance: {},
-  cases: [],
-  documentNeeded: false,
-  documentDeclined: false,
-  deductibleConflict: false,
-  session: null,
-  input: null,
-  transcript: '',
-  attachments: [],
-  confirmed: false,
-  comparedRevision: null,
-  selectedId: 'baseline',
-  saved: null,
-  events: [],
-  quote: null,
-  reminder: null,
-});
 export const money = (cents: number) =>
   new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -119,8 +34,6 @@ export const procedureLabel = (id: string, input?: DentalCaseInput | null) =>
     'crown-1': 'Crown',
   }[id] ??
   id;
-export const sampleTranscript =
-  'I need two fillings and a crown. Can you help me understand what my plan covers?';
 export function dentistQuestion(
   input: DentalCaseInput,
   scenario: Scenario,

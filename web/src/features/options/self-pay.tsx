@@ -1,4 +1,4 @@
-import type { Scenario } from '@actionbridge/contracts';
+import type { CoverageComparison, Scenario } from '@actionbridge/contracts';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -7,245 +7,211 @@ import {
   Card,
   Field,
   Notice,
+  Orb,
   PageHeading,
   Row,
 } from '../../components/ui';
-import {
-  money,
-  parseMoney,
-  scenarioTitle,
-  treatmentTitle,
-} from '../../domain/model';
-import { AmountField } from '../intake/case-forms';
-import { useDemo } from '../../state/demo-store';
-export function SelfPay({ scenarios }: { scenarios: Scenario[] }) {
-  const { state, setQuote } = useDemo();
-  const [value, setValue] = useState(
-    state.quote ? String(state.quote.cents / 100) : '',
+import { money, scenarioTitle, treatmentTitle } from '../../domain/model';
+import { localToday, quoteTexts, selfPayChanges } from '../../domain/self-pay';
+import { asApiError, type ApiError } from '../../services/api';
+import { useCase, useResults } from '../../state/case-store';
+import { ApiNotice } from '../assistant/assistant-page';
+
+/**
+ * Self-pay comparison. Quotes are the dentist's written cash prices per procedure, saved to the
+ * case; the comparison itself comes from the server (coverage comparison), never from browser
+ * arithmetic. An empty price is unknown, never $0.
+ */
+export function SelfPay({
+  coverage,
+  scenarios = [],
+}: {
+  coverage: CoverageComparison;
+  scenarios?: Scenario[];
+}) {
+  const { record } = useCase();
+  const [editing, setEditing] = useState(
+    coverage.selfPay.status === 'unavailable',
   );
-  const [editing, setEditing] = useState(!state.quote);
-  const [error, setError] = useState('');
-  const [itemized, setItemized] = useState(false);
-  const save = () => {
-    const cents = parseMoney(value);
-    if (cents === null || cents <= 0) {
-      setError('Enter a positive cash quote with up to two decimal places.');
-      return;
-    }
-    setQuote({ cents, source: 'user' });
-    setEditing(false);
-    setError('');
-  };
+  if (!record) return null;
+  const available =
+    coverage.selfPay.status === 'available' ? coverage.selfPay : null;
   return (
     <Card className="stack">
       <PageHeading
         title={
-          editing || !state.quote
-            ? 'Add a self-pay quote'
-            : 'Self-pay compared with your plan'
+          available && !editing
+            ? 'Self-pay compared with your plan'
+            : 'Add a self-pay quote'
         }
-        description={`Ask your dentist for a written cash price for the same treatment: ${treatmentTitle(state.input)}.`}
+        description={`Ask your dentist for a written cash price for the same treatment: ${treatmentTitle(record)}.`}
       />
-      <div className="actions">
-        <Button
-          variant="secondary"
-          aria-pressed={itemized}
-          onClick={() => setItemized(!itemized)}
-        >
-          {itemized ? 'Use one combined quote' : 'Enter individual cash prices'}
-        </Button>
-      </div>
-      {itemized && (
-        <ItemizedQuote
-          onSaved={(cents) => {
-            setValue(String(cents / 100));
-            setItemized(false);
-            setEditing(false);
-          }}
+      {!available &&
+        coverage.selfPay.status === 'unavailable' &&
+        coverage.selfPay.missingQuoteProcedureIds.length > 0 &&
+        coverage.selfPay.missingQuoteProcedureIds.length <
+          record.procedures.length && (
+          <Notice tone="warning">
+            Add a cash price for{' '}
+            {coverage.selfPay.missingQuoteProcedureIds
+              .map(
+                (id) =>
+                  record.procedures.find((p) => p.id === id)?.label ??
+                  'each procedure',
+              )
+              .join(', ')}{' '}
+            to compare. Saved prices are kept.
+          </Notice>
+        )}
+      {editing || !available ? (
+        <QuoteForm
+          onSaved={() => setEditing(false)}
+          onCancel={available ? () => setEditing(false) : undefined}
         />
-      )}
-      {!itemized && (
+      ) : (
         <>
-          {editing || !state.quote ? (
-            <form
-              className="stack"
-              onSubmit={(e) => {
-                e.preventDefault();
-                save();
-              }}
-            >
-              <Field
-                label={
-                  state.input?.procedures.length === 3
-                    ? 'Cash quote for all three procedures'
-                    : 'Cash quote for all procedures'
-                }
-                error={error}
-              >
-                <div className="money-input quote-input">
-                  <span>$</span>
-                  <input
-                    inputMode="decimal"
-                    placeholder="Enter quoted amount"
-                    value={value}
-                    onChange={(e) => setValue(e.target.value)}
-                  />
-                </div>
-              </Field>
-              <div className="actions">
-                <Button type="submit">Add quote</Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setQuote({ cents: 150000, source: 'sample' });
-                    setValue('1500');
-                    setEditing(false);
-                  }}
-                >
-                  Use sample quote: $1,500
-                </Button>
-                {state.quote && (
-                  <Button variant="ghost" onClick={() => setEditing(false)}>
-                    Cancel edit
-                  </Button>
+          <div className="actions">
+            <Badge>
+              {available.lines.some((l) => l.source === 'synthetic')
+                ? 'Sample quote'
+                : 'Provided by you · Unverified'}
+            </Badge>
+            <Button variant="secondary" onClick={() => setEditing(true)}>
+              Edit quotes
+            </Button>
+          </div>
+          <div className="cash-comparison">
+            <div className="cash-cell">
+              <p className="small muted">Self-pay quotes</p>
+              <strong>{money(available.totalCents)}</strong>
+              <p className="small muted">Same treatment scope</p>
+            </div>
+            {coverage.insured.status === 'estimated' && (
+              <div className="cash-cell">
+                <p className="small muted">Using your plan · original dates</p>
+                <strong>
+                  {money(coverage.insured.totals.patientPaysCents)}
+                </strong>
+                {coverage.selfPayMinusInsuredCents !== null && (
+                  <p className="accent small">
+                    {coverage.selfPayMinusInsuredCents === 0
+                      ? 'Equal treatment cost'
+                      : coverage.selfPayMinusInsuredCents < 0
+                        ? `Cash is ${money(-coverage.selfPayMinusInsuredCents)} lower`
+                        : `Using your plan is ${money(coverage.selfPayMinusInsuredCents)} lower`}
+                  </p>
                 )}
               </div>
-            </form>
-          ) : (
-            <>
-              <div className="actions">
-                <Badge>
-                  {state.quote.source === 'sample'
-                    ? 'Sample quote'
-                    : 'Provided by you · Unverified'}
-                </Badge>
-                <Button variant="secondary" onClick={() => setEditing(true)}>
-                  Edit quote
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setQuote(null);
-                    setEditing(true);
-                    setValue('');
-                  }}
-                >
-                  Remove
-                </Button>
-              </div>
-              <div className="cash-comparison">
-                <div className="cash-cell">
-                  <p className="small muted">Self-pay quote</p>
-                  <strong>{money(state.quote.cents)}</strong>
-                  <p className="small muted">Same treatment scope</p>
+            )}
+            {scenarios
+              .filter((s) => s.kind === 'alternative')
+              .map((s) => (
+                <div className="cash-cell" key={s.scenarioId}>
+                  <p className="small muted">{scenarioTitle(s)}</p>
+                  <strong>{money(s.estimate.totals.patientPaysCents)}</strong>
+                  <p className="small muted">
+                    Using your plan · permitted timing
+                  </p>
                 </div>
-                {scenarios.map((s) => {
-                  const difference =
-                    state.quote!.cents - s.estimate.totals.patientPaysCents;
-                  return (
-                    <div className="cash-cell" key={s.scenarioId}>
-                      <p className="small muted">{scenarioTitle(s)}</p>
-                      <strong>
-                        {money(s.estimate.totals.patientPaysCents)}
-                      </strong>
-                      <p className="small muted">
-                        {s.kind === 'baseline'
-                          ? 'All in 2026'
-                          : 'Across two benefit years'}
-                      </p>
-                      <p className="accent small">
-                        {difference === 0
-                          ? 'Equal treatment cost'
-                          : difference < 0
-                            ? `Cash is ${money(-difference)} lower`
-                            : `Using this schedule is ${money(difference)} lower`}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-              <Row label="Quote scope" value={treatmentTitle(state.input)} />
-              {state.quote.perProcedure && (
-                <>
-                  {state.input?.procedures.map((p) => (
-                    <Row
-                      key={p.id}
-                      label={`${p.label} · cash price`}
-                      value={money(state.quote!.perProcedure![p.id])}
-                    />
-                  ))}
-                  <Badge>Individual prices · Scope confirmed by you</Badge>
-                </>
-              )}
-            </>
-          )}
+              ))}
+          </div>
+          {available.lines.map((line) => (
+            <Row
+              key={line.procedureId}
+              label={`${record.procedures.find((p) => p.id === line.procedureId)?.label ?? 'Procedure'} · cash price`}
+              value={money(line.amountCents)}
+            />
+          ))}
+          {coverage.notes.map((note) => (
+            <p key={note.code} className="small muted">
+              {note.message}
+            </p>
+          ))}
         </>
       )}
       <Notice>
         This compares treatment costs, not the value of buying insurance.
-        Premiums aren't included. Timing differs between insured options;
-        confirm what the cash quote includes and whether cash billing is
-        available.
+        Premiums aren't included. Confirm what the cash quote includes and
+        whether cash billing is available.
       </Notice>
     </Card>
   );
 }
 
-function ItemizedQuote({ onSaved }: { onSaved: (cents: number) => void }) {
-  const { state, setQuote } = useDemo();
-  const [prices, setPrices] = useState<Record<string, number | null>>(() =>
-    Object.fromEntries(
-      state.input!.procedures.map((p) => [
-        p.id,
-        state.quote?.perProcedure?.[p.id] ?? null,
-      ]),
-    ),
+function QuoteForm({
+  onSaved,
+  onCancel,
+}: {
+  onSaved: () => void;
+  onCancel?: (() => void) | undefined;
+}) {
+  const { record, patch } = useCase();
+  const [texts, setTexts] = useState(() => (record ? quoteTexts(record) : {}));
+  const [scope, setScope] = useState(
+    () => !!record?.procedures.some((p) => p.selfPayQuote),
   );
-  const [scope, setScope] = useState(state.quote?.scopeConfirmed ?? false);
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState<ApiError | null>(null);
+  if (!record) return null;
   return (
     <form
       className="stack"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
-        if (!scope) {
-          setError('Confirm that each quote covers the same service.');
+        if (saving) return;
+        const result = selfPayChanges(
+          record,
+          texts,
+          scope,
+          localToday(new Date()),
+        );
+        if ('errors' in result) {
+          setErrors(result.errors);
           return;
         }
-        if (Object.values(prices).some((v) => v === null)) {
-          setError(
-            'Enter a written price for every procedure. Unknown is not $0.',
-          );
-          return;
+        setErrors({});
+        setSaving(true);
+        setFailure(null);
+        try {
+          await patch(result.changes);
+          onSaved();
+        } catch (caught) {
+          setFailure(asApiError(caught));
+        } finally {
+          setSaving(false);
         }
-        const perProcedure = prices as Record<string, number>;
-        setQuote({
-          cents: Object.values(perProcedure).reduce((sum, v) => sum + v, 0),
-          source: 'user',
-          perProcedure,
-          scopeConfirmed: true,
-        });
-        onSaved(Object.values(perProcedure).reduce((sum, v) => sum + v, 0));
       }}
     >
-      <h3>Individual cash prices</h3>
       <p className="muted small">
         Use your dentist’s written prices. A quoted $0 is valid; an empty field
-        is unknown.
+        means unknown.
       </p>
       <div className="form-grid">
-        {state.input!.procedures.map((p) => (
-          <AmountField
+        {record.procedures.map((p) => (
+          <Field
             key={p.id}
             label={`${p.label} · cash price`}
-            value={prices[p.id]}
-            onChange={(v) =>
-              setPrices((current) => ({ ...current, [p.id]: v }))
-            }
-          />
+            error={errors[p.id]}
+          >
+            <div className="money-input">
+              <span>$</span>
+              <input
+                inputMode="decimal"
+                value={texts[p.id] ?? ''}
+                placeholder="0.00"
+                onChange={(e) =>
+                  setTexts((current) => ({
+                    ...current,
+                    [p.id]: e.target.value,
+                  }))
+                }
+              />
+            </div>
+          </Field>
         ))}
       </div>
-      <label className="consent-box">
+      <label className={`consent-box ${scope ? 'checked' : ''}`}>
         <input
           type="checkbox"
           checked={scope}
@@ -255,29 +221,51 @@ function ItemizedQuote({ onSaved }: { onSaved: (cents: number) => void }) {
           Each quote covers the same service as the treatment estimate.
         </span>
       </label>
-      {error && <Notice tone="danger">{error}</Notice>}
-      <Button type="submit">Save individual quotes</Button>
+      {errors.scope && <Notice tone="danger">{errors.scope}</Notice>}
+      {failure && <ApiNotice error={failure} />}
+      <div className="actions">
+        <Button type="submit" busy={saving}>
+          Save quotes
+        </Button>
+        {onCancel && (
+          <Button variant="ghost" onClick={onCancel}>
+            Cancel
+          </Button>
+        )}
+      </div>
     </form>
   );
 }
+
 /** A cash-only branch doesn't require insurer balances or fabricate insured costs. */
 export function SelfPayPage() {
-  const { state } = useDemo();
+  const { record } = useCase();
+  const { data, error, retry } = useResults();
   const navigate = useNavigate();
   return (
     <div className="page medium">
       <PageHeading
-        eyebrow="Sample case · Self-pay"
+        eyebrow="Self-pay"
         title="Your treatment quote"
-        description={`Review a cash quote for ${treatmentTitle(state.input)}.`}
+        description={
+          record
+            ? `Review a cash quote for ${treatmentTitle(record)}.`
+            : undefined
+        }
       />
-      {state.input ? (
-        <SelfPay scenarios={[]} />
-      ) : (
+      {!record ? (
         <Card>
           <p>Start a case to review your treatment quote.</p>
           <Button onClick={() => navigate('/')}>Start on Home</Button>
         </Card>
+      ) : error ? (
+        <ApiNotice error={error} onRetry={retry} />
+      ) : !data ? (
+        <div className="centered" role="status">
+          <Orb size={110} active />
+        </div>
+      ) : (
+        <SelfPay coverage={data.coverage} />
       )}
       <div className="actions">
         <Button variant="secondary" onClick={() => navigate('/facts')}>

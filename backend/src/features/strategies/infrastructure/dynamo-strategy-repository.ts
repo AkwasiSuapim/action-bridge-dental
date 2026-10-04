@@ -1,5 +1,5 @@
-import { SavedStrategySchema } from '@actionbridge/contracts';
-import { GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { SavedStrategySchema, type SavedStrategy } from '@actionbridge/contracts';
+import { GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { caseKey, casePartition, isConditionFailure, ttl, type DocumentClient } from '../../../shared/dynamo.js';
 import { ledgerItem } from '../../ledger/infrastructure/dynamo-ledger.js';
 import type { IdempotencyRecord, SaveOutcome, StrategyRepository, StrategySave } from '../ports/strategy-repository.js';
@@ -64,6 +64,19 @@ export class DynamoStrategyRepository implements StrategyRepository {
       if (isConditionFailure(error, 1)) return 'idempotency_key_taken';
       throw error;
     }
+  }
+
+  async listForCase(ownerId: string, caseId: string): Promise<SavedStrategy[]> {
+    const output = await this.client.send(
+      new QueryCommand({
+        TableName: this.tableName,
+        KeyConditionExpression: 'pk = :pk AND begins_with(sk, :prefix)',
+        ExpressionAttributeValues: { ':pk': casePartition(ownerId, caseId), ':prefix': 'STRATEGY#' },
+        Limit: 50,
+        ConsistentRead: true,
+      }),
+    );
+    return (output.Items ?? []).map((item) => SavedStrategySchema.parse(item.strategy));
   }
 }
 

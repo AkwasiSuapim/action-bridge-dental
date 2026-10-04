@@ -58,8 +58,11 @@ export interface UploadStore {
   remove(key: string): Promise<void>;
 }
 
+/** Audio formats Amazon Transcribe accepts that the app and browsers record. */
+export type AudioFormat = 'm4a' | 'webm' | 'ogg';
+
 export interface Transcriber {
-  start(name: string, s3Uri: string): Promise<void>;
+  start(name: string, s3Uri: string, format?: AudioFormat): Promise<void>;
   get(name: string): Promise<{ status: 'QUEUED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'; transcriptUri?: string; failureReason?: string }>;
   fetchTranscript(uri: string): Promise<string>;
   remove(name: string): Promise<void>;
