@@ -30,6 +30,12 @@ Parameters:
     Type: CommaDelimitedList
     Default: actionbridgedental://auth/callback
     Description: Mobile app redirect URIs for Cognito managed login (authorization code + PKCE).
+  WebAllowedOrigins:
+    Type: CommaDelimitedList
+    Default: http://localhost:5173,http://127.0.0.1:5173
+    Description: >
+      Browser origins allowed to call the API (CORS), e.g. add the Vercel site
+      https://<project>.vercel.app. Exact origins only; never "*". Native mobile calls are unaffected.
 
 Globals:
   Function:
@@ -141,6 +147,14 @@ Resources:
       DefaultRouteSettings:
         ThrottlingBurstLimit: 20
         ThrottlingRateLimit: 10
+      # Lets the web app call the API from the browser. API Gateway answers preflight requests
+      # itself (no authorizer runs); real requests still need a valid Cognito token.
+      CorsConfiguration:
+        AllowOrigins: !Ref WebAllowedOrigins
+        AllowMethods: [GET, POST, PATCH]
+        AllowHeaders: [authorization, content-type, idempotency-key]
+        ExposeHeaders: [x-request-id]
+        MaxAge: 600
 
   HealthFunction:
     Type: AWS::Serverless::Function
