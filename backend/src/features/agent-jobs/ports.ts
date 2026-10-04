@@ -70,6 +70,8 @@ export class ModelError extends Error {
   constructor(
     message: string,
     readonly retryable: boolean,
+    /** AWS's own error text (identifiers such as role and model ARNs, never user content), for diagnostics. */
+    readonly detail: string | null = null,
   ) {
     super(message);
     this.name = 'ModelError';

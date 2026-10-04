@@ -332,6 +332,14 @@ Resources:
               Resource:
                 - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModelId}
                 - !Sub arn:aws:bedrock:*::foundation-model/${BedrockFoundationModel}
+            # Anthropic models are billed through AWS Marketplace. Bedrock requires exactly these two
+            # actions for the caller (AccessDeniedException text, 2026-10-03). Marketplace actions do not
+            # support resource-level scoping; usage is still limited to the one model by InvokeModel above.
+            - Effect: Allow
+              Action:
+                - aws-marketplace:ViewSubscriptions
+                - aws-marketplace:Subscribe
+              Resource: '*'
       Events:
         Jobs:
           Type: SQS

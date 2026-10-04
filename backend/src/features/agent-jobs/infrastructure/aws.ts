@@ -114,7 +114,8 @@ export class BedrockAgentModel implements AgentModel {
       return { stopReason: output.stopReason ?? 'end_turn', content: content as unknown as ContentBlock[] };
     } catch (error) {
       const name = error instanceof Error ? error.name : 'UnknownError';
-      throw new ModelError(`Model call failed: ${name}`, RETRYABLE.has(name));
+      const detail = error instanceof Error ? error.message.slice(0, 300) : null;
+      throw new ModelError(`Model call failed: ${name}`, RETRYABLE.has(name), detail);
     }
   }
 }
