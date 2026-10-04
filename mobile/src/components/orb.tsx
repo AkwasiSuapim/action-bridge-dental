@@ -61,7 +61,7 @@ export function AgentOrb({ size = 170, mode = 'idle' }: { size?: number; mode?: 
 
   const rings = (angles: number[], halo: boolean, width: number) =>
     angles.map((angle) => (
-      <G key={angle} rotation={angle} origin="100, 100">
+      <G key={angle} transform={`rotate(${angle} 100 100)`}>
         {halo ? <Ellipse cx={100} cy={100} rx={68} ry={40} fill="none" stroke={tint} strokeOpacity={0.07} strokeWidth={14} /> : null}
         <Ellipse cx={100} cy={100} rx={68} ry={40} fill="none" stroke={tint} strokeOpacity={0.18} strokeWidth={5.6} />
         <Ellipse cx={100} cy={100} rx={68} ry={40} fill="none" stroke={`url(#orbRing-${amber ? 'a' : 'g'})`} strokeWidth={width} />

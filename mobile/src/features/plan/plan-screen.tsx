@@ -87,7 +87,14 @@ function PlanBody({ record, plan }: { record: DentalCase; plan: PlanDetails }) {
   };
 
   return (
-    <Screen>
+    <Screen
+      footer={
+        <Button
+          label="Review and save"
+          onPress={() => router.push({ pathname: '/case/[caseId]/review', params: { caseId: record.caseId, scenario: plan.scenarioId } })}
+        />
+      }
+    >
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space(2) }}>
         <Badge label="Your selected option · estimated" tone="neutral" />
         {isSampleCase(record) ? <Badge label="Sample data" tone="neutral" /> : null}
