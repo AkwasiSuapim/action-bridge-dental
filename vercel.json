@@ -4,7 +4,6 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build:web",
   "outputDirectory": "web/dist",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- web packages package.json package-lock.json vercel.json",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
   "headers": [
     {
