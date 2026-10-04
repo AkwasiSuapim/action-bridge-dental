@@ -1,0 +1,576 @@
+{
+  "v": 3,
+  "title": "ActionBridge Dental v3",
+  "pages": [
+    {
+      "id": "page-dental",
+      "name": "Dental v3"
+    }
+  ],
+  "boards": {
+    "Dental-App.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "page": "page-dental",
+      "title": "Interactive prototype · start here (Play)",
+      "w": 390,
+      "x": 0,
+      "y": 0
+    },
+    "D-Welcome.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Welcome",
+      "w": 390,
+      "x": 470,
+      "y": 0
+    },
+    "D-Welcome-Cancelled.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Welcome · sign-in cancelled",
+      "w": 390,
+      "x": 940,
+      "y": 0
+    },
+    "D-Welcome-Expired.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Welcome · session expired",
+      "w": 390,
+      "x": 1410,
+      "y": 0
+    },
+    "D-Auth-Handoff.dc.html": {
+      "h": 1300,
+      "page": "page-dental",
+      "title": "Sign-in handoff · app → system browser → app (annotated)",
+      "w": 1944,
+      "x": 1880,
+      "y": 0
+    },
+    "D-Auth-SignIn.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Hosted sign-in",
+      "w": 390,
+      "x": 3904,
+      "y": 0
+    },
+    "D-Auth-Invalid.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Sign-in · invalid credentials",
+      "w": 390,
+      "x": 4374,
+      "y": 0
+    },
+    "D-Auth-Network.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Sign-in · network error",
+      "w": 390,
+      "x": 4844,
+      "y": 0
+    },
+    "D-Auth-Create.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Create account",
+      "w": 390,
+      "x": 5314,
+      "y": 0
+    },
+    "D-Auth-Verify.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Create account · verify email",
+      "w": 390,
+      "x": 5784,
+      "y": 0
+    },
+    "D-Auth-Reset.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Reset password",
+      "w": 390,
+      "x": 6254,
+      "y": 0
+    },
+    "D-Home.dc.html": {
+      "h": 1070,
+      "page": "page-dental",
+      "title": "Home · multimodal start (full scroll)",
+      "w": 390,
+      "x": 0,
+      "y": 1643
+    },
+    "D-Home-Returning.dc.html": {
+      "h": 1180,
+      "page": "page-dental",
+      "title": "Home · continue your plan",
+      "w": 390,
+      "x": 470,
+      "y": 1643
+    },
+    "D-Voice-Permission.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Voice · microphone permission",
+      "w": 390,
+      "x": 940,
+      "y": 1643
+    },
+    "D-Voice-Recording.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Voice · recording",
+      "w": 390,
+      "x": 1410,
+      "y": 1643
+    },
+    "D-Voice-Transcribing.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Voice · transcribing",
+      "w": 390,
+      "x": 1880,
+      "y": 1643
+    },
+    "D-Voice-Failed.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Voice · could not transcribe",
+      "w": 390,
+      "x": 2350,
+      "y": 1643
+    },
+    "D-Transcript.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Review transcript + extracted facts",
+      "w": 390,
+      "x": 2820,
+      "y": 1643
+    },
+    "D-Capture-Choose.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Capture · choose file, photo or camera",
+      "w": 390,
+      "x": 3290,
+      "y": 1643
+    },
+    "D-Capture-Permission.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Capture · camera permission",
+      "w": 390,
+      "x": 3760,
+      "y": 1643
+    },
+    "D-Capture-Blurry.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Capture · blurry photo recovery",
+      "w": 390,
+      "x": 4230,
+      "y": 1643
+    },
+    "D-Capture-Preview.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Capture · preview, page counts, voice note",
+      "w": 390,
+      "x": 4700,
+      "y": 1643
+    },
+    "D-Working-Reading.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Agent · reading documents",
+      "w": 390,
+      "x": 0,
+      "y": 3166
+    },
+    "D-Working-Retry.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Agent · bounded retry",
+      "w": 390,
+      "x": 470,
+      "y": 3166
+    },
+    "D-Working-Paused.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Agent · we need two details",
+      "w": 390,
+      "x": 940,
+      "y": 3166
+    },
+    "D-Q-Network.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Question 1 of 2 · network",
+      "w": 390,
+      "x": 1410,
+      "y": 3166
+    },
+    "D-Q-Paid.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Question 2 of 2 · benefits already paid",
+      "w": 390,
+      "x": 1880,
+      "y": 3166
+    },
+    "D-Q-Paid-Voice.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Question · spoken answer",
+      "w": 390,
+      "x": 2350,
+      "y": 3166
+    },
+    "D-Q-Paid-Unknown.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Question · I don’t know",
+      "w": 390,
+      "x": 2820,
+      "y": 3166
+    },
+    "D-Q-Doc.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "A quick detail · missing documents",
+      "w": 390,
+      "x": 3290,
+      "y": 3166
+    },
+    "D-Facts.dc.html": {
+      "h": 1950,
+      "page": "page-dental",
+      "title": "Here is what we’ll use (full scroll)",
+      "w": 390,
+      "x": 3760,
+      "y": 3166
+    },
+    "D-Working-Calc.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Agent · calculating options",
+      "w": 390,
+      "x": 4230,
+      "y": 3166
+    },
+    "D-Options.dc.html": {
+      "h": 1760,
+      "page": "page-dental",
+      "title": "Your dental options · 390 (full scroll)",
+      "w": 390,
+      "x": 0,
+      "y": 5459
+    },
+    "D-Options-360.dc.html": {
+      "h": 1790,
+      "page": "page-dental",
+      "title": "Your dental options · 360",
+      "w": 360,
+      "x": 470,
+      "y": 5459
+    },
+    "D-Options-430.dc.html": {
+      "h": 1710,
+      "page": "page-dental",
+      "title": "Your dental options · 430",
+      "w": 430,
+      "x": 910,
+      "y": 5459
+    },
+    "D-Options-All.dc.html": {
+      "h": 2010,
+      "page": "page-dental",
+      "title": "Options · all-this-year selected, what could change open",
+      "w": 390,
+      "x": 1420,
+      "y": 5459
+    },
+    "D-Options-SelfPay.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Options · add a self-pay quote",
+      "w": 390,
+      "x": 1890,
+      "y": 5459
+    },
+    "D-Options-Tablet.dc.html": {
+      "h": 1366,
+      "page": "page-dental",
+      "title": "Tablet · side-by-side comparison",
+      "w": 1024,
+      "x": 2360,
+      "y": 5459
+    },
+    "D-Plan.dc.html": {
+      "h": 3330,
+      "page": "page-dental",
+      "title": "Plan details · calculation and evidence (full scroll)",
+      "w": 390,
+      "x": 3464,
+      "y": 5459
+    },
+    "D-Plan-Sources.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Plan · source excerpts",
+      "w": 390,
+      "x": 3934,
+      "y": 5459
+    },
+    "D-Plan-Share.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Plan · share preview",
+      "w": 390,
+      "x": 4404,
+      "y": 5459
+    },
+    "D-Review.dc.html": {
+      "h": 1240,
+      "page": "page-dental",
+      "title": "Review your plan",
+      "w": 390,
+      "x": 0,
+      "y": 9132
+    },
+    "D-Saving.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Saving your plan",
+      "w": 390,
+      "x": 470,
+      "y": 9132
+    },
+    "D-Recovery-Save.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Recovery · save failed, safe retry",
+      "w": 390,
+      "x": 940,
+      "y": 9132
+    },
+    "D-Recovery-Extract.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Recovery · unreadable document",
+      "w": 390,
+      "x": 1410,
+      "y": 9132
+    },
+    "D-Recovery-Unknown.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Recovery · implausible value",
+      "w": 390,
+      "x": 1880,
+      "y": 9132
+    },
+    "D-Recovery-Expired.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Recovery · session expired",
+      "w": 390,
+      "x": 2350,
+      "y": 9132
+    },
+    "D-Recovery-Stale.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Recovery · stale estimate",
+      "w": 390,
+      "x": 2820,
+      "y": 9132
+    },
+    "D-Saved.dc.html": {
+      "h": 1490,
+      "page": "page-dental",
+      "title": "Your plan is saved + history",
+      "w": 390,
+      "x": 3290,
+      "y": 9132
+    },
+    "D-Saved-History.dc.html": {
+      "h": 1890,
+      "page": "page-dental",
+      "title": "Saved · reminder on, full history",
+      "w": 390,
+      "x": 3760,
+      "y": 9132
+    },
+    "D-Activity.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "Activity",
+      "w": 390,
+      "x": 4230,
+      "y": 9132
+    },
+    "D-MyPlan-Empty.dc.html": {
+      "h": 844,
+      "page": "page-dental",
+      "title": "My plan · empty",
+      "w": 390,
+      "x": 4700,
+      "y": 9132
+    },
+    "D-Profile.dc.html": {
+      "h": 1160,
+      "page": "page-dental",
+      "title": "Profile and privacy",
+      "w": 390,
+      "x": 5170,
+      "y": 9132
+    },
+    "Dental-Components.dc.html": {
+      "h": 2920,
+      "page": "page-dental",
+      "title": "Components and states",
+      "w": 1640,
+      "x": 0,
+      "y": 11365
+    },
+    "Dental-Orb.dc.html": {
+      "h": 200,
+      "page": "page-dental",
+      "title": "Agent orb component",
+      "w": 200,
+      "x": 1720,
+      "y": 11365
+    },
+    "Dental-Handoff.dc.html": {
+      "expand": "fill",
+      "h": 8000,
+      "page": "page-dental",
+      "title": "Design handoff · screen map, states, contract, permissions, provenance",
+      "w": 1200,
+      "x": 2000,
+      "y": 11365
+    }
+  },
+  "notes": {
+    "dental0": {
+      "kind": "title1",
+      "maxW": 6644,
+      "page": "page-dental",
+      "text": "Start: interactive prototype, welcome and sign-in handoff",
+      "w": 240,
+      "x": 0,
+      "y": -223
+    },
+    "dental1": {
+      "kind": "title1",
+      "maxW": 5090,
+      "page": "page-dental",
+      "text": "Home and intake: voice, transcript, documents (dark)",
+      "w": 240,
+      "x": 0,
+      "y": 1420
+    },
+    "dental2": {
+      "kind": "title1",
+      "maxW": 4620,
+      "page": "page-dental",
+      "text": "Agent work and adaptive questions",
+      "w": 240,
+      "x": 0,
+      "y": 2943
+    },
+    "dental3": {
+      "kind": "title1",
+      "maxW": 4794,
+      "page": "page-dental",
+      "text": "Your dental options and plan details (light)",
+      "w": 240,
+      "x": 0,
+      "y": 5236
+    },
+    "dental4": {
+      "kind": "title1",
+      "maxW": 5560,
+      "page": "page-dental",
+      "text": "Review, save, recovery and history",
+      "w": 240,
+      "x": 0,
+      "y": 8909
+    },
+    "dental5": {
+      "kind": "title1",
+      "maxW": 3200,
+      "page": "page-dental",
+      "text": "Components, orb and design handoff",
+      "w": 240,
+      "x": 0,
+      "y": 11142
+    }
+  },
+  "order": [
+    "Dental-App.dc.html",
+    "D-Welcome.dc.html",
+    "D-Welcome-Cancelled.dc.html",
+    "D-Welcome-Expired.dc.html",
+    "D-Auth-Handoff.dc.html",
+    "D-Auth-SignIn.dc.html",
+    "D-Auth-Invalid.dc.html",
+    "D-Auth-Network.dc.html",
+    "D-Auth-Create.dc.html",
+    "D-Auth-Verify.dc.html",
+    "D-Auth-Reset.dc.html",
+    "D-Home.dc.html",
+    "D-Home-Returning.dc.html",
+    "D-Voice-Permission.dc.html",
+    "D-Voice-Recording.dc.html",
+    "D-Voice-Transcribing.dc.html",
+    "D-Voice-Failed.dc.html",
+    "D-Transcript.dc.html",
+    "D-Capture-Choose.dc.html",
+    "D-Capture-Permission.dc.html",
+    "D-Capture-Blurry.dc.html",
+    "D-Capture-Preview.dc.html",
+    "D-Working-Reading.dc.html",
+    "D-Working-Retry.dc.html",
+    "D-Working-Paused.dc.html",
+    "D-Q-Network.dc.html",
+    "D-Q-Paid.dc.html",
+    "D-Q-Paid-Voice.dc.html",
+    "D-Q-Paid-Unknown.dc.html",
+    "D-Q-Doc.dc.html",
+    "D-Facts.dc.html",
+    "D-Working-Calc.dc.html",
+    "D-Options.dc.html",
+    "D-Options-360.dc.html",
+    "D-Options-430.dc.html",
+    "D-Options-All.dc.html",
+    "D-Options-SelfPay.dc.html",
+    "D-Options-Tablet.dc.html",
+    "D-Plan.dc.html",
+    "D-Plan-Sources.dc.html",
+    "D-Plan-Share.dc.html",
+    "D-Review.dc.html",
+    "D-Saving.dc.html",
+    "D-Recovery-Save.dc.html",
+    "D-Recovery-Extract.dc.html",
+    "D-Recovery-Unknown.dc.html",
+    "D-Recovery-Expired.dc.html",
+    "D-Recovery-Stale.dc.html",
+    "D-Saved.dc.html",
+    "D-Saved-History.dc.html",
+    "D-Activity.dc.html",
+    "D-MyPlan-Empty.dc.html",
+    "D-Profile.dc.html",
+    "Dental-Components.dc.html",
+    "Dental-Orb.dc.html",
+    "Dental-Handoff.dc.html"
+  ]
+}
