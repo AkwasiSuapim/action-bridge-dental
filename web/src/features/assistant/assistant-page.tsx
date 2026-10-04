@@ -108,6 +108,13 @@ export function ApiNotice({
   return (
     <Notice tone={error.options.retryable ? 'warning' : 'danger'}>
       {error.message}
+      {error.options.issues?.length ? (
+        <ul className="hint-list small">
+          {error.options.issues.map((issue, i) => (
+            <li key={`${issue.fieldPath ?? 'issue'}-${i}`}>{issue.message}</li>
+          ))}
+        </ul>
+      ) : null}
       {error.options.requestId ? (
         <span className="block small">
           Reference: {error.options.requestId}

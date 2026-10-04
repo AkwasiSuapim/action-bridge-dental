@@ -201,12 +201,20 @@ export async function mockBackend(
             ? compareSchedules(input)
             : compareCoverage(input);
       if ('status' in result && result.status === 'invalid')
-        return error(
-          route,
-          422,
-          'INCONSISTENT_INPUT',
-          'Some values contradict each other.',
-        );
+        // Same envelope as the API: the engine's issues say which values conflict.
+        return route.fulfill({
+          status: 422,
+          json: {
+            error: {
+              code: 'INCONSISTENT_INPUT',
+              message:
+                'Some values contradict each other. Review them and try again.',
+              retryable: false,
+              requestId: 'req-test',
+              issues: 'issues' in result ? result.issues : [],
+            },
+          },
+        });
       return route.fulfill({ json: result });
     }
     if ((m = path.match(/^\/v1\/cases\/([^/]+)\/strategies$/))) {

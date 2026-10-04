@@ -19,7 +19,15 @@ export function LoadingState({ label }: { label: string }) {
 /** An API failure with its support reference and a retry. Never replaced by sample data. */
 export function ErrorNotice({ error, onRetry }: { error: ApiError; onRetry?: () => void }) {
   return (
-    <Notice tone={error.options.retryable ? 'warning' : 'danger'} title={error.message} {...(error.options.requestId ? { body: `Reference: ${error.options.requestId}` } : {})}>
+    <Notice
+      tone={error.options.retryable ? 'warning' : 'danger'}
+      title={error.message}
+      {...(error.options.issues?.length || error.options.requestId
+        ? {
+            body: [...(error.options.issues ?? []).map((issue) => `• ${issue.message}`), ...(error.options.requestId ? [`Reference: ${error.options.requestId}`] : [])].join('\n'),
+          }
+        : {})}
+    >
       {onRetry ? <Button label="Try again" variant="secondary" onPress={onRetry} /> : null}
     </Notice>
   );

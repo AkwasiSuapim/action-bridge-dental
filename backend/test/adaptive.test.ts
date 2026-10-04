@@ -128,3 +128,41 @@ describe('adaptive loop through the jobs API', () => {
     expect(done.resultBlocks.blocks[1].items[0]).toMatchObject({ audience: 'dentist', text: 'What is my plan’s allowed amount for Filling one?' });
   });
 });
+
+describe('answers that would contradict the case', () => {
+  it('money questions carry the largest value that fits the case', () => {
+    const input = fixture();
+    input.planYears['py-2026']!.deductibleAlreadyMetCents = null;
+    input.planYears['py-2026']!.insurerAlreadyPaidCents = null;
+    const step = planStep(missingFor(input), input, none, 1);
+    const byPath = Object.fromEntries(step.blocks.map((b) => [b.fieldPath, b]));
+    expect(byPath['planYears.py-2026.deductibleAlreadyMetCents']).toMatchObject({ inputType: 'currency', maximumCents: 5000 });
+    expect(byPath['planYears.py-2026.insurerAlreadyPaidCents']).toMatchObject({ inputType: 'currency', maximumCents: 80000 });
+  });
+
+  it('the server refuses "deductible met $60" on a $50 deductible and keeps the case unchanged', async () => {
+    const h = createAgentHarness(new ScriptedModel([]));
+    const base = fixture();
+    const planYears = { ...base.planYears, 'py-2026': { ...base.planYears['py-2026']!, deductibleAlreadyMetCents: null } };
+    const created = await h.call('POST /v1/cases', {}, { currency: 'USD', coverageMode: 'insured', policy: base.policy, planYears, procedures: base.procedures });
+    const caseId = created.body.caseId;
+    const job = await h.call('POST /v1/cases/{caseId}/jobs', { caseId }, { expectedRevision: 1, operation: 'interpret', input: {} });
+    await h.drain();
+    const asked = (await h.call('GET /v1/jobs/{jobId}', { jobId: job.body.jobId })).body;
+    const question = asked.questions.blocks.find((b: MissingFieldBlock) => b.fieldPath === 'planYears.py-2026.deductibleAlreadyMetCents');
+    expect(question).toMatchObject({ maximumCents: 5000 });
+
+    const refused = await h.call('POST /v1/jobs/{jobId}/answers', { jobId: job.body.jobId }, {
+      expectedRevision: 1,
+      answers: [{ questionId: question.questionId, value: 6000, unknown: false, responseMode: 'type', attachmentId: null }],
+    });
+    expect(refused.status).toBe(400);
+    expect((await h.call('GET /v1/cases/{caseId}', { caseId })).body.caseRevision).toBe(1);
+
+    const accepted = await h.call('POST /v1/jobs/{jobId}/answers', { jobId: job.body.jobId }, {
+      expectedRevision: 1,
+      answers: [{ questionId: question.questionId, value: 5000, unknown: false, responseMode: 'type', attachmentId: null }],
+    });
+    expect(accepted.status).toBe(202);
+  });
+});

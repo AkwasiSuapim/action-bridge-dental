@@ -9,6 +9,7 @@ import {
   type PatchCaseRequest,
   type SourceFact,
 } from '@actionbridge/contracts';
+import { estimateCase } from '@actionbridge/benefits-engine';
 import { expiresAtFrom } from '../../../shared/dynamo.js';
 import { HttpError } from '../../../shared/http.js';
 import { toEngineInput, type CaseService } from '../../cases/application/case-service.js';
@@ -122,6 +123,16 @@ export class JobService {
     if (issues.length > 0) throw new HttpError('BAD_REQUEST', 'Some answers could not be used.', issues);
     const valid = DentalCaseInputSchema.safeParse(input);
     if (!valid.success) throw new HttpError('BAD_REQUEST', 'Those answers would make the case invalid. Review them and try again.');
+    // Never store numbers that contradict each other (e.g. deductible met above the deductible):
+    // the calculator would refuse every estimate afterwards. Say which detail conflicts instead.
+    const after = estimateCase(valid.data);
+    if (after.status === 'invalid' && estimateCase(before).status !== 'invalid') {
+      throw new HttpError(
+        'BAD_REQUEST',
+        `That answer conflicts with your other details: ${after.issues.map((i) => i.message).join(' ')}`.slice(0, 300),
+        after.issues.map((i) => ({ fieldPath: i.fieldPath, code: 'CONFLICTING_ANSWER', message: i.message })),
+      );
+    }
 
     let revision = record.caseRevision;
     const changes = changedSections(before, input);
