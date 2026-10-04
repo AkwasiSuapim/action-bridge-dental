@@ -2,6 +2,8 @@
 
 Version 2.0 · 3 October 2026 · Mobile first; web after the release gate.
 
+> **Judges and new readers:** start with the [root README](../README.md), then [judging criteria and evidence](JUDGING.md) and the [demo kit](demo/README.md). The documents below are the original build plan; the web app has since been built and connected to the same API.
+
 This is a **documentation and implementation-planning package**, not a rebuilt application. The uploaded mobile source and earlier backend starter have not been changed. Put the `docs/` directory beside `mobile/`, `backend/`, `packages/`, and `infra/` in the permitted team repository.
 
 ## Read in this order
