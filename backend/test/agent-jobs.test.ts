@@ -102,15 +102,17 @@ describe('T5 adaptive agent loop, end to end with a scripted model', () => {
     const second = await getJob(h, answered.body.jobId);
     expect(second.status).toBe('needs_information');
     const questions = second.questions!.blocks.flatMap((b) => (b.type === 'missing_field' ? [b] : []));
+    // Five missing details across three procedures and two categories become two grouped questions.
     expect(questions.map((q) => [q.fieldPath, q.inputType])).toEqual([
-      ['procedures.proc-1.contractualWriteoffCents', 'currency'],
-      ['policy.annualMaximumAppliesByCategory.basic', 'single_select'],
-      ['procedures.proc-2.contractualWriteoffCents', 'currency'],
-      ['procedures.proc-3.contractualWriteoffCents', 'currency'],
-      ['policy.annualMaximumAppliesByCategory.major', 'single_select'],
+      ['procedures.all.contractualWriteoffCents', 'single_select'],
+      ['policy.annualMaximumAppliesByCategory.all', 'single_select'],
     ]);
+    expect(second.questions!.blocks[0]).toMatchObject({ type: 'notice', title: '2 quick questions and I can calculate your estimate.' });
+    // All three are in network with allowed amounts known, so "the difference" is offered first.
+    expect(questions[0]?.options.map((o) => o.id)).toEqual(['difference', 'none', 'each']);
 
-    const answers = questions.map((q) => ({ questionId: q.questionId, value: q.inputType === 'currency' ? 0 : 'yes', unknown: false, responseMode: 'tap', attachmentId: null }));
+    const pick = { 'procedures.all.contractualWriteoffCents': 'difference', 'policy.annualMaximumAppliesByCategory.all': 'yes' } as Record<string, string>;
+    const answers = questions.map((q) => ({ questionId: q.questionId, value: pick[q.fieldPath], unknown: false, responseMode: 'tap', attachmentId: null }));
     const final = await h.call('POST /v1/jobs/{jobId}/answers', { jobId: second.jobId }, { expectedRevision: 2, answers });
     expect(final.status).toBe(202);
     await h.drain();
@@ -185,12 +187,25 @@ describe('T5 adaptive agent loop, end to end with a scripted model', () => {
     expect(dropped).toEqual([{ group: 'procedure', field: 'Crown.allowedCents', reason: 'amount_not_in_quote' }]);
   });
 
+  it('a date or network status the text never states is dropped, even if the amount is quoted', () => {
+    const text = 'Crown (D2740) fee $1,000.00. Filling $250.';
+    const empty = { caseRevision: 1, currency: 'USD' as const, coverageMode: 'unknown' as const, policy: null, planYears: {}, procedures: [] };
+    const { groups, dropped } = groupsFromExtraction(
+      { procedures: [{ label: 'Crown', category: 'major', providerChargeCents: 100000, network: 'in', proposedDate: '2026-11-12', quote: 'Crown (D2740) fee $1,000.00' }] },
+      text,
+      empty,
+      '2026-10-03',
+    );
+    expect(groups[0]).toMatchObject({ procedure: { providerChargeCents: 100000, network: 'unknown', proposedDate: null } });
+    expect(dropped.map((d) => d.field).sort()).toEqual(['Crown.network', 'Crown.proposedDate']);
+  });
+
   it('timing heard from the user never unlocks the optimizer; only a dentist window does', () => {
-    const text = 'The crown at $1,000. The dentist said the crown can be done any time until 2027-01-15. I would rather wait until January.';
+    const text = 'The crown at $1,000 is planned for 2026-11-12. The dentist said the crown can be done any time from 2026-11-12 until 2027-01-15. I would rather wait until January.';
     const base = { label: 'Crown', category: 'major' as const, providerChargeCents: 100000, proposedDate: '2026-11-12', dentistEarliestDate: '2026-11-12', dentistLatestDate: '2027-01-15' };
     const empty = { caseRevision: 1, currency: 'USD' as const, coverageMode: 'unknown' as const, policy: null, planYears: {}, procedures: [] };
-    const dentist = groupsFromExtraction({ procedures: [{ ...base, timingStatedBy: 'dentist', quote: 'The crown at $1,000.' }] }, text, empty, '2026-10-03');
-    const user = groupsFromExtraction({ procedures: [{ ...base, timingStatedBy: 'user', quote: 'The crown at $1,000.' }] }, text, empty, '2026-10-03');
+    const dentist = groupsFromExtraction({ procedures: [{ ...base, timingStatedBy: 'dentist', quote: 'The crown at $1,000' }] }, text, empty, '2026-10-03');
+    const user = groupsFromExtraction({ procedures: [{ ...base, timingStatedBy: 'user', quote: 'The crown at $1,000' }] }, text, empty, '2026-10-03');
     expect(dentist.groups[0]).toMatchObject({ procedure: { timingSource: 'dentist_supplied' } });
     expect(user.groups[0]).toMatchObject({ procedure: { timingSource: 'user_reported' } });
   });

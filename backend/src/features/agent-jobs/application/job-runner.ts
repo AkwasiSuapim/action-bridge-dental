@@ -1,4 +1,5 @@
 import {
+  UPLOAD_LIMITS,
   UI_BLOCK_SCHEMA_VERSION,
   UiBlockEnvelopeSchema,
   type DentalCaseInput,
@@ -13,8 +14,8 @@ import { logEvent } from '../../../shared/logger.js';
 import { toEngineInput } from '../../cases/application/case-service.js';
 import type { CaseRepository } from '../../cases/ports/case-repository.js';
 import type { FactGroup } from '../domain/extraction.js';
-import { questionBlocks } from '../domain/questions.js';
-import { ModelError, type AgentModel, type JobRecord, type JobRepository } from '../ports.js';
+import { nextStepItems, planStep } from '../domain/adaptive.js';
+import { ModelError, uploadKey, type AgentModel, type DocumentReader, type JobRecord, type JobRepository, type Transcriber, type UploadStore } from '../ports.js';
 import { explainComparison } from './explain.js';
 import { runInterpretAgent } from './interpret-agent.js';
 
@@ -26,6 +27,10 @@ export interface JobRunnerDeps {
   newId: () => string;
   retentionDays: number | null;
   leaseMs: number;
+  uploads?: UploadStore;
+  transcriber?: Transcriber;
+  reader?: DocumentReader;
+  sleep?: (ms: number) => Promise<void>;
 }
 
 /**
@@ -71,11 +76,24 @@ export async function runJob(deps: JobRunnerDeps, message: { ownerId: string; jo
     }
     const input = toEngineInput(record);
 
-    if (job.inputText) {
-      const result = await runInterpretAgent({ model: deps.model, input, text: job.inputText, today: deps.now().toISOString().slice(0, 10), report });
+    if (job.operation === 'transcribe_audio') {
+      await transcribe();
+      return 'completed';
+    }
+
+    let text = job.inputText;
+    let source: 'description' | 'document' = 'description';
+    if (job.operation === 'analyze_document') {
+      text = await readDocument();
+      if (text === null) return 'completed';
+      source = 'document';
+    }
+
+    if (text) {
+      const result = await runInterpretAgent({ model: deps.model, input, text, today: deps.now().toISOString().slice(0, 10), report, source });
       if (result.groups.length > 0) {
         await report('preparing_explanation', 'completed', 'Ready for you to confirm');
-        const questions = envelope(job.caseRevision, [...confirmationBlocks(result.groups, job.caseRevision), foundNotice(result)]);
+        const questions = envelope(job.caseRevision, [...confirmationBlocks(result.groups, job.caseRevision, source), foundNotice(result)]);
         await finish('needs_information', questions, null, null, result.groups);
         return 'completed';
       }
@@ -83,7 +101,7 @@ export async function runJob(deps: JobRunnerDeps, message: { ownerId: string; jo
 
     // No description, or nothing quotable in it: let the engine decide what to ask or show.
     await report('checking_missing_facts', 'started', 'Checking what is still needed');
-    await assess(input, Boolean(job.inputText));
+    await assess(input, Boolean(text));
     return 'completed';
   } catch (error) {
     if (error instanceof LeaseLost) return 'skipped';
@@ -105,6 +123,92 @@ export async function runJob(deps: JobRunnerDeps, message: { ownerId: string; jo
     return 'completed';
   }
 
+  /** Size and real file type (first bytes), never the file name. Removes the object when it fails. */
+  async function verifiedUpload(kind: 'audio' | 'document'): Promise<{ key: string; type: 'm4a' | 'pdf' | 'jpeg' | 'png' } | null> {
+    const store = deps.uploads;
+    if (!store || !job.documentId) throw new Error('Uploads are not configured');
+    const key = uploadKey(job.ownerId, job.caseId, job.documentId);
+    const head = await store.head(key);
+    const reject = async (message: string) => {
+      await store.remove(key).catch(() => undefined);
+      await finish('failed', null, null, { code: 'BAD_REQUEST', message, retryable: false, requestId: job.jobId });
+      return null;
+    };
+    if (!head) return reject('The upload was not found. It may have expired — please upload it again.');
+    if (head.sizeBytes > UPLOAD_LIMITS[kind].maxBytes) return reject('That file is too large. Please use a shorter recording or a smaller file.');
+    const type = fileTypeOf(await store.firstBytes(key, 16));
+    const allowed = kind === 'audio' ? type === 'm4a' : type === 'pdf' || type === 'jpeg' || type === 'png';
+    if (!type || !allowed) return reject(kind === 'audio' ? 'That recording format isn’t supported. Please record again in the app.' : 'Please upload a PDF, JPEG or PNG — or take a photo of the page.');
+    return { key, type };
+  }
+
+  async function transcribe() {
+    const transcriber = deps.transcriber;
+    if (!transcriber || !deps.uploads) throw new Error('Transcription is not configured');
+    await report('reading_input', 'started', 'Listening to your recording');
+    const upload = await verifiedUpload('audio');
+    if (!upload) return;
+    const name = `actionbridge-${job.jobId}`;
+    try {
+      await transcriber.start(name, `s3://${deps.uploads.bucket}/${upload.key}`);
+    } catch (error) {
+      // A retried attempt may find its own transcription job already started; keep following it.
+      if (!(error instanceof Error && error.name === 'ConflictException')) throw error;
+    }
+    let transcript: string | null = null;
+    for (let i = 0; i < 35 && transcript === null; i++) {
+      const state = await transcriber.get(name);
+      if (state.status === 'COMPLETED' && state.transcriptUri) transcript = await transcriber.fetchTranscript(state.transcriptUri);
+      else if (state.status === 'FAILED') {
+        await cleanUp();
+        await finish('failed', null, null, { code: 'BAD_REQUEST', message: 'I couldn’t process that recording. Please try again, or type instead.', retryable: false, requestId: job.jobId });
+        return;
+      } else await (deps.sleep ?? defaultSleep)(2000);
+    }
+    // On a timeout keep the audio and the transcription job: a retry resumes following the same job.
+    if (transcript === null) throw new ModelError('Transcription timed out', true);
+    await cleanUp();
+    await report('reading_input', 'completed', transcript ? 'Recording transcribed' : 'No words recognized');
+    const body = transcript
+      ? 'Check the words below and fix anything I misheard. Nothing is used until you continue.'
+      : 'I couldn’t make out any words. Try again a little closer to the phone, or type instead.';
+    await finish('completed', null, envelope(job.caseRevision, [notice(transcript ? 'info' : 'warning', transcript ? 'Here’s what I heard' : 'No words recognized', body)]), null, [], transcript.slice(0, 8000));
+
+    async function cleanUp() {
+      // Raw audio and the transcription job are removed as soon as the text is read.
+      await transcriber!.remove(name);
+      await deps.uploads!.remove(upload!.key).catch(() => undefined);
+    }
+  }
+
+  async function readDocument(): Promise<string | null> {
+    const reader = deps.reader;
+    if (!reader || !deps.uploads) throw new Error('Document reading is not configured');
+    await report('reading_input', 'started', 'Reading your document');
+    const upload = await verifiedUpload('document');
+    if (!upload) return null;
+    let lines: string[];
+    try {
+      lines = await reader.readLines(deps.uploads.bucket, upload.key);
+    } catch (error) {
+      await deps.uploads.remove(upload.key).catch(() => undefined);
+      if (error instanceof Error && /UnsupportedDocument|BadDocument|DocumentTooLarge|InvalidParameter/.test(error.name)) {
+        await finish('failed', null, null, { code: 'BAD_REQUEST', message: 'I can read one page at a time. Upload a single page, or take a photo of it.', retryable: false, requestId: job.jobId });
+        return null;
+      }
+      throw error;
+    }
+    await deps.uploads.remove(upload.key).catch(() => undefined);
+    const text = lines.join('\n').slice(0, 8000);
+    if (text.replace(/\s/g, '').length < 20) {
+      await report('reading_input', 'completed', 'No readable text found');
+      await finish('completed', null, envelope(job.caseRevision, [notice('warning', 'I couldn’t read this document', 'The photo may be blurry or cut off. Retake it in good light with the whole page in view, upload a PDF, or type the details instead.')]), null);
+      return null;
+    }
+    await report('reading_input', 'completed', `Read ${lines.length} lines of text`);
+    return text;
+  }
+
   async function assess(input: DentalCaseInput, afterDescription: boolean) {
     const estimate = estimateCase(input);
     const lead: UiBlock[] = afterDescription
@@ -112,14 +216,26 @@ export async function runJob(deps: JobRunnerDeps, message: { ownerId: string; jo
       : [];
 
     if (estimate.status === 'needs_information') {
-      const { blocks, unanswerable } = questionBlocks(estimate.missing, input, job.caseRevision);
-      const extra = unanswerable.length > 0 ? [notice('info', 'Also needed in your case details', unanswerable.map((m) => m.message).join(' ').slice(0, 500))] : [];
-      if (blocks.length > 0) {
-        await report('checking_missing_facts', 'completed', `${blocks.length} ${blocks.length === 1 ? 'question' : 'questions'} for you`);
-        await finish('needs_information', envelope(job.caseRevision, [...lead, ...blocks, ...extra].slice(0, 10)), null, null);
-      } else {
-        await finish('completed', null, envelope(job.caseRevision, [...lead, ...extra].slice(0, 10)), null);
+      const state = { skipped: job.skippedFieldPaths ?? [], expanded: job.expandedGroups ?? [] };
+      const step = planStep(estimate.missing, input, state, job.caseRevision);
+      const extra = step.unanswerable.length > 0 ? [notice('info', 'Also needed in your case details', step.unanswerable.map((m) => m.message).join(' ').slice(0, 500))] : [];
+      if (step.blocks.length > 0) {
+        await report('checking_missing_facts', 'completed', step.message);
+        const header = notice('info', step.message, 'Each answer goes straight into the calculator. Choose “I don’t know” for anything you don’t have — I won’t ask again.');
+        await finish('needs_information', envelope(job.caseRevision, [...lead, header, ...step.blocks, ...extra].slice(0, 10)), null, null);
+        return;
       }
+      // Everything left is something the user doesn't have: no more questions, a clear next step instead.
+      const items = nextStepItems([...step.skippedFacts, ...step.unanswerable], input);
+      await report('checking_missing_facts', 'completed', 'Some details are still needed from your dentist or insurer');
+      const blocks: UiBlock[] = [
+        ...lead,
+        notice('warning', 'I can’t calculate an exact estimate yet', 'A few details are still unknown. Ask for these, then add them to your case and I’ll finish the calculation.'),
+      ];
+      if (items.length > 0) {
+        blocks.push({ id: 'next-step', type: 'next_step', title: 'Questions to ask', items: items.map((item, i) => ({ id: `ask-${i + 1}`, audience: item.audience, text: item.text.slice(0, 200), issueId: null })) });
+      }
+      await finish('completed', null, envelope(job.caseRevision, blocks.slice(0, 10)), null);
       return;
     }
     if (estimate.status === 'unsupported' || estimate.status === 'invalid') {
@@ -155,9 +271,16 @@ export async function runJob(deps: JobRunnerDeps, message: { ownerId: string; jo
     await finish('completed', null, envelope(job.caseRevision, blocks), null);
   }
 
-  async function finish(status: JobRecord['status'], questions: UiBlockEnvelope | null, resultBlocks: UiBlockEnvelope | null, error: JobRecord['error'], proposals: FactGroup[] = []) {
+  async function finish(
+    status: JobRecord['status'],
+    questions: UiBlockEnvelope | null,
+    resultBlocks: UiBlockEnvelope | null,
+    error: JobRecord['error'],
+    proposals: FactGroup[] = [],
+    transcript?: string,
+  ) {
     const ok = await deps.jobs.put(
-      { ...job, status, questions, resultBlocks, error, proposals, leaseToken: null, leaseUntil: null, updatedAt: deps.now().toISOString() },
+      { ...job, status, questions, resultBlocks, error, proposals, ...(transcript !== undefined ? { transcript } : {}), leaseToken: null, leaseUntil: null, updatedAt: deps.now().toISOString() },
       { status: ['running'], leaseToken: token },
       ttl(),
     );
@@ -185,8 +308,20 @@ const GROUP_LABEL: Record<FactGroup['kind'], string> = {
   procedure: 'Is this right? A recommended procedure',
 };
 
+/** First bytes → real file type. File names and declared types are not trusted. */
+export function fileTypeOf(bytes: Uint8Array): 'm4a' | 'pdf' | 'jpeg' | 'png' | null {
+  const ascii = (from: number, to: number) => String.fromCharCode(...bytes.slice(from, to));
+  if (bytes.length >= 8 && ascii(4, 8) === 'ftyp') return 'm4a';
+  if (ascii(0, 4) === '%PDF') return 'pdf';
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'jpeg';
+  if (bytes[0] === 0x89 && ascii(1, 4) === 'PNG') return 'png';
+  return null;
+}
+
+const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 /** One "Is this right?" confirmation per group of proposed facts (`confirm-N` ↔ proposals[N-1]). */
-export function confirmationBlocks(groups: FactGroup[], caseRevision: number): MissingFieldBlock[] {
+export function confirmationBlocks(groups: FactGroup[], caseRevision: number, source: 'description' | 'document' = 'description'): MissingFieldBlock[] {
   return groups.slice(0, 9).map((group, index) => ({
     id: `confirm-${index + 1}`,
     type: 'missing_field',
@@ -194,7 +329,7 @@ export function confirmationBlocks(groups: FactGroup[], caseRevision: number): M
     fieldPath: group.fieldPath,
     inputType: 'fact_review',
     label: GROUP_LABEL[group.kind],
-    reason: `From your description: “${group.quote}”`.slice(0, 300),
+    reason: `From your ${source}: “${group.quote}”`.slice(0, 300),
     options: [],
     allowedResponseModes: ['tap'],
     required: false,

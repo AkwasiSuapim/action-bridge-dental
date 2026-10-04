@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Camera, Keyboard, Mic, Upload, type LucideIcon } from 'lucide-react-native';
+import { Camera, Keyboard, MessageSquareText, Mic, Upload, type LucideIcon } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { BrandLockup } from '../../components/brand';
@@ -18,11 +18,12 @@ import { useRefreshOnFocus } from '../activity/use-refresh-on-focus';
 import { sampleCaseRequest } from '../intake/sample-case';
 
 /** Intake methods (design v3 "Home · multimodal start"), switched on in `lib/capabilities.ts`. */
-const METHODS: { id: 'speak' | 'upload' | 'photo' | 'type'; label: string; Icon: LucideIcon; available: boolean }[] = [
+const METHODS: { id: 'describe' | 'speak' | 'upload' | 'photo' | 'type'; label: string; Icon: LucideIcon; available: boolean }[] = [
+  { id: 'describe', label: 'Describe your situation', Icon: MessageSquareText, available: capabilities.assistant },
   { id: 'speak', label: 'Speak', Icon: Mic, available: capabilities.voice },
   { id: 'upload', label: 'Upload', Icon: Upload, available: capabilities.upload },
   { id: 'photo', label: 'Take photo', Icon: Camera, available: capabilities.photo },
-  { id: 'type', label: 'Type', Icon: Keyboard, available: capabilities.typing },
+  { id: 'type', label: 'Form', Icon: Keyboard, available: capabilities.typing },
 ];
 
 const STEPS = [
@@ -64,7 +65,7 @@ function HomeBody() {
       setStarting(false);
     }
   };
-  const [speak, ...others] = METHODS;
+  const [primary, ...others] = METHODS;
 
   return (
     <Screen headerless>
@@ -80,7 +81,7 @@ function HomeBody() {
       </View>
 
       <View style={{ gap: space(3) }}>
-        {speak ? <MethodButton method={speak} large /> : null}
+        {primary ? <MethodButton method={primary} large /> : null}
         <View style={{ flexDirection: 'row', gap: space(3) }}>
           {others.map((method) => (
             <MethodButton key={method.id} method={method} />
@@ -162,6 +163,10 @@ function MethodButton({ method, large = false }: { method: (typeof METHODS)[numb
       accessibilityState={{ disabled: !available }}
       disabled={!available}
       onPress={() => {
+        if (method.id === 'describe') router.push('/case/describe');
+        if (method.id === 'speak' || method.id === 'upload' || method.id === 'photo') {
+          router.push({ pathname: '/case/describe', params: { start: method.id === 'speak' ? 'voice' : method.id } });
+        }
         if (method.id === 'type') router.push('/case/new');
       }}
       style={({ pressed }) => ({

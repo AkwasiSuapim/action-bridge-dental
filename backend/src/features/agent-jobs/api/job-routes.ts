@@ -1,11 +1,13 @@
-import { CreateJobRequestSchema, EmptyRequestSchema, IdSchema, JobAnswersRequestSchema } from '@actionbridge/contracts';
+import { CreateJobRequestSchema, CreateUploadRequestSchema, EmptyRequestSchema, IdSchema, JobAnswersRequestSchema } from '@actionbridge/contracts';
 import { resolveOwnerId, type AuthMode } from '../../../shared/auth.js';
 import { HttpError, jsonResult, parseBody, type HttpEvent, type RouteHandler } from '../../../shared/http.js';
 import { caseIdFrom } from '../../cases/api/case-routes.js';
 import type { JobService } from '../application/job-service.js';
+import type { UploadService } from '../application/upload-service.js';
 
 export interface JobRouteDeps {
   jobs: JobService;
+  uploads?: UploadService;
   authMode: AuthMode;
 }
 
@@ -16,8 +18,14 @@ function jobIdFrom(event: HttpEvent): string {
 }
 
 /** Agent jobs (system design §6). Results are polled; the backend owns completion. */
-export function jobRoutes({ jobs, authMode }: JobRouteDeps): Record<string, RouteHandler> {
+export function jobRoutes({ jobs, uploads, authMode }: JobRouteDeps): Record<string, RouteHandler> {
   return {
+    'POST /v1/cases/{caseId}/uploads': async (event) => {
+      const ownerId = resolveOwnerId(event, authMode);
+      if (!uploads) throw new HttpError('BAD_REQUEST', 'Uploads are not available in this environment.');
+      const slot = await uploads.create(ownerId, caseIdFrom(event), parseBody(event, CreateUploadRequestSchema));
+      return jsonResult(201, slot, event.requestContext.requestId);
+    },
     'POST /v1/cases/{caseId}/jobs': async (event) => {
       const ownerId = resolveOwnerId(event, authMode);
       const created = await jobs.create(ownerId, caseIdFrom(event), parseBody(event, CreateJobRequestSchema));

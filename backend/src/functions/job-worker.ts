@@ -1,12 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
+import { S3Client } from '@aws-sdk/client-s3';
+import { TextractClient } from '@aws-sdk/client-textract';
+import { TranscribeClient } from '@aws-sdk/client-transcribe';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { z } from 'zod';
 import { runJob, type JobRunnerDeps } from '../features/agent-jobs/application/job-runner.js';
 import { BedrockAgentModel, DynamoJobRepository } from '../features/agent-jobs/infrastructure/aws.js';
+import { AwsTranscriber, S3UploadStore, TextractReader } from '../features/agent-jobs/infrastructure/aws-inputs.js';
 import { DynamoCaseRepository } from '../features/cases/infrastructure/dynamo-case-repository.js';
-import { loadConfig, requireBedrockModelId, requireTableName } from '../shared/config.js';
+import { loadConfig, requireBedrockModelId, requireTableName, requireUploadBucket } from '../shared/config.js';
 import { logEvent } from '../shared/logger.js';
 
 const MessageSchema = z.object({ ownerId: z.string().min(1).max(300), jobId: z.string().min(1).max(64) });
@@ -28,6 +32,9 @@ function build(): JobRunnerDeps {
     newId: randomUUID,
     retentionDays: config.retentionDays,
     leaseMs: 120_000,
+    uploads: new S3UploadStore(new S3Client({}), requireUploadBucket(config)),
+    transcriber: new AwsTranscriber(new TranscribeClient({})),
+    reader: new TextractReader(new TextractClient({})),
   };
 }
 

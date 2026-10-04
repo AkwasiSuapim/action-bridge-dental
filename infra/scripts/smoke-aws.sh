@@ -46,3 +46,9 @@ if [ "${SMOKE_AGENT:-1}" = "1" ]; then
   echo "Agent smoke test (real Bedrock calls; set SMOKE_AGENT=0 to skip)"
   API_BASE_URL="$API" node "$(dirname "$0")/../../backend/scripts/smoke-agent.mjs"
 fi
+
+if [ "${SMOKE_INPUTS:-1}" = "1" ]; then
+  echo
+  echo "Document input smoke test (S3 + Textract + assistant; set SMOKE_INPUTS=0 to skip)"
+  API_BASE_URL="$API" node "$(dirname "$0")/../../backend/scripts/smoke-inputs.mjs"
+fi

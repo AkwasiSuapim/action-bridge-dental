@@ -59,6 +59,39 @@ export const CreateJobResponseSchema = z.strictObject({
 /** Body of `POST /v1/jobs/{jobId}/retry` and `/cancel`. */
 export const EmptyRequestSchema = z.strictObject({});
 
+/** Upload limits (doc 03 §7): short voice notes and single-page documents or photos. */
+export const UPLOAD_LIMITS = {
+  audio: { maxBytes: 5 * 1024 * 1024, mimeTypes: ['audio/mp4', 'audio/m4a', 'audio/x-m4a'] },
+  document: { maxBytes: 5 * 1024 * 1024, mimeTypes: ['application/pdf', 'image/jpeg', 'image/png'] },
+} as const;
+
+/** `POST /v1/cases/{caseId}/uploads`: asks for a short-lived, size- and type-restricted upload slot. */
+export const CreateUploadRequestSchema = z
+  .strictObject({
+    kind: z.enum(['audio', 'document']),
+    mimeType: z.string().min(3).max(100),
+    sizeBytes: z.number().int().min(1),
+  })
+  .superRefine((request, ctx) => {
+    const limits = UPLOAD_LIMITS[request.kind];
+    if (!(limits.mimeTypes as readonly string[]).includes(request.mimeType)) {
+      ctx.addIssue({ code: 'custom', path: ['mimeType'], message: `Use ${limits.mimeTypes.join(', ')}` });
+    }
+    if (request.sizeBytes > limits.maxBytes) ctx.addIssue({ code: 'custom', path: ['sizeBytes'], message: `Files must be ${limits.maxBytes / 1024 / 1024} MB or smaller` });
+  });
+
+/**
+ * A presigned S3 POST: send `fields` plus the file (form field `file`) to `url` before `expiresAt`.
+ * S3 itself enforces the size limit and content type. Then start a job with `documentId: uploadId`.
+ */
+export const CreateUploadResponseSchema = z.strictObject({
+  uploadId: IdSchema,
+  url: z.string().url(),
+  fields: z.record(z.string(), z.string()),
+  expiresAt: IsoDateTimeSchema,
+  maxBytes: z.number().int().min(1),
+});
+
 /** `GET /v1/jobs/{jobId}`. Lease and queue internals are not part of the public contract. */
 export const AgentJobViewSchema = z.strictObject({
   jobId: IdSchema,
@@ -73,6 +106,8 @@ export const AgentJobViewSchema = z.strictObject({
   questions: UiBlockEnvelopeSchema.nullable(),
   /** Explanation and display blocks referencing stored engine results by ID. */
   resultBlocks: UiBlockEnvelopeSchema.nullable(),
+  /** For `transcribe_audio`: what was heard, for the user to read and edit before anything is used. */
+  transcript: z.string().max(8000).nullish(),
   error: ErrorEnvelopeSchema.shape.error.nullable(),
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,
@@ -106,3 +141,5 @@ export type CreateJobRequest = z.infer<typeof CreateJobRequestSchema>;
 export type CreateJobResponse = z.infer<typeof CreateJobResponseSchema>;
 export type AgentJobView = z.infer<typeof AgentJobViewSchema>;
 export type JobAnswersRequest = z.infer<typeof JobAnswersRequestSchema>;
+export type CreateUploadRequest = z.infer<typeof CreateUploadRequestSchema>;
+export type CreateUploadResponse = z.infer<typeof CreateUploadResponseSchema>;

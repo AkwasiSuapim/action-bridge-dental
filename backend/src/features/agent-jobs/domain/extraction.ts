@@ -239,26 +239,39 @@ export function groupsFromExtraction(
       dropped.push({ group: 'procedure', field: `${p.label}.${field}`, reason: 'amount_not_in_quote' });
       return null;
     };
+    // Dates and network status must be stated somewhere in the source text, not inferred.
+    const statedDate = (field: string, value: string | undefined): string | null => {
+      if (value === undefined) return null;
+      if (text.includes(value)) return value;
+      dropped.push({ group: 'procedure', field: `${p.label}.${field}`, reason: 'quote_not_in_description' });
+      return null;
+    };
+    const networkStated = p.network === 'in' ? /\bin[- ]network\b/i.test(text) : p.network === 'out' ? /\bout[- ]of[- ]network\b/i.test(text) : false;
+    if (p.network && !networkStated) dropped.push({ group: 'procedure', field: `${p.label}.network`, reason: 'quote_not_in_description' });
+    const network = networkStated && p.network ? p.network : null;
+    const proposedDate = statedDate('proposedDate', p.proposedDate);
+    const earliest = statedDate('dentistEarliestDate', p.dentistEarliestDate);
+    const latest = statedDate('dentistLatestDate', p.dentistLatestDate);
     while (usedIds.has(`proc-${next}`)) next++;
     const id = `proc-${next}`;
     usedIds.add(id);
     const charge = keep('providerChargeCents', p.providerChargeCents);
     const selfPay = keep('selfPayQuoteCents', p.selfPayQuoteCents);
-    const dentistWindow = p.timingStatedBy === 'dentist' && p.dentistEarliestDate && p.dentistLatestDate;
+    const dentistWindow = p.timingStatedBy === 'dentist' && earliest !== null && latest !== null;
     const procedure: Procedure = {
       id,
       label: p.label,
       cdtCode: null,
       category: p.category,
-      network: p.network ?? 'unknown',
+      network: network ?? 'unknown',
       providerChargeCents: charge,
       allowedCents: keep('allowedCents', p.allowedCents),
       contractualWriteoffCents: keep('contractualWriteoffCents', p.contractualWriteoffCents),
-      proposedDate: p.proposedDate ?? null,
-      dentistEarliestDate: p.dentistEarliestDate ?? null,
-      dentistLatestDate: p.dentistLatestDate ?? null,
+      proposedDate,
+      dentistEarliestDate: earliest,
+      dentistLatestDate: latest,
       // Timing reported through the user never unlocks the optimizer (D-14).
-      timingSource: dentistWindow ? 'dentist_supplied' : p.dentistEarliestDate || p.dentistLatestDate ? 'user_reported' : 'unknown',
+      timingSource: dentistWindow ? 'dentist_supplied' : earliest || latest ? 'user_reported' : 'unknown',
       prerequisiteIds: [],
       selfPayQuote: selfPay === null ? null : { amountCents: selfPay, quotedOn: today, source: 'user_reported', includedScope: p.label },
     };
@@ -266,9 +279,9 @@ export function groupsFromExtraction(
       `${p.label} (${p.category} service)`,
       charge !== null ? `charge ${money(charge)}` : null,
       procedure.allowedCents !== null ? `allowed ${money(procedure.allowedCents)}` : null,
-      p.network ? (p.network === 'in' ? 'in network' : 'out of network') : null,
-      p.proposedDate ? `planned ${p.proposedDate}` : null,
-      dentistWindow ? `dentist allows ${p.dentistEarliestDate} to ${p.dentistLatestDate}` : null,
+      network ? (network === 'in' ? 'in network' : 'out of network') : null,
+      proposedDate ? `planned ${proposedDate}` : null,
+      dentistWindow ? `dentist allows ${earliest} to ${latest}` : null,
       selfPay !== null ? `cash quote ${money(selfPay)}` : null,
     ].filter(Boolean);
     groups.push({ kind: 'procedure', fieldPath: `procedures.${id}`, quote: verified, procedure, summary: parts.join(' · ').slice(0, 200) });

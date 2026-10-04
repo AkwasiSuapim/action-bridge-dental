@@ -8,13 +8,14 @@ The dental app UI (design v3, `actionbridge-dental-v3/`), built on the foundatio
 |---|---|---|
 | Welcome, Sign in | `welcome`, `sign-in` | `features/auth` (hero image slot: `welcome-image.ts`) |
 | Home, My plan, Activity, Profile (tabs) | `(app)/(tabs)/…` | `features/home`, `features/activity`, `features/profile` |
+| Describe your situation → assistant (confirm what it understood → grouped questions → result / questions to ask) | `(app)/case/describe`, `case/[caseId]/assistant` | `features/assistant` |
 | New estimate (typed) → questions → coverage rules | `(app)/case/new`, `case/[caseId]/questions`, `…/rules` | `features/intake`, `features/case` |
 | Check your details → update a detail | `case/[caseId]/facts`, `…/edit` | `features/case` |
 | Your options → self-pay quotes | `case/[caseId]/options`, `…/self-pay` | `features/options` |
 | Plan details → sources | `case/[caseId]/plan`, `…/sources` | `features/plan` |
 | Review and save → saved + history | `case/[caseId]/review`, `…/saved` | `features/saved` |
 
-Not built yet, because their backend does not exist: voice, document upload and camera, agent progress, reminders, and data deletion. Home shows those inputs as "Coming soon".
+Not built yet, because their backend does not exist: voice, document upload and camera, reminders, and data deletion. Home shows those inputs as "Coming soon".
 
 Ready for the next backend features:
 - `src/lib/capabilities.ts` switches voice, upload and photo on Home once their APIs are deployed.

@@ -25,7 +25,20 @@
       "expo-router",
       "expo-status-bar",
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone to record a voice note about your treatment."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use the camera to photograph a dental estimate or plan document."
+        }
+      ],
+      "expo-asset"
     ],
     "scheme": "actionbridgedental",
     "experiments": {

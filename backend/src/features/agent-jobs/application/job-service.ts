@@ -13,7 +13,7 @@ import { expiresAtFrom } from '../../../shared/dynamo.js';
 import { HttpError } from '../../../shared/http.js';
 import { toEngineInput, type CaseService } from '../../cases/application/case-service.js';
 import { applyGroups, type FactGroup } from '../domain/extraction.js';
-import { setField, valueForAnswer } from '../domain/questions.js';
+import { applyAnswer, skipMarker } from '../domain/adaptive.js';
 import type { JobQueue, JobRecord, JobRepository } from '../ports.js';
 
 export interface JobServiceDeps {
@@ -31,11 +31,18 @@ export class JobService {
   constructor(private readonly deps: JobServiceDeps) {}
 
   async create(ownerId: string, caseId: string, request: CreateJobRequest): Promise<{ jobId: string }> {
-    if (request.operation !== 'interpret') {
+    if (request.operation === 'explain') {
       throw new HttpError('BAD_REQUEST', 'This kind of analysis is not available yet.');
     }
+    const needsUpload = request.operation === 'transcribe_audio' || request.operation === 'analyze_document';
+    if (needsUpload && !request.input.documentId) {
+      throw new HttpError('BAD_REQUEST', 'Upload the recording or document first, then send its documentId.');
+    }
     const record = await this.deps.cases.getAtRevision(ownerId, caseId, request.expectedRevision);
-    return this.start(ownerId, record.caseId, record.caseRevision, request.input.text?.trim() || null);
+    return this.start(ownerId, record.caseId, record.caseRevision, needsUpload ? null : request.input.text?.trim() || null, undefined, {
+      operation: request.operation,
+      documentId: needsUpload ? (request.input.documentId ?? null) : null,
+    });
   }
 
   async view(ownerId: string, jobId: string): Promise<AgentJobView> {
@@ -61,6 +68,8 @@ export class JobService {
 
     const confirmed: FactGroup[] = [];
     const fieldAnswers: { block: MissingFieldBlock; value: unknown }[] = [];
+    const skipped = new Set(job.skippedFieldPaths ?? []);
+    const expanded = new Set(job.expandedGroups ?? []);
     const issues: ErrorIssue[] = [];
     for (const answer of request.answers) {
       const block = blocks.get(answer.questionId);
@@ -68,16 +77,17 @@ export class JobService {
         issues.push({ fieldPath: null, code: 'UNKNOWN_QUESTION', message: `Question ${answer.questionId} is not part of this step.` });
         continue;
       }
-      if (answer.unknown) continue;
       if (block.inputType === 'fact_review') {
         const index = Number(block.questionId.replace('confirm-', '')) - 1;
         const group = job.proposals[index];
-        if (answer.value === true && group) confirmed.push(group);
+        if (!answer.unknown && answer.value === true && group) confirmed.push(group);
         continue;
       }
-      const mapped = valueForAnswer(block, answer.value, toEngineInput(record));
-      if (!mapped.ok) issues.push({ fieldPath: block.fieldPath, code: 'INVALID_ANSWER', message: `That answer is not valid for: ${block.label}` });
-      else fieldAnswers.push({ block, value: mapped.value });
+      if (answer.unknown) {
+        skipped.add(skipMarker(block));
+        continue;
+      }
+      fieldAnswers.push({ block, value: answer.value });
     }
     if (issues.length > 0) throw new HttpError('BAD_REQUEST', 'Some answers could not be used.', issues);
 
@@ -86,7 +96,7 @@ export class JobService {
       id: `fact-${this.deps.newId()}`,
       fieldPath,
       value,
-      sourceId: quote ? 'user-description' : null,
+      sourceId: quote ? (job.documentId ? `upload-${job.documentId}` : 'user-description') : null,
       location: quote ? { page: null, section: null, snippet: quote.slice(0, 500) } : null,
       origin,
       extractionStatus: origin === 'agent_proposed' ? 'extracted' : 'not_applicable',
@@ -99,9 +109,16 @@ export class JobService {
     const before = toEngineInput(record);
     let { input, facts } = applyGroups(before, confirmed, makeFact);
     for (const { block, value } of fieldAnswers) {
-      input = setField(input, block.fieldPath, value);
-      facts.push(makeFact(block.fieldPath, value as string | number | boolean, null, 'user_entered'));
+      const applied = applyAnswer(input, block, value);
+      if ('error' in applied) {
+        issues.push({ fieldPath: block.fieldPath, code: 'INVALID_ANSWER', message: applied.error });
+        continue;
+      }
+      input = applied.input;
+      if (applied.expand) expanded.add(applied.expand);
+      for (const change of applied.changed) facts.push(makeFact(change.fieldPath, change.value, null, 'user_entered'));
     }
+    if (issues.length > 0) throw new HttpError('BAD_REQUEST', 'Some answers could not be used.', issues);
     const valid = DentalCaseInputSchema.safeParse(input);
     if (!valid.success) throw new HttpError('BAD_REQUEST', 'Those answers would make the case invalid. Review them and try again.');
 
@@ -117,7 +134,7 @@ export class JobService {
 
     // Close this step; a concurrent duplicate submit already lost the revision check above.
     await this.deps.jobs.put({ ...job, status: 'completed', updatedAt: recordedAt }, { status: ['needs_information'] }, this.ttl());
-    return this.start(ownerId, job.caseId, revision, null);
+    return this.start(ownerId, job.caseId, revision, null, { skippedFieldPaths: [...skipped], expandedGroups: [...expanded] });
   }
 
   async retry(ownerId: string, jobId: string): Promise<{ jobId: string }> {
@@ -141,14 +158,22 @@ export class JobService {
     return toView(job);
   }
 
-  private async start(ownerId: string, caseId: string, caseRevision: number, inputText: string | null): Promise<{ jobId: string }> {
+  private async start(
+    ownerId: string,
+    caseId: string,
+    caseRevision: number,
+    inputText: string | null,
+    carry: { skippedFieldPaths: string[]; expandedGroups: string[] } = { skippedFieldPaths: [], expandedGroups: [] },
+    kind: { operation: JobRecord['operation']; documentId: string | null } = { operation: 'interpret', documentId: null },
+  ): Promise<{ jobId: string }> {
     const now = this.deps.now().toISOString();
     const job: JobRecord = {
       jobId: this.deps.newId(),
       ownerId,
       caseId,
       caseRevision,
-      operation: 'interpret',
+      operation: kind.operation,
+      documentId: kind.documentId,
       status: 'queued',
       attempt: 0,
       maxAttempts: this.deps.maxAttempts,
@@ -158,6 +183,8 @@ export class JobService {
       resultBlocks: null,
       error: null,
       proposals: [],
+      skippedFieldPaths: carry.skippedFieldPaths,
+      expandedGroups: carry.expandedGroups,
       leaseToken: null,
       leaseUntil: null,
       createdAt: now,
@@ -200,6 +227,7 @@ export function toView(job: JobRecord): AgentJobView {
     events: job.events.slice(-100),
     questions: job.questions,
     resultBlocks: job.resultBlocks,
+    transcript: job.transcript ?? null,
     error: job.error,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
