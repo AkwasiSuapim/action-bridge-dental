@@ -218,7 +218,7 @@ describe('T5 adaptive agent loop, end to end with a scripted model', () => {
     await h.drain();
     const job = await getJob(h, body.jobId);
     expect(job.status).toBe('needs_information');
-    expect(job.questions!.blocks[0]).toMatchObject({ type: 'notice', title: 'Nothing to confirm from your description' });
+    expect(job.questions!.blocks[0]).toMatchObject({ type: 'notice', title: 'Nothing to confirm from what you shared' });
     expect(job.questions!.blocks.some((b) => b.type === 'missing_field' && b.fieldPath === 'coverageMode')).toBe(true);
   });
 });

@@ -42,6 +42,7 @@ export class JobService {
     return this.start(ownerId, record.caseId, record.caseRevision, needsUpload ? null : request.input.text?.trim() || null, undefined, {
       operation: request.operation,
       documentId: needsUpload ? (request.input.documentId ?? null) : null,
+      documentIds: request.operation === 'interpret' ? [...new Set(request.input.documentIds ?? [])] : [],
     });
   }
 
@@ -92,11 +93,11 @@ export class JobService {
     if (issues.length > 0) throw new HttpError('BAD_REQUEST', 'Some answers could not be used.', issues);
 
     const recordedAt = this.deps.now().toISOString();
-    const makeFact = (fieldPath: string, value: string | number | boolean | null, quote: string | null, origin: SourceFact['origin']): SourceFact => ({
+    const makeFact = (fieldPath: string, value: string | number | boolean | null, quote: string | null, origin: SourceFact['origin'], groupSourceId?: string): SourceFact => ({
       id: `fact-${this.deps.newId()}`,
       fieldPath,
       value,
-      sourceId: quote ? (job.documentId ? `upload-${job.documentId}` : 'user-description') : null,
+      sourceId: quote ? (groupSourceId ?? (job.documentId ? `upload-${job.documentId}` : 'user-description')) : null,
       location: quote ? { page: null, section: null, snippet: quote.slice(0, 500) } : null,
       origin,
       extractionStatus: origin === 'agent_proposed' ? 'extracted' : 'not_applicable',
@@ -164,7 +165,7 @@ export class JobService {
     caseRevision: number,
     inputText: string | null,
     carry: { skippedFieldPaths: string[]; expandedGroups: string[] } = { skippedFieldPaths: [], expandedGroups: [] },
-    kind: { operation: JobRecord['operation']; documentId: string | null } = { operation: 'interpret', documentId: null },
+    kind: { operation: JobRecord['operation']; documentId: string | null; documentIds?: string[] } = { operation: 'interpret', documentId: null },
   ): Promise<{ jobId: string }> {
     const now = this.deps.now().toISOString();
     const job: JobRecord = {
@@ -174,6 +175,7 @@ export class JobService {
       caseRevision,
       operation: kind.operation,
       documentId: kind.documentId,
+      ...(kind.documentIds && kind.documentIds.length > 0 ? { documentIds: kind.documentIds } : {}),
       status: 'queued',
       attempt: 0,
       maxAttempts: this.deps.maxAttempts,

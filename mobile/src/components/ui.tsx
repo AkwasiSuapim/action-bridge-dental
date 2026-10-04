@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Eye, EyeOff, Info, XCircle } from 'lucide-react-native';
+import { AlertTriangle, Check, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, Info, XCircle } from 'lucide-react-native';
 import { useState, type ReactNode, type Ref } from 'react';
 import {
   ActivityIndicator,
@@ -434,7 +434,6 @@ export function MoneyField({
   helper?: string;
   allowUnknown?: boolean;
 }) {
-  const { colors } = useTheme();
   const invalid = !unknown && text.trim() !== '' && parseDollarsToCents(text) === null;
   return (
     <View style={{ gap: space(2) }}>
@@ -457,18 +456,89 @@ export function MoneyField({
         />
       )}
       {allowUnknown ? (
-        <Pressable
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: unknown }}
-          accessibilityLabel={`I don't know ${label}`}
-          onPress={() => onChange({ text: unknown ? text : '', unknown: !unknown })}
-          style={styles.unknownToggle}
-        >
-          <View style={[styles.checkbox, { borderColor: colors.primary, backgroundColor: unknown ? colors.primary : 'transparent' }]} />
-          <AppText variant="caption">I don’t know</AppText>
-        </Pressable>
+        <Checkbox label="I don’t know" accessibilityLabel={`I don't know ${label}`} checked={unknown} onChange={() => onChange({ text: unknown ? text : '', unknown: !unknown })} />
       ) : null}
     </View>
+  );
+}
+
+/** A tickable box with its label; `boxed` draws it as a bordered card for consent-style choices. */
+export function Checkbox({
+  label,
+  checked,
+  onChange,
+  boxed = false,
+  accessibilityLabel,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  boxed?: boolean;
+  accessibilityLabel?: string;
+}) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked }}
+      accessibilityLabel={accessibilityLabel ?? label}
+      onPress={() => onChange(!checked)}
+      style={[
+        styles.unknownToggle,
+        { gap: space(3) },
+        boxed ? { alignSelf: 'stretch', padding: space(4), borderRadius: layout.radius, borderWidth: 1.5, borderColor: checked ? colors.primary : colors.border, backgroundColor: colors.surface } : null,
+      ]}
+    >
+      <View style={[styles.checkbox, { borderColor: colors.primary, backgroundColor: checked ? colors.primary : 'transparent' }]}>
+        {checked ? <Check size={14} color={colors.onPrimary} strokeWidth={3} /> : null}
+      </View>
+      <AppText variant="caption" style={{ flexShrink: 1 }}>
+        {label}
+      </AppText>
+    </Pressable>
+  );
+}
+
+/** A heading and its content: the one way screens group related information. */
+export function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <View style={{ gap: space(2.5) }}>
+      <AppText variant="heading">{title}</AppText>
+      {children}
+    </View>
+  );
+}
+
+/** A collapsible card: a 44-point row that shows its content when opened. Closed by default. */
+export function Disclosure({ title, children, initiallyOpen = false }: { title: string; children: ReactNode; initiallyOpen?: boolean }) {
+  const { colors } = useTheme();
+  const [open, setOpen] = useState(initiallyOpen);
+  const Icon = open ? ChevronUp : ChevronDown;
+  return (
+    <Card>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={title}
+        accessibilityState={{ expanded: open }}
+        onPress={() => setOpen((value) => !value)}
+        style={{ minHeight: layout.minHitArea, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space(3) }}
+      >
+        <AppText variant="label" style={{ fontFamily: fonts.semibold, flex: 1 }}>
+          {title}
+        </AppText>
+        <Icon size={20} color={colors.textMuted} />
+      </Pressable>
+      {open ? <View style={{ gap: space(2) }}>{children}</View> : null}
+    </Card>
+  );
+}
+
+/** The single "estimates only" line, shown once per screen at the end of its content. */
+export function EstimateNote() {
+  return (
+    <AppText variant="caption" muted style={{ textAlign: 'center' }}>
+      Estimates only. Your dentist and insurer decide final costs.
+    </AppText>
   );
 }
 
@@ -513,6 +583,6 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space(2) },
   chip: { minHeight: layout.minHitArea, borderWidth: 1.5, borderRadius: 999, paddingHorizontal: space(4), justifyContent: 'center' },
   unknownToggle: { flexDirection: 'row', alignItems: 'center', gap: space(2), minHeight: layout.minHitArea, alignSelf: 'flex-start' },
-  checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 2 },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'baseline', gap: space(3), minHeight: 28 },
 });

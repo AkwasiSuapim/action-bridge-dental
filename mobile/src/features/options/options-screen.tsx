@@ -1,16 +1,14 @@
 import type { CoverageComparison, DentalCase, EstimateResult, ScenarioComparisonResult } from '@actionbridge/contracts';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChevronDown, ChevronUp } from 'lucide-react-native';
-import { useState, type ReactNode } from 'react';
-import { Pressable, View, useWindowDimensions } from 'react-native';
+import { useState } from 'react';
+import { View, useWindowDimensions } from 'react-native';
 import { AgentOrb } from '../../components/orb';
 import { ErrorNotice, ErrorState, LoadingState } from '../../components/states';
-import { AppText, Badge, Button, Card, Notice, Row, Screen } from '../../components/ui';
+import { AppText, Badge, Button, Card, Disclosure, EstimateNote, Notice, Row, Screen, Section } from '../../components/ui';
 import { formatCents } from '../../lib/format';
 import { questionFor } from '../../lib/questions';
 import { useApi } from '../../services/api-context';
-import { useTheme } from '../../theme/theme';
-import { fonts, layout, space } from '../../theme/tokens';
+import { fonts, space } from '../../theme/tokens';
 import { useCase } from '../case/case-store';
 import { isSampleCase } from '../case/facts';
 import { useRevisionResult } from '../case/use-revision-result';
@@ -59,6 +57,8 @@ export function OptionsScreen() {
 function OptionsBody({ record, results }: { record: DentalCase; results: Results }) {
   const { estimate, scenarios, coverage } = results;
   const [selected, setSelected] = useState(scenarios.status === 'estimated' ? scenarios.baseline.scenarioId : null);
+  // Hooks stay above every early return (rules of hooks): results can change from loading to estimated.
+  const { width } = useWindowDimensions();
   const sample = isSampleCase(record);
   const footer = <Button label="Edit details" variant="secondary" onPress={() => router.dismissTo(`/case/${record.caseId}/facts`)} />;
 
@@ -91,9 +91,9 @@ function OptionsBody({ record, results }: { record: DentalCase; results: Results
     );
   }
 
-  const { width } = useWindowDimensions();
   const sideBySide = width >= 700;
   const model = buildOptions(record, scenarios);
+  const notes = [model.outcomeNote, ...scenarios.limitations.map((l) => l.message)].filter((note): note is string => Boolean(note));
   const selectedCard = model.cards.find((card) => card.scenarioId === selected);
   return (
     <Screen
@@ -133,20 +133,18 @@ function OptionsBody({ record, results }: { record: DentalCase; results: Results
           <AppText variant="caption">{model.difference.conditions}</AppText>
         </Card>
       ) : null}
-      {model.outcomeNote ? <Notice tone="info" title={model.outcomeNote} /> : null}
-      {scenarios.limitations.length > 0 ? <Notice tone="info" title="Limits of this comparison" body={scenarios.limitations.map((l) => l.message).join('\n')} /> : null}
-
-      {model.benefitsBefore ? (
-        <Card tone="muted">
-          <AppText variant="label" style={{ fontFamily: fonts.semibold }}>
-            Your {model.benefitsBefore.yearLabel} benefits before this treatment
-          </AppText>
-          <Row label="Plan already paid" value={formatCents(model.benefitsBefore.paidCents)} />
-          <Row label={`Left of the ${formatCents(model.benefitsBefore.maximumCents)} annual maximum`} value={formatCents(model.benefitsBefore.leftCents)} />
-        </Card>
-      ) : null}
+      {notes.length > 0 ? <Notice tone="info" title={notes[0] ?? ''} {...(notes.length > 1 ? { body: notes.slice(1).join('\n') } : {})} /> : null}
 
       <Disclosure title="What could change this estimate">
+        {model.benefitsBefore ? (
+          <View style={{ gap: space(1), paddingBottom: space(1) }}>
+            <AppText variant="label" style={{ fontFamily: fonts.semibold }}>
+              Your {model.benefitsBefore.yearLabel} benefits before this treatment
+            </AppText>
+            <Row label="Plan already paid" value={formatCents(model.benefitsBefore.paidCents)} />
+            <Row label={`Left of the ${formatCents(model.benefitsBefore.maximumCents)} annual maximum`} value={formatCents(model.benefitsBefore.leftCents)} />
+          </View>
+        ) : null}
         {model.whatCouldChange.map((item) => (
           <AppText key={item} variant="caption">
             • {item}
@@ -156,32 +154,8 @@ function OptionsBody({ record, results }: { record: DentalCase; results: Results
 
       <SelfPaySection record={record} coverage={coverage} />
 
-      <AppText variant="caption" muted style={{ textAlign: 'center' }}>
-        Estimates only. Your dentist and insurer decide final costs.
-      </AppText>
+      <EstimateNote />
     </Screen>
-  );
-}
-
-function Disclosure({ title, children }: { title: string; children: ReactNode }) {
-  const { colors } = useTheme();
-  const [open, setOpen] = useState(false);
-  const Icon = open ? ChevronUp : ChevronDown;
-  return (
-    <Card>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        onPress={() => setOpen((value) => !value)}
-        style={{ minHeight: layout.minHitArea, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space(3) }}
-      >
-        <AppText variant="label" style={{ fontFamily: fonts.semibold, flex: 1 }}>
-          {title}
-        </AppText>
-        <Icon size={20} color={colors.textMuted} />
-      </Pressable>
-      {open ? <View style={{ gap: space(2) }}>{children}</View> : null}
-    </Card>
   );
 }
 
@@ -189,8 +163,7 @@ function SelfPaySection({ record, coverage }: { record: DentalCase; coverage: Co
   const view = selfPayView(record, coverage);
   const open = () => router.push(`/case/${record.caseId}/self-pay`);
   return (
-    <View style={{ gap: space(2) }}>
-      <AppText variant="heading">Self-pay comparison</AppText>
+    <Section title="Self-pay comparison">
       <Card>
         {view.status === 'unavailable' ? (
           <>
@@ -201,7 +174,7 @@ function SelfPaySection({ record, coverage }: { record: DentalCase; coverage: Co
           </>
         ) : (
           <>
-            {view.insuredCents !== null ? <Row label="With insurance · estimated" value={formatCents(view.insuredCents)} /> : null}
+            {view.insuredCents !== null ? <Row label="With insurance" value={formatCents(view.insuredCents)} /> : null}
             <Row label="Self-pay quotes · provided by you" value={formatCents(view.selfPayCents)} />
             <AppText style={{ fontFamily: fonts.semibold }}>{view.result}</AppText>
             {view.notes.map((note) => (
@@ -213,6 +186,6 @@ function SelfPaySection({ record, coverage }: { record: DentalCase; coverage: Co
           </>
         )}
       </Card>
-    </View>
+    </Section>
   );
 }
