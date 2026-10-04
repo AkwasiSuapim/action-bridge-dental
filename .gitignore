@@ -8,3 +8,6 @@ coverage/
 .aws-sam/
 .DS_Store
 backend/.build/
+
+# Private team notes
+PITCH.md

@@ -14,15 +14,45 @@ ActionBridge is an **agentic, voice-first benefits assistant**. Upload your dent
 | 🔑 **Test login** | **Email:** `demo.judge@example.com` · **Password:** `DentalDemo2026!` |
 | 📄 **Demo documents** | [`docs/demo/`](docs/demo/) — fictional estimate and plan summary to upload |
 
-> The test account is shared on purpose for judging. It contains fictional data only — please don't enter real personal or health information.
+> The test account is shared on purpose for reviewers. It contains fictional data only — please don't enter real personal or health information.
 
 ---
 
 ## The problem
 
-A patient is told: two fillings and a crown, **$1,500**. They have dental insurance, but no idea what *they* will pay. Dental plans cap what the insurer pays each **benefit year**; once the cap is used, the patient pays everything else. Few people know how much of their cap is left, or that it resets every year.
+A patient is told: two fillings and a crown, **$1,500**. They have dental insurance, but no idea what *they* will pay. Dental plans cap what the insurer pays each **benefit year**; once the cap is used, the patient pays everything else. Few people know how much of their cap is left, or that it resets every year, so unused benefits quietly expire while people delay care or overpay.
 
 In our reference case, doing everything now costs **$1,200**. Doing the crown a few weeks later — inside the window the dentist says is safe, but in the new benefit year — costs **$725**. Same care, **$475 less**. Working that out by hand means reading two documents and applying deductibles, percentages, annual maximums and the year reset.
+
+## Built for everyone
+
+Dental paperwork is confusing for anyone. For many people it's worse: small print they can't see, words they can't easily read, forms they can't fill in with their hands. **Understanding your own care shouldn't depend on any of that.** So ActionBridge can be used without reading the screen, and on the web without touching it at all.
+
+| If you… | ActionBridge helps by… |
+|---|---|
+| **are blind or have low vision** | reading every key step aloud in a natural voice (Amazon Polly) as each screen opens, and labeling every control for screen readers |
+| **find reading hard** (dyslexia, low literacy, English as a second language) | one question at a time, plain-language results ("you pay about $1,200, or $725 if…"), one-line definitions of every insurance term, all read aloud |
+| **can't easily use your hands** | letting you do the whole flow by voice on the web: say *yes* or *not right*, pick options, say amounts ("about two hundred fifty dollars"), say *continue* |
+| **are busy, older, or anxious about money** | one clear answer, your choices side by side, and a reminder before your benefits reset |
+
+Turn on **Voice** in the top bar (or in Profile), upload your papers, and listen. ActionBridge asks, hears your answer, confirms it aloud and moves on.
+
+## How we solved it
+
+Three rules guide everything:
+
+1. **The AI reads.** Amazon Bedrock (Nova 2 Lite) reads your words and documents and *proposes* facts through typed tools. Every value must quote the exact words it came from, and we check that quote word for word before showing it.
+2. **The calculator counts.** A pure, deterministic engine (integer cents, no AI, 280+ tests) applies deductibles, percentages, yearly maximums and the benefit-year reset, and compares only dates your dentist allows.
+3. **You confirm.** Nothing is used until you say yes. Anything unknown is asked, never guessed, and "I don't know" becomes a question for your dentist or insurer.
+
+Around those rules sits an **agent that orchestrates the work for you**: background jobs on Amazon SQS read documents (Textract), transcribe voice (Transcribe), call the model with a bounded tool loop, ask only the questions that change your cost, and hand back results the voice agent can read aloud.
+
+## Where the data comes from
+
+- **Your own documents and words**: the dentist's estimate, your plan summary, a voice note or typed text. They're read once and deleted.
+- **Plan rules come from your documents**, not from insurers. We don't connect to insurer systems or pull outside data.
+- **Insurance terms** are explained with definitions we wrote (`packages/contracts/src/plain-language.ts`).
+- **Demo data is fictional**: a shared reference case ([`docs/fixtures/`](docs/fixtures/dental-regression.json)) and two sample PDFs ([`docs/demo/`](docs/demo/)). No real patient data is used anywhere.
 
 ## How it works
 
@@ -40,7 +70,7 @@ With **Voice on** (top bar or Profile), the assistant runs the whole conversatio
 |---|---|
 | **Reads the key words**, not the whole screen — dates and money spoken naturally | *"I found 6 things to check. Your benefit year: January 1, 2026 to December 31, 2026, annual maximum 800 dollars, insurer already paid 500 dollars. Is this right?"* |
 | **Listens** for a few seconds after each question and understands the reply | *"Yes"* · *"Not right"* · *"In network"* · *"I don't know"* |
-| **Fills in amounts you say** — the number appears in the box and is confirmed aloud | *"About two hundred fifty dollars"* → **50.00** · *"Got it: $250."* |
+| **Fills in amounts you say** — the number appears in the box and is confirmed aloud | *"About two hundred fifty dollars"* → **$250.00** · *"Got it: $250."* |
 | **Acknowledges and moves on** by itself, and says when it didn't catch you | *"Got it."* · *"Okay, I'll leave that out."* · *"Sorry, I didn't catch that."* |
 | **Finishes the job** — submits on *"continue"*, then reads your result | *"Your estimate is ready. If you do everything as planned, you pay about 1,200 dollars…"* |
 
@@ -116,7 +146,7 @@ action-bridge-dental/
 │   ├── contracts/            # Zod schemas shared by API, web and mobile
 │   └── benefits-engine/      # Pure calculator and schedule comparison
 ├── infra/                    # AWS SAM template + live smoke-test scripts
-└── docs/                     # Design, decisions, judging evidence, demo kit, fixtures
+└── docs/                     # Design, decisions, evidence, demo kit, fixtures
 ```
 
 ## Run it
@@ -165,7 +195,7 @@ bash infra/scripts/smoke-aws.sh   # live checks: API, agent, documents
 
 ## Documentation
 
-- [Judging criteria and evidence](docs/JUDGING.md)
+- [What we built, and how we know it works](docs/EVIDENCE.md)
 - [Project brief](docs/00_PROJECT_BRIEF.md) · [System design](docs/01_SYSTEM_DESIGN.md) · [Decisions](docs/DECISIONS.md)
 - [Demo kit and walkthrough](docs/demo/README.md) · [Contributing](CONTRIBUTING.md)
 
@@ -173,6 +203,7 @@ bash infra/scripts/smoke-aws.sh   # live checks: API, agent, documents
 
 - When next year's plan terms aren't stated, the assistant asks once whether the plan renews the same way; the cross-year option is then labeled "Assumes next year's plan stays the same".
 - Hands-free voice answers need a browser with speech recognition (Chrome, Edge, Safari); the phone app reads aloud and you tap.
+- Accessibility is built in and checked automatically (axe, labeled controls); it hasn't yet been tested with screen-reader users or people with disabilities — that's our next step.
 - Supported plan model: deductible, percentage by service type, annual maximum. Waiting periods, exclusions and frequency limits are detected and reported as "can't estimate yet" rather than guessed.
 - Estimates only — your dentist and insurer decide final treatment and costs.
 
