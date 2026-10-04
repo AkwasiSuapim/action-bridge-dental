@@ -210,3 +210,48 @@ export function plainSummary({ comparison: baseline, alternative, outcome, proce
   paragraphs.push('These are estimates. Your dentist decides the timing and your insurer decides the final payment.');
   return { paragraphs, speech: paragraphs.join(' ') };
 }
+
+// ---- Voice guidance ------------------------------------------------------------------------
+
+/**
+ * Text as it should be spoken: ISO dates become "January 1, 2026", "$800.00" becomes "$800",
+ * separators and quotation marks are dropped, so the voice never says "dot" or "middle dot".
+ */
+export function speakable(text: string): string {
+  return text
+    .replace(/\b(\d{4}-\d{2}-\d{2})\b/g, (iso) => plainDate(iso))
+    .replace(/\$(\d[\d,]*)\.00\b/g, '$$$1')
+    .replace(/\s*[·•|]\s*/g, ', ')
+    .replace(/[“”"«»]/g, '')
+    .replace(/\s*\((D\d{4})\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export type SpokenAnswer = 'yes' | 'no' | 'unknown';
+
+/**
+ * What a short spoken reply means, by fixed rules (no AI): "not right" before "right", and
+ * "I don't know" before either. Null when the reply is unclear, so the app asks again.
+ */
+export function spokenAnswer(transcript: string): SpokenAnswer | null {
+  const said = ` ${transcript.toLowerCase().replace(/[^a-z' ]/g, ' ').replace(/\s+/g, ' ').trim()} `;
+  if (/ (i )?(don't|do not|dont) know | not sure | no idea | skip /.test(said)) return 'unknown';
+  if (/ (not right|not correct|incorrect|wrong|no|nope|nah|not really) /.test(said)) return 'no';
+  if (/ (yes|yeah|yep|yup|right|correct|that's right|thats right|sure|ok|okay|confirm|true|use it|continue|go ahead) /.test(said)) return 'yes';
+  return null;
+}
+
+/** Which offered option a spoken reply names, by the option's distinctive words. */
+export function spokenChoice(transcript: string, options: { id: string; label: string }[]): string | null {
+  const said = new Set(transcript.toLowerCase().split(/[^a-z]+/).filter(Boolean));
+  const stop = new Set(['the', 'a', 'of', 'for', 'and', 'all', 'these', 'my', 'it', 'is', 'to']);
+  const scored = options.map((option) => {
+    const words = option.label.toLowerCase().split(/[^a-z]+/).filter((w) => w && !stop.has(w));
+    const hits = words.filter((w) => said.has(w)).length;
+    return { id: option.id, score: words.length ? hits / words.length : 0 };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  const [best, second] = scored;
+  return best && best.score > 0 && (!second || best.score > second.score) ? best.id : null;
+}

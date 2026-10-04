@@ -217,6 +217,8 @@ export function groupsFromExtraction(
   }
 
   const restrictions = (extraction.planRestrictions ?? []).filter((r) => {
+    // "No waiting periods apply" says there is no limit; recording it would block every estimate.
+    if (/^\s*(no|none|not|without)\b/i.test(r.description) || /\bno (waiting|exclusion|frequency|limit)/i.test(r.description)) return false;
     const ok = quoteAppears(r.quote, text);
     if (!ok) dropped.push({ group: 'restrictions', field: r.kind, reason: 'quote_not_in_description' });
     return ok;

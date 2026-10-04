@@ -349,3 +349,101 @@ test('contradictory details: one request, a clear message and a way to fix it �
     page.getByText('Two details don’t add up — fix one to continue:'),
   ).toBeVisible();
 });
+
+test('voice guidance: reads each card, hears "yes" / "not right" / "continue", and moves on hands-free', async ({
+  page,
+}) => {
+  // Simulated voice and microphone: speaking ends at once; each listen hears the next reply.
+  await page.addInitScript(() => {
+    const replies = ['yes', 'not right', 'continue'];
+    const spoken: string[] = [];
+    (window as unknown as { __spoken: string[] }).__spoken = spoken;
+    const fakeSynthesis = {
+      speak: (u: { text: string; onend?: () => void }) => {
+        spoken.push(u.text);
+        setTimeout(() => u.onend?.(), 10);
+      },
+      cancel: () => undefined,
+    };
+    try {
+      Object.defineProperty(window, 'speechSynthesis', {
+        configurable: true,
+        get: () => fakeSynthesis,
+      });
+    } catch {
+      Object.assign(window.speechSynthesis, fakeSynthesis);
+    }
+    (
+      window as unknown as { SpeechSynthesisUtterance: unknown }
+    ).SpeechSynthesisUtterance = class {
+      text: string;
+      onend?: () => void;
+      onerror?: () => void;
+      constructor(text: string) {
+        this.text = text;
+      }
+    };
+    const FakeRecognition = class {
+      lang = '';
+      interimResults = false;
+      maxAlternatives = 1;
+      onresult: ((e: unknown) => void) | null = null;
+      onerror: (() => void) | null = null;
+      onend: (() => void) | null = null;
+      start() {
+        const transcript = replies.shift() ?? '';
+        setTimeout(() => {
+          this.onresult?.({ results: [[{ transcript }]] });
+        }, 20);
+      }
+      stop() {
+        setTimeout(() => this.onend?.(), 5);
+      }
+      abort() {
+        this.onend?.();
+      }
+    };
+    // Replace both the standard and the prefixed recognizer.
+    Object.assign(window, {
+      SpeechRecognition: FakeRecognition,
+      webkitSpeechRecognition: FakeRecognition,
+    });
+  });
+  const api = await mockBackend(page);
+  // Polly unavailable in the test: the browser voice (simulated above) is used instead.
+  await page.route(/\/v1\/speech$/, (route) =>
+    route.fulfill({
+      status: 503,
+      json: {
+        error: {
+          code: 'UPSTREAM_UNAVAILABLE',
+          message: 'x',
+          retryable: true,
+          requestId: 'r',
+        },
+      },
+    }),
+  );
+  await signIn(page);
+  await page.getByRole('button', { name: 'Turn on voice guidance' }).click();
+  await page.getByRole('button', { name: 'Type' }).click();
+  await page
+    .getByLabel('Describe your treatment and your plan')
+    .fill(
+      'I have dental insurance and my dentist recommends a crown at $1,000.',
+    );
+  await page.getByRole('button', { name: 'Analyse' }).click();
+
+  // No taps from here: yes → not right → continue.
+  await expect(
+    page.getByRole('heading', { name: 'Your estimate is ready' }),
+  ).toBeVisible({ timeout: 20_000 });
+  const answers = api.requests.find((r) => r.path.endsWith('/answers'))!
+    .body as { answers: { value: unknown }[] };
+  expect(answers.answers.map((a) => a.value)).toEqual([true, false]);
+  const spoken = await page.evaluate(
+    () => (window as unknown as { __spoken: string[] }).__spoken,
+  );
+  expect(spoken[0]).toContain('Is this right?');
+  expect(spoken.join(' ')).not.toMatch(/\d{4}-\d{2}-\d{2}|·/);
+});

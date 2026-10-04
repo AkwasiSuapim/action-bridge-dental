@@ -3431,3 +3431,42 @@ tfoot td {
     max-width: none;
   }
 }
+
+/* ---- Voice guidance ---------------------------------------------------------------------- */
+.voice-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.voice-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+.voice-status.listening {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  animation: record-pulse 1.2s ease-in-out infinite;
+}
+.topbar .voice-toggle {
+  min-height: 38px;
+  padding: 6px 12px;
+}
+@media (max-width: 640px) {
+  .topbar .voice-toggle span,
+  .topbar .voice-toggle {
+    font-size: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-status.listening {
+    animation: none;
+  }
+}

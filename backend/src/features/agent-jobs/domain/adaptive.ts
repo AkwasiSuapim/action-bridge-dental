@@ -1,5 +1,5 @@
 import { estimateCase } from '@actionbridge/benefits-engine';
-import type { DentalCaseInput, MissingFact, MissingFieldBlock } from '@actionbridge/contracts';
+import { plainDate, type DentalCaseInput, type MissingFact, type MissingFieldBlock } from '@actionbridge/contracts';
 import { questionBlocks, setField, specFor, valueForAnswer } from './questions.js';
 
 /**
@@ -228,6 +228,11 @@ export interface AppliedAnswer {
 
 /** Applies one validated answer; grouped answers fill every still-missing field in the group. */
 export function applyAnswer(input: DentalCaseInput, block: MissingFieldBlock, value: unknown): AppliedAnswer | { error: string } {
+  if (block.fieldPath === NEXT_YEAR_PATH) {
+    if (value === 'same') return withUnchangedNextYear(input);
+    if (value === 'different') return { input, changed: [], expand: null };
+    return { error: `That answer is not valid for: ${block.label}` };
+  }
   const key = (Object.entries(GROUP_PATH).find(([, path]) => path === block.fieldPath)?.[0] ?? null) as GroupKey | null;
   if (key === null) {
     const mapped = valueForAnswer(block, value, input);
@@ -307,4 +312,71 @@ export function nextStepItems(facts: MissingFact[], input: DentalCaseInput): { a
 export function missingFor(input: DentalCaseInput): MissingFact[] {
   const result = estimateCase(input);
   return result.status === 'needs_information' ? result.missing : [];
+}
+
+// ---- Next benefit year ----------------------------------------------------------------------
+
+/** The question that unlocks cross-year timing when only the current year's terms are known. */
+export const NEXT_YEAR_PATH = 'planYears.next.sameTerms';
+
+function addDays(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+function dollars(cents: number | null): string {
+  return cents === null ? 'not stated' : `$${(cents / 100).toLocaleString('en-US')}`;
+}
+function latestYear(input: DentalCaseInput) {
+  return Object.entries(input.planYears).sort(([, a], [, b]) => b.startDate.localeCompare(a.startDate))[0];
+}
+
+/**
+ * "Will your plan renew on 2027-01-01 with the same yearly maximum and deductible?" Asked when a
+ * dentist window reaches past the last known benefit year, so the engine can compare that timing.
+ */
+export function nextYearQuestion(input: DentalCaseInput, expectedRevision: number): MissingFieldBlock | null {
+  const latest = latestYear(input);
+  if (!latest) return null;
+  const [, year] = latest;
+  const start = addDays(year.endDate, 1);
+  return {
+    id: 'q-next-year',
+    type: 'missing_field',
+    questionId: 'q-next-year',
+    fieldPath: NEXT_YEAR_PATH,
+    inputType: 'single_select',
+    label: `Will your plan renew on ${plainDate(start)} with the same yearly maximum (${dollars(year.annualMaximumCents)}) and deductible (${dollars(year.annualDeductibleCents)})?`,
+    reason: 'Your dentist allows some treatment after your new benefit year starts. If your plan renews the same way, I can compare doing it then — it may cost you less.',
+    options: [
+      { id: 'same', label: 'Yes, the same' },
+      { id: 'different', label: 'No, it changes' },
+    ],
+    allowedResponseModes: ['tap'],
+    required: false,
+    allowUnknown: true,
+    sourceRefs: [],
+    expectedRevision,
+  };
+}
+
+/** Adds next year's plan with the same maximum and deductible, labeled as an assumption, nothing used yet. */
+export function withUnchangedNextYear(input: DentalCaseInput): AppliedAnswer {
+  const latest = latestYear(input);
+  if (!latest) return { input, changed: [], expand: null };
+  const [, year] = latest;
+  const start = addDays(year.endDate, 1);
+  const end = addDays(start, 0).replace(/^(\d{4})/, (y) => String(Number(y) + 1));
+  const id = start.endsWith('-01-01') ? `py-${start.slice(0, 4)}` : `py-${start.slice(0, 7)}`;
+  if (input.planYears[id]) return { input, changed: [], expand: null };
+  const next = structuredClone(input);
+  next.planYears[id] = {
+    startDate: start,
+    endDate: addDays(end, -1),
+    annualMaximumCents: year.annualMaximumCents,
+    insurerAlreadyPaidCents: 0,
+    annualDeductibleCents: year.annualDeductibleCents,
+    deductibleAlreadyMetCents: 0,
+    sourceStatus: 'explicit_unchanged_plan_assumption',
+  };
+  return { input: next, changed: [{ fieldPath: `planYears.${id}`, value: 'Same terms as this year (assumed)' }], expand: null };
 }

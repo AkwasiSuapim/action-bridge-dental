@@ -32,6 +32,8 @@ import {
 } from './financial-components';
 import { SelfPay } from './self-pay';
 import { ListenButton } from '../../components/listen';
+import { useApi } from '../../state/auth';
+import { useAutoRead } from '../../voice/voice';
 import { ReminderActions } from '../saved/reminder';
 
 /**
@@ -291,6 +293,9 @@ export function MeaningCard({
   summary: PlainSummary;
   title?: string;
 }) {
+  const api = useApi();
+  // Voice guidance reads this aloud when the page opens.
+  useAutoRead(api, summary.speech);
   return (
     <Card className="meaning-card">
       <div className="section-title">

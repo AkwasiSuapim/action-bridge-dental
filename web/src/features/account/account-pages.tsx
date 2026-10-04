@@ -30,6 +30,7 @@ import { useCase } from '../../state/case-store';
 import { ApiNotice } from '../assistant/assistant-page';
 import { ledgerTitle, PlanHistory, QuestionCard } from '../saved/saved-pages';
 import { BenefitsLeft } from '../options/options-page';
+import { VoiceToggle } from '../../components/listen';
 
 type Summary = { record: DentalCase; saved: SavedStrategy | null };
 
@@ -388,6 +389,22 @@ export function ProfilePage() {
           )}
         </form>
         <Row label="Email" value={session.email} />
+      </Card>
+      <Card>
+        <div className="section-title">
+          <h3>Voice guidance</h3>
+          <VoiceToggle />
+        </div>
+        <p className="muted">
+          When it’s on, key screens read themselves aloud as you open them —
+          what I found, the questions and your results — and you can answer “Is
+          this right?” by voice: say yes, not right, or I don’t know. The
+          microphone opens for a few seconds only after a question.
+        </p>
+        <p className="small muted">
+          Voice answers work in Chrome, Edge and Safari. You can always tap
+          instead.
+        </p>
       </Card>
       <Card>
         <h3>About your data</h3>

@@ -14,7 +14,7 @@ import { expiresAtFrom } from '../../../shared/dynamo.js';
 import { HttpError } from '../../../shared/http.js';
 import { toEngineInput, type CaseService } from '../../cases/application/case-service.js';
 import { applyGroups, type FactGroup } from '../domain/extraction.js';
-import { applyAnswer, skipMarker } from '../domain/adaptive.js';
+import { applyAnswer, NEXT_YEAR_PATH, skipMarker } from '../domain/adaptive.js';
 import type { JobQueue, JobRecord, JobRepository } from '../ports.js';
 
 export interface JobServiceDeps {
@@ -117,6 +117,8 @@ export class JobService {
         continue;
       }
       input = applied.input;
+      // Next year's terms are asked once: "No, it changes" means the user will enter them.
+      if (block.fieldPath === NEXT_YEAR_PATH && value !== 'same') skipped.add(NEXT_YEAR_PATH);
       if (applied.expand) expanded.add(applied.expand);
       for (const change of applied.changed) facts.push(makeFact(change.fieldPath, change.value, null, 'user_entered'));
     }
