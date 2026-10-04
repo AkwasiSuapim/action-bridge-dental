@@ -31,7 +31,7 @@ function build(): JobRunnerDeps {
     now: () => new Date(),
     newId: randomUUID,
     retentionDays: config.retentionDays,
-    leaseMs: 120_000,
+    leaseMs: 300_000, // Longer than the worker timeout (240 s), so a running job is never reclaimed.
     uploads: new S3UploadStore(new S3Client({}), requireUploadBucket(config)),
     transcriber: new AwsTranscriber(new TranscribeClient({})),
     reader: new TextractReader(new TextractClient({})),
