@@ -29,14 +29,27 @@ Login → Home → type, local document upload, sample voice or camera → edita
 
 Profile supports editing the display name, sign-out and reset. Demo controls expose permission fallback, analysis failure/retry, incomplete input, empty state and expired-session examples. Browser Back/Forward, dialog Escape/focus handling, keyboard controls, reduced motion and responsive navigation are supported.
 
+### Additional interfaces
+
+- **Manual treatment entry** from Home or Type: add/remove up to six procedures, enter separate billed/allowed/write-off amounts, network status and planned dates. Missing values remain unknown; arbitrary notes still use explicitly labeled sample analysis.
+- **Coverage editing** from fact review: service percentages, deductible and maximum applicability, current/next benefit periods, maximum, paid balance, deductible and deductible met. Contradictory amounts and overlapping benefit periods are rejected.
+- **Focused questions** for missing engine fields, benefit-year dates, deductible conflicts and missing documents. Sample voice answers require explicit acceptance or discard. Demo controls expose the date, conflict and document examples.
+- **Case history** in Activity and My plan: each case has its own identity, answers, quote, saved snapshot and reminder. Starting another sample or manual case preserves the previous case; Resume case restores its state. Up to 20 previous cases are kept locally.
+- **Sources and saved history** distinguish original sample excerpts from entered/edited answers. Saved details use the snapshot's source labels. Routine history entries can be shown or hidden.
+- **Save recovery** is available through Demo controls → Save failure. Retry preserves the option and consent; saves remain unique per case/revision/option. The dentist question follows the saved schedule, including the original-date option.
+- **Individual cash quotes** require a price for every procedure and explicit confirmation of equivalent service scope. A genuine quoted $0 is supported; blank is unavailable. The combined quote input remains available.
+- **First-sign-in password change** can be previewed on login. It validates the mobile application's password rules and confirmation; it does not store or change a real password.
+
 ## Frontend boundaries
 
 - `src/components/`: shared controls, shell, accessible dialog, brand, orb, evidence drawer.
 - `src/features/`: page components grouped by user flow.
 - `src/domain/`: web view models and formatting.
+- `src/domain/case-fields.ts`: field labels, provenance values and the engine-driven missing-information mapping.
+- `src/features/intake/case-forms.tsx`: shared treatment, currency and coverage form controls used by manual entry and editing.
 - `src/services/dental-service.ts`: calculation adapter behind `DentalService`. Currently invokes the existing pure engine locally; replace this adapter when adding HTTP requests.
 - `src/features/options/use-comparison.ts`: central result-loading boundary. For asynchronous API integration, add pending/error state here and adapt the job completion call in `src/state/job-store.tsx`.
-- `src/state/demo-store.tsx`: versioned browser-only case, selection, saved snapshot and activity state. All critical edits invalidate comparison results. Saves are checked against the current revision and are idempotent per selected scenario/revision.
+- `src/state/demo-store.tsx`: versioned browser-only case, selection, saved snapshot and activity state, with independent archived cases. All critical edits invalidate comparison results. Saves are checked against the current case identity and revision and are idempotent per selected scenario/revision.
 - `src/state/job-store.tsx`: local simulated task lifecycle. Replace with actual job polling/events during integration.
 
 Insured amounts come from `@actionbridge/benefits-engine`, using the shared fictional regression case. The web mockup's January 10 date is estimated explicitly inside the existing dentist window; the shared fixture and optimizer rules are not modified. Reported insurer payments remain separate from projected usage. Unknown amounts remain unknown.
@@ -52,7 +65,7 @@ npx.cmd playwright install chromium
 npm.cmd test
 ```
 
-Browser tests cover the sample journey, authentication simulations, all intake methods, stale-result protection, lower cash quotes, duplicate saves, failure/retry, background completion, reset, and layouts at 360, 390, 768, 1024, 1280 and 1440 pixels. Axe checks run on the comparison page. Browser artifacts are under `test-results/` and `playwright-report/` and are ignored by Git.
+Browser tests cover the sample and manual journeys, case switching/reload, edited coverage, individual quotes and scope validation, authentication/password-change simulations, all intake methods, explicit voice confirmation, stale-result protection, lower cash quotes, duplicate saves, save retry, background completion, extra question types, reset, and layouts at 360, 390, 768, 1024, 1280 and 1440 pixels. Axe checks cover the main journey, manual forms and coverage drawers. Browser artifacts are under `test-results/` and `playwright-report/` and are ignored by Git.
 
 For static hosting, serve `dist/` and rewrite application routes to `index.html` so direct links and reloads work. `npm.cmd run preview` serves the production build locally.
 

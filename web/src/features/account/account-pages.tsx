@@ -13,14 +13,103 @@ import {
   PageHeading,
   Row,
 } from '../../components/ui';
-import { dateLabel, money, scenarioTitle } from '../../domain/model';
-import { useDemo } from '../../state/demo-store';
+import {
+  dateLabel,
+  money,
+  scenarioTitle,
+  treatmentTitle,
+  type CaseSnapshot,
+} from '../../domain/model';
+import { useDemo, recentCases } from '../../state/demo-store';
+import { nextQuestion } from '../../domain/case-fields';
 import { useJob } from '../../state/job-store';
-import { QuestionCard, ReminderCard } from '../saved/saved-pages';
+import { QuestionCard, ReminderCard, PlanHistory } from '../saved/saved-pages';
+
+function casePath(c: CaseSnapshot) {
+  return c.saved && c.saved.input.caseRevision === c.input?.caseRevision
+    ? '/details?saved=1'
+    : c.comparedRevision === c.input?.caseRevision
+      ? '/options'
+      : nextQuestion(c.input!) || c.documentNeeded || c.deductibleConflict
+        ? '/questions'
+        : '/facts';
+}
+function CaseList({ limit }: { limit?: number }) {
+  const { state, openCase } = useDemo();
+  const { cancel } = useJob();
+  const navigate = useNavigate();
+  const cases = recentCases(state).slice(0, limit);
+  return (
+    <div className="stack">
+      {cases.map((c) => {
+        const changed =
+          !!c.saved && c.saved.input.caseRevision !== c.input?.caseRevision;
+        const missing =
+          !!nextQuestion(c.input!) || c.documentNeeded || c.deductibleConflict;
+        const status = changed
+          ? 'Details changed'
+          : c.saved
+            ? 'Saved plan'
+            : missing
+              ? 'Needs information'
+              : c.comparedRevision === c.input?.caseRevision
+                ? 'Comparison ready'
+                : 'Ready to compare';
+        return (
+          <Card className="case-history-card" key={c.caseId}>
+            <div className="section-title">
+              <h3>{treatmentTitle(c.input)}</h3>
+              <Badge
+                tone={
+                  changed || missing ? 'warning' : c.saved ? 'green' : undefined
+                }
+              >
+                {status}
+              </Badge>
+            </div>
+            <p className="small muted">
+              {c.origin === 'sample' ? 'Sample case' : 'Manual demo case'} ·
+              Updated {new Date(c.updatedAt).toLocaleString('en-US')}
+            </p>
+            {c.saved && (
+              <Row
+                label="Saved patient estimate"
+                value={money(c.saved.scenario.estimate.totals.patientPaysCents)}
+              />
+            )}
+            <Button
+              variant="secondary"
+              onClick={() => {
+                cancel();
+                openCase(c.caseId!);
+                navigate(casePath(c));
+              }}
+            >
+              Resume case
+            </Button>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
 
 export function MyPlanPage() {
   const { state } = useDemo();
   const navigate = useNavigate();
+  if (!state.saved && (state.input || state.cases.length))
+    return (
+      <div className="page medium">
+        <PageHeading
+          title="My plan"
+          description="Your most recent case and where to pick it up."
+        />
+        <CaseList limit={1} />
+        <Button variant="ghost" onClick={() => navigate('/activity')}>
+          See all cases in Activity
+        </Button>
+      </div>
+    );
   if (!state.saved)
     return (
       <div className="page medium">
@@ -43,7 +132,7 @@ export function MyPlanPage() {
       <PageHeading
         eyebrow="Your saved plan"
         title={scenarioTitle(scenario)}
-        description="Two fillings and a crown. Your selected estimate and next steps, in one place."
+        description={`${treatmentTitle(state.saved.input)}. Your selected estimate and next steps, in one place.`}
       />
       <Card>
         <div className="section-title">
@@ -67,13 +156,16 @@ export function MyPlanPage() {
             <strong>{money(scenario.estimate.totals.insurerPaysCents)}</strong>
           </div>
         </div>
-        <Row label="Fillings" value="Nov 10 and 11, 2026" />
-        <Row
-          label="Crown"
-          value={dateLabel(
-            scenario.schedule.find((s) => s.procedureId === 'crown-1')!.date,
-          )}
-        />
+        {scenario.schedule.map((s) => (
+          <Row
+            key={s.procedureId}
+            label={
+              state.saved!.input.procedures.find((p) => p.id === s.procedureId)
+                ?.label ?? 'Treatment'
+            }
+            value={dateLabel(s.date)}
+          />
+        ))}
         {changed && (
           <Notice tone="warning">
             Your case details changed after this snapshot was saved. Recompare
@@ -103,6 +195,10 @@ export function MyPlanPage() {
       </Card>
       <QuestionCard />
       <ReminderCard />
+      <PlanHistory />
+      <Button variant="ghost" onClick={() => navigate('/activity')}>
+        See all cases in Activity
+      </Button>
     </div>
   );
 }
@@ -115,6 +211,13 @@ export function ActivityPage() {
         title="Your activity"
         description="Events from your actions in this demo, newest first. Stored only in this browser."
       />
+      {(state.input || state.cases.length > 0) && (
+        <>
+          <h3>Your cases</h3>
+          <CaseList />
+          <h3>Recent actions</h3>
+        </>
+      )}
       {state.events.length === 0 ? (
         <EmptyState
           icon={History}

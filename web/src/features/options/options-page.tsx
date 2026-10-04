@@ -13,7 +13,7 @@ import {
   PageHeading,
   Row,
 } from '../../components/ui';
-import { money } from '../../domain/model';
+import { money, treatmentTitle } from '../../domain/model';
 import { useDemo } from '../../state/demo-store';
 import {
   BenefitYears,
@@ -54,7 +54,7 @@ export function OptionsPage() {
     <div className="page options-page">
       <PageHeading
         eyebrow={`Sample case · ${state.session?.name}`}
-        title="Two fillings and a crown"
+        title={treatmentTitle(state.input)}
         description="Compare treatment timing against your benefit years. Estimates only."
         actions={
           <>
@@ -110,10 +110,10 @@ export function OptionsPage() {
                 </strong>
               </div>
               <p>
-                Moving the crown into the next benefit year could lower your
+                Using the alternative permitted schedule could lower your
                 estimated cost.{' '}
                 <strong>
-                  This depends on the dentist-supplied window and unchanged
+                  This depends on the dentist-supplied window and the entered
                   future coverage and prices.
                 </strong>{' '}
                 ActionBridge doesn't decide whether care can wait.
@@ -121,8 +121,11 @@ export function OptionsPage() {
             </div>
           ) : (
             <Notice>
-              No lower-cost feasible alternative was found for these details.
-              The baseline estimate still helps you understand coverage.
+              {comparison.outcome === 'no_flexible_timing'
+                ? 'No dentist-supplied flexible window is available. We show your original dates without moving treatment.'
+                : comparison.outcome === 'comparison_incomplete'
+                  ? 'The original estimate is available, but an alternative could not be compared. Check future benefit dates and balances.'
+                  : 'No lower-cost feasible alternative was found for these details. The original estimate still helps you understand coverage.'}
             </Notice>
           )}
           <div className="financial-grid">
@@ -136,11 +139,26 @@ export function OptionsPage() {
             <Disclosure title="What could change this estimate?">
               <Row
                 label="Next year's coverage and fees"
-                value={<Badge tone="assumed">Assumed unchanged</Badge>}
+                value={
+                  <Badge tone="assumed">
+                    {Object.values(state.input!.planYears).some(
+                      (y) =>
+                        y.sourceStatus === 'explicit_unchanged_plan_assumption',
+                    )
+                      ? 'Assumed unchanged'
+                      : 'Entered terms · Unverified'}
+                  </Badge>
+                }
               />
               <Row
                 label="Dentist-permitted treatment dates"
-                value={<Badge>Sample instruction</Badge>}
+                value={
+                  <Badge>
+                    {state.origin === 'sample'
+                      ? 'Sample instruction'
+                      : 'No new window inferred'}
+                  </Badge>
+                }
               />
               <Row
                 label="Additional claims before treatment"
@@ -148,7 +166,13 @@ export function OptionsPage() {
               />
               <Row
                 label="Network, eligibility and allowed amount"
-                value={<Badge>Sample plan</Badge>}
+                value={
+                  <Badge>
+                    {state.origin === 'sample'
+                      ? 'Sample plan and your edits'
+                      : 'Provided by you'}
+                  </Badge>
+                }
               />
             </Disclosure>
           </Card>

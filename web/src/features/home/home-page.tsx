@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, Card, Orb } from '../../components/ui';
 import { useDemo } from '../../state/demo-store';
 import { useJob } from '../../state/job-store';
+import { treatmentTitle } from '../../domain/model';
 export function HomePage() {
   const { state, startSample } = useDemo();
   const { job, cancel } = useJob();
@@ -87,6 +88,9 @@ export function HomePage() {
               Nothing leaves this browser.
             </p>
           </div>
+          <Button variant="ghost" onClick={() => navigate('/intake/manual')}>
+            Enter procedures and coverage manually
+          </Button>
         </div>
         <div className="home-orb">
           <Orb size={300} />
@@ -100,7 +104,7 @@ export function HomePage() {
           </span>
           <span>
             <small className="muted">Continue your plan</small>
-            <strong>Two fillings and a crown</strong>
+            <strong>{treatmentTitle(state.input)}</strong>
             <small className="accent">
               {job.status === 'running'
                 ? 'Sample analysis in progress'

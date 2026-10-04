@@ -35,6 +35,16 @@ export function TypePage() {
         title="Describe your treatment"
         description="What did your dentist recommend, and what would you like to know?"
       />
+      <Card>
+        <h3>Prefer to enter the details yourself?</h3>
+        <p className="muted small">
+          Add procedures, fees, dates and your plan’s coverage without document
+          interpretation.
+        </p>
+        <Button variant="secondary" onClick={() => navigate('/intake/manual')}>
+          Enter treatment details
+        </Button>
+      </Card>
       <form
         className="stack"
         onSubmit={(e: FormEvent) => {

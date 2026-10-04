@@ -30,6 +30,7 @@ const pages: Record<string, string> = {
   '/intake/upload': 'Add a document',
   '/intake/photo': 'Take a photo',
   '/intake/type': 'Describe your treatment',
+  '/intake/manual': 'Enter treatment details',
   '/facts': 'Review your information',
   '/questions': 'A quick detail',
   '/working': 'Benefits analysis',
@@ -40,7 +41,7 @@ const pages: Record<string, string> = {
   '/saved': 'Saved plan',
 };
 export function Shell() {
-  const { state, signOut, reset, startSample, edit } = useDemo();
+  const { state, signOut, reset, startSample, edit, setCaseFlags } = useDemo();
   const { job, controls, setControl, cancel } = useJob();
   const navigate = useNavigate();
   const location = useLocation();
@@ -203,6 +204,11 @@ export function Shell() {
           {(
             [
               {
+                key: 'failSave',
+                label: 'Save failure',
+                help: 'Show a failed save with retry and preserved consent.',
+              },
+              {
                 key: 'failAnalysis',
                 label: 'Analysis failure',
                 help: 'Interrupt sample analysis; retry after switching this off.',
@@ -239,13 +245,52 @@ export function Shell() {
               if (!state.input) startSample();
               else
                 edit((input) => {
-                  input.planYears['py-2026'].insurerAlreadyPaidCents = null;
+                  const year = Object.values(input.planYears)[0];
+                  if (year) year.insurerAlreadyPaidCents = null;
                 });
               setDemoOpen(false);
               navigate('/questions');
             }}
           >
             Load incomplete-information example
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              cancel();
+              if (!state.input) startSample();
+              setCaseFlags({ deductibleConflict: true });
+              setDemoOpen(false);
+              navigate('/questions');
+            }}
+          >
+            Show conflicting deductible details
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              cancel();
+              if (!state.input) startSample();
+              setCaseFlags({ documentNeeded: true });
+              setDemoOpen(false);
+              navigate('/questions');
+            }}
+          >
+            Show missing-document question
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              cancel();
+              if (!state.input) startSample();
+              edit((input) => {
+                input.planYears = {};
+              });
+              setDemoOpen(false);
+              navigate('/questions');
+            }}
+          >
+            Show benefit-year date question
           </Button>
           <Button
             variant="secondary"

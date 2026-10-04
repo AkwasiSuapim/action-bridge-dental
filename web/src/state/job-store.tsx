@@ -23,6 +23,7 @@ type Job = {
   error?: string;
 };
 type Controls = {
+  failSave: boolean;
   failAnalysis: boolean;
   denyVoice: boolean;
   denyCamera: boolean;
@@ -46,6 +47,7 @@ export function JobProvider({ children }: { children: ReactNode }) {
     revision: 0,
   });
   const [controls, setControls] = useState<Controls>({
+    failSave: false,
     failAnalysis: false,
     denyVoice: false,
     denyCamera: false,
@@ -105,7 +107,11 @@ export function JobProvider({ children }: { children: ReactNode }) {
   };
   useEffect(() => {
     cancel();
-  }, [demo.state.input?.caseRevision, demo.state.session?.email]);
+  }, [
+    demo.state.input?.caseRevision,
+    demo.state.session?.email,
+    demo.state.caseId,
+  ]);
   useEffect(() => () => clearInterval(timer.current), []);
   return (
     <Context.Provider

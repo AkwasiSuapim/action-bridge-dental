@@ -8,9 +8,9 @@ export function LoginPage() {
   const { state, signIn } = useDemo();
   const navigate = useNavigate();
   const location = useLocation();
-  const [view, setView] = useState<'signin' | 'create' | 'forgot' | 'sent'>(
-    'signin',
-  );
+  const [view, setView] = useState<
+    'signin' | 'create' | 'forgot' | 'sent' | 'new-password'
+  >('signin');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,6 +37,18 @@ export function LoginPage() {
     if (view === 'create') {
       if (!name.trim()) next.name = 'Enter your name.';
       if (password.length < 8) next.password = 'Use at least 8 characters.';
+      if (confirmation !== password)
+        next.confirmation = 'Passwords must match.';
+    }
+    if (view === 'new-password') {
+      if (
+        password.length < 12 ||
+        !/[A-Z]/.test(password) ||
+        !/[a-z]/.test(password) ||
+        !/[0-9]/.test(password)
+      )
+        next.password =
+          'Use at least 12 characters, with upper and lower case letters and a number.';
       if (confirmation !== password)
         next.confirmation = 'Passwords must match.';
     }
@@ -100,22 +112,26 @@ export function LoginPage() {
             )}
             <div>
               <h1>
-                {view === 'signin'
-                  ? 'Welcome to ActionBridge Dental'
-                  : view === 'create'
-                    ? 'Create a demo account'
-                    : view === 'forgot'
-                      ? 'Reset your password'
-                      : 'Demo reset confirmation. No email was sent.'}
+                {view === 'new-password'
+                  ? 'Choose a new password'
+                  : view === 'signin'
+                    ? 'Welcome to ActionBridge Dental'
+                    : view === 'create'
+                      ? 'Create a demo account'
+                      : view === 'forgot'
+                        ? 'Reset your password'
+                        : 'Demo reset confirmation. No email was sent.'}
               </h1>
               <p className="muted">
-                {view === 'signin'
-                  ? 'Understand your dental costs. Plan your next step.'
-                  : view === 'create'
-                    ? 'Stays in this browser. No real account is created.'
-                    : view === 'forgot'
-                      ? 'Enter your email. In this demo, nothing is sent.'
-                      : `A real reset link would go to ${email}. Use the demo credentials to sign in.`}
+                {view === 'new-password'
+                  ? 'Finish the first-sign-in step for a demo account. This is a simulation; no password is stored or changed.'
+                  : view === 'signin'
+                    ? 'Understand your dental costs. Plan your next step.'
+                    : view === 'create'
+                      ? 'Stays in this browser. No real account is created.'
+                      : view === 'forgot'
+                        ? 'Enter your email. In this demo, nothing is sent.'
+                        : `A real reset link would go to ${email}. Use the demo credentials to sign in.`}
               </p>
             </div>
             {view === 'signin' && (
@@ -148,6 +164,7 @@ export function LoginPage() {
               <Field label="Email" error={errors.email}>
                 <input
                   type="email"
+                  readOnly={view === 'new-password'}
                   autoComplete={view === 'signin' ? 'username' : 'email'}
                   placeholder="you@example.com"
                   value={email}
@@ -156,7 +173,9 @@ export function LoginPage() {
                 />
               </Field>
             )}
-            {(view === 'signin' || view === 'create') && (
+            {(view === 'signin' ||
+              view === 'create' ||
+              view === 'new-password') && (
               <>
                 <div>
                   <div className="password-label">
@@ -173,7 +192,11 @@ export function LoginPage() {
                   </div>
                   <Field
                     label={
-                      view === 'create' ? 'Choose a password' : 'Your password'
+                      view === 'new-password'
+                        ? 'New password'
+                        : view === 'create'
+                          ? 'Choose a password'
+                          : 'Your password'
                     }
                     error={errors.password}
                   >
@@ -181,7 +204,7 @@ export function LoginPage() {
                       <input
                         type={show ? 'text' : 'password'}
                         autoComplete={
-                          view === 'create'
+                          view === 'create' || view === 'new-password'
                             ? 'new-password'
                             : 'current-password'
                         }
@@ -199,7 +222,7 @@ export function LoginPage() {
                     </div>
                   </Field>
                 </div>
-                {view === 'create' && (
+                {(view === 'create' || view === 'new-password') && (
                   <Field label="Confirm password" error={errors.confirmation}>
                     <input
                       type={show ? 'text' : 'password'}
@@ -216,11 +239,24 @@ export function LoginPage() {
               <Button type="submit" busy={busy} className="full">
                 {busy
                   ? 'Signing in…'
-                  : view === 'signin'
-                    ? 'Sign in'
-                    : view === 'create'
-                      ? 'Create demo account'
-                      : 'Send reset link'}
+                  : view === 'new-password'
+                    ? 'Set password and continue'
+                    : view === 'signin'
+                      ? 'Sign in'
+                      : view === 'create'
+                        ? 'Create demo account'
+                        : 'Send reset link'}
+              </Button>
+            )}
+            {view === 'signin' && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  switchView('new-password');
+                  setEmail('jordan@example.com');
+                }}
+              >
+                Preview first-sign-in password change
               </Button>
             )}
             {view === 'signin' ? (

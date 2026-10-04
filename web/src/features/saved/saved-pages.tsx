@@ -25,17 +25,24 @@ import {
   dentistQuestion,
   money,
   scenarioTitle,
+  currentYear,
+  amountLabel,
+  treatmentTitle,
 } from '../../domain/model';
 import { useDemo } from '../../state/demo-store';
+import { useJob } from '../../state/job-store';
 import { Conditions, TreatmentTimeline } from '../options/financial-components';
 import { useComparison } from '../options/use-comparison';
 
 export function ReviewPage() {
   const { state, save } = useDemo();
+  const { controls, setControl } = useJob();
   const { scenarios } = useComparison();
   const navigate = useNavigate();
   const [consent, setConsent] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const attempts = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lock = useRef(false);
   const latest = useRef(state);
@@ -66,24 +73,64 @@ export function ReviewPage() {
         <p className="muted">Keeping the selected estimate in this browser.</p>
       </div>
     );
-  const submit = () => {
+  const submit = (retry = false) => {
     if (!consent || lock.current) return;
     lock.current = true;
+    attempts.current++;
+    setSaveError(false);
     setSaving(true);
     timer.current = setTimeout(() => {
       if (
         latest.current.input?.caseRevision !== scenario.estimate.caseRevision ||
-        !latest.current.confirmed
+        !latest.current.confirmed ||
+        latest.current.caseId !== state.caseId
       ) {
         lock.current = false;
         setSaving(false);
         navigate('/facts');
         return;
       }
+      if (controls.failSave && !retry) {
+        lock.current = false;
+        setSaving(false);
+        setSaveError(true);
+        return;
+      }
       save(scenario);
       navigate('/saved', { replace: true });
     }, 600);
   };
+  if (saveError)
+    return (
+      <div className="page narrow centered">
+        <Orb size={170} alert />
+        <PageHeading
+          title="We couldn’t confirm your plan was saved"
+          description="Your selected option and consent are preserved. Retry when you are ready."
+        />
+        <Notice tone="warning">
+          Simulated save failure · Attempt {attempts.current}. No new plan was
+          saved. Retrying the same case, revision and option will not duplicate
+          a save.
+        </Notice>
+        <div className="actions">
+          <Button
+            onClick={() => {
+              setControl('failSave', false);
+              submit(true);
+            }}
+          >
+            Try saving again
+          </Button>
+          <Button variant="secondary" onClick={() => navigate('/options')}>
+            Back to options
+          </Button>
+          <Button variant="ghost" onClick={() => navigate('/')}>
+            Finish later
+          </Button>
+        </div>
+      </div>
+    );
   return (
     <div className="page">
       <PageHeading
@@ -138,12 +185,19 @@ export function ReviewPage() {
           </Card>
           <Card>
             <h3>Based on your confirmed details</h3>
-            <Row label="Coverage" value="Sample individual PPO" />
-            <Row label="Procedure scope" value="Two fillings and a crown" />
+            <Row
+              label="Coverage"
+              value={
+                state.origin === 'sample'
+                  ? 'Sample individual PPO'
+                  : 'Manually entered individual plan'
+              }
+            />
+            <Row label="Procedure scope" value={treatmentTitle(state.input)} />
             <Row
               label="Reported paid this year"
-              value={money(
-                state.input!.planYears['py-2026'].insurerAlreadyPaidCents!,
+              value={amountLabel(
+                currentYear(state.input!)?.[1].insurerAlreadyPaidCents,
               )}
             />
             <Row
@@ -168,7 +222,7 @@ export function ReviewPage() {
             className="full"
             icon={Check}
             disabled={!consent}
-            onClick={submit}
+            onClick={() => submit()}
           >
             Save this plan
           </Button>
@@ -181,11 +235,19 @@ export function ReviewPage() {
   );
 }
 export function QuestionCard() {
+  const { state } = useDemo();
+  const question = state.saved
+    ? dentistQuestion(state.saved.input, state.saved.scenario)
+    : 'Confirm the fees, coverage and dates with your dentist before choosing a plan.';
   const [copied, setCopied] = useState(false);
   const [fallback, setFallback] = useState(false);
+  useEffect(() => {
+    setCopied(false);
+    setFallback(false);
+  }, [question]);
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(dentistQuestion);
+      await navigator.clipboard.writeText(question);
       setCopied(true);
     } catch {
       setFallback(true);
@@ -197,7 +259,7 @@ export function QuestionCard() {
       <p className="muted small">
         Take this question to your dentist before choosing dates.
       </p>
-      <blockquote>{dentistQuestion}</blockquote>
+      <blockquote>{question}</blockquote>
       <div>
         <Button
           variant="secondary"
@@ -217,7 +279,7 @@ export function QuestionCard() {
           <textarea
             readOnly
             rows={3}
-            value={dentistQuestion}
+            value={question}
             onFocus={(e) => e.target.select()}
           />
         </Field>
@@ -282,6 +344,48 @@ export function ReminderCard() {
     </Card>
   );
 }
+export function PlanHistory() {
+  const { state } = useDemo();
+  const [showRoutine, setShowRoutine] = useState(false);
+  const events = state.events.filter(
+    (e) =>
+      e.caseId === state.caseId ||
+      (!e.caseId && state.caseId === 'legacy-demo'),
+  );
+  const hidden = events.filter((e) => e.routine).length;
+  return (
+    <Card>
+      <h3>Plan history</h3>
+      <p className="muted small">
+        Actions for this case, newest first. Stored only in this browser.
+      </p>
+      {events.length ? (
+        <ol className="history-list">
+          {events
+            .filter((e) => showRoutine || !e.routine)
+            .map((e) => (
+              <li key={e.id}>
+                <time className="small muted" dateTime={e.timestamp}>
+                  {new Date(e.timestamp).toLocaleString('en-US')} · You
+                </time>
+                <strong>{e.title}</strong>
+                <p className="small muted">{e.detail}</p>
+              </li>
+            ))}
+        </ol>
+      ) : (
+        <p className="muted">No history yet.</p>
+      )}
+      {hidden > 0 && (
+        <Button variant="ghost" onClick={() => setShowRoutine(!showRoutine)}>
+          {showRoutine
+            ? 'Hide routine entries'
+            : `Show ${hidden} routine entries`}
+        </Button>
+      )}
+    </Card>
+  );
+}
 export function SavedPage() {
   const { state } = useDemo();
   const navigate = useNavigate();
@@ -335,6 +439,7 @@ export function SavedPage() {
       </Card>
       <QuestionCard />
       <ReminderCard />
+      <PlanHistory />
       <FooterActions>
         <Button variant="secondary" onClick={() => navigate('/')}>
           Back to Home
