@@ -10,6 +10,8 @@ const entries = {
   health: 'src/functions/health.ts',
   cases: 'src/functions/cases.ts',
   calculations: 'src/functions/calculations.ts',
+  jobs: 'src/functions/jobs.ts',
+  'job-worker': 'src/functions/job-worker.ts',
   local: 'src/local/server.ts',
 };
 

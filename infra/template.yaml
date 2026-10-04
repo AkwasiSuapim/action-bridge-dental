@@ -16,6 +16,14 @@ Parameters:
     MinValue: 1
     MaxValue: 90
     Description: Demo case records expire via DynamoDB TTL (eventual deletion, not immediate).
+  BedrockModelId:
+    Type: String
+    Default: us.anthropic.claude-haiku-4-5-20251001-v1:0
+    Description: Bedrock inference profile the agent worker calls.
+  BedrockFoundationModel:
+    Type: String
+    Default: anthropic.claude-haiku-4-5-20251001-v1:0
+    Description: Foundation model behind the inference profile (IAM scope).
   AuthCallbackUrls:
     Type: CommaDelimitedList
     Default: actionbridgedental://auth/callback
@@ -231,6 +239,125 @@ Resources:
             Method: POST
             Path: /v1/cases/{caseId}/coverage-comparison
 
+  JobDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 345600
+      SqsManagedSseEnabled: true
+
+  JobQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      # Longer than the worker timeout, so an in-flight job is not redelivered while it runs.
+      VisibilityTimeout: 180
+      MessageRetentionPeriod: 3600
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt JobDeadLetterQueue.Arn
+        maxReceiveCount: 2
+
+  JobsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/.build/jobs
+      Description: Agent jobs API — create, view, answer, retry, cancel (enqueues; never calls the model)
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref CasesTable
+          RETENTION_DAYS: !Ref RetentionDays
+          JOB_QUEUE_URL: !Ref JobQueue
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+              Resource: !GetAtt CasesTable.Arn
+            - Effect: Allow
+              Action: sqs:SendMessage
+              Resource: !GetAtt JobQueue.Arn
+      Events:
+        CreateJob:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /v1/cases/{caseId}/jobs
+        GetJob:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /v1/jobs/{jobId}
+        AnswerJob:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /v1/jobs/{jobId}/answers
+        RetryJob:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /v1/jobs/{jobId}/retry
+        CancelJob:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /v1/jobs/{jobId}/cancel
+
+  JobWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/.build/job-worker
+      Description: Agent worker — bounded Bedrock tool loop over the deterministic engine (SQS, batch 1)
+      Timeout: 90
+      MemorySize: 1024
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref CasesTable
+          RETENTION_DAYS: !Ref RetentionDays
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+              Resource: !GetAtt CasesTable.Arn
+            - Effect: Allow
+              Action: bedrock:InvokeModel
+              Resource:
+                - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModelId}
+                - !Sub arn:aws:bedrock:*::foundation-model/${BedrockFoundationModel}
+      Events:
+        Jobs:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt JobQueue.Arn
+            BatchSize: 1
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+            # Caps concurrent model calls (cost and quota) without reserving account concurrency.
+            ScalingConfig:
+              MaximumConcurrency: 2
+
+  JobsLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${JobsFunction}
+      RetentionInDays: 7
+
+  JobWorkerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${JobWorkerFunction}
+      RetentionInDays: 7
+
   HealthLogGroup:
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Delete
@@ -268,6 +395,9 @@ Outputs:
   CognitoIssuer:
     Description: Token issuer checked by the API authorizer
     Value: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}
+  JobDeadLetterQueueUrl:
+    Description: Agent jobs that failed twice in the worker land here for inspection
+    Value: !Ref JobDeadLetterQueue
   ManagedLoginDomain:
     Description: Cognito managed login base URL for the mobile PKCE flow
     Value: !Sub https://${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com
