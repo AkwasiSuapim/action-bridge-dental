@@ -30,6 +30,7 @@ export const handler = composeHandler((config) => {
   const uploads = new UploadService({ cases, uploads: new S3UploadStore(new S3Client({}), requireUploadBucket(config)), newId: randomUUID, now: () => new Date() });
   return {
     ...jobRoutes({ jobs, uploads, authMode: config.authMode }),
-    ...speechRoutes({ synthesizer: new PollySynthesizer(new PollyClient({})), authMode: config.authMode }),
+    // Neural voices aren't offered in us-east-2; Polly runs in us-east-1 (text only, nothing stored).
+    ...speechRoutes({ synthesizer: new PollySynthesizer(new PollyClient({ region: process.env.POLLY_REGION ?? 'us-east-1' })), authMode: config.authMode }),
   };
 });
