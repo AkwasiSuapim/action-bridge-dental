@@ -1,11 +1,11 @@
 import { Tabs } from 'expo-router';
-import { House, User } from 'lucide-react-native';
+import { Activity, ClipboardList, House, User } from 'lucide-react-native';
 import { useTheme } from '../../../theme/theme';
 import { fonts, palettes, type Palette } from '../../../theme/tokens';
 
 /**
  * Main tabs (design v3 tab bar). Home is always dark, so its tab bar uses the dark palette;
- * other tabs follow the system theme. My plan and Activity join when cases can be listed.
+ * other tabs follow the system theme.
  */
 function barOptions(colors: Palette) {
   return {
@@ -22,6 +22,14 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{ title: 'Home', ...barOptions(palettes.dark), tabBarIcon: ({ color, size }) => <House color={color} size={size} /> }}
+      />
+      <Tabs.Screen
+        name="my-plan"
+        options={{ title: 'My plan', ...barOptions(colors), tabBarIcon: ({ color, size }) => <ClipboardList color={color} size={size} /> }}
+      />
+      <Tabs.Screen
+        name="activity"
+        options={{ title: 'Activity', ...barOptions(colors), tabBarIcon: ({ color, size }) => <Activity color={color} size={size} /> }}
       />
       <Tabs.Screen
         name="profile"

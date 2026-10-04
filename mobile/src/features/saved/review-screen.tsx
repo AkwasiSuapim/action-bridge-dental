@@ -12,7 +12,6 @@ import { asApiError, type ApiError } from '../../services/api';
 import { useApi } from '../../services/api-context';
 import { ThemeProvider, useTheme } from '../../theme/theme';
 import { fonts, layout, space } from '../../theme/tokens';
-import { useAuth } from '../auth/auth-context';
 import { useCase, useSavedStrategy } from '../case/case-store';
 import { buildFactGroups, isSampleCase } from '../case/facts';
 import { buildOptions } from '../options/options-model';
@@ -63,7 +62,6 @@ type Phase = { kind: 'review' } | { kind: 'saving' } | { kind: 'retry'; attempt:
 
 function ReviewFlow({ record, comparison, scenarioId }: { record: DentalCase; comparison: ScenarioComparison; scenarioId: string }) {
   const api = useApi();
-  const auth = useAuth();
   const { colors } = useTheme();
   const { putSave } = useSavedStrategy(record.caseId);
   const [consent, setConsent] = useState(false);
@@ -96,10 +94,10 @@ function ReviewFlow({ record, comparison, scenarioId }: { record: DentalCase; co
     } catch (caught) {
       const apiError = asApiError(caught);
       const kind = classifySaveFailure(apiError);
-      if (kind === 'expired') await auth.signOut('expired');
-      else if (kind === 'retry') setPhase({ kind: 'retry', attempt: attempts.current });
+      // `expired` is handled by the API provider (signs out to Welcome with the expired note).
+      if (kind === 'retry') setPhase({ kind: 'retry', attempt: attempts.current });
       else if (kind === 'stale') setPhase({ kind: 'stale' });
-      else setPhase({ kind: 'error', error: apiError });
+      else if (kind === 'error') setPhase({ kind: 'error', error: apiError });
     }
   };
 

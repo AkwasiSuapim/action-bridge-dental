@@ -22,6 +22,17 @@ const client = (fetchImpl: typeof fetch, token: string | null = 'token-abc') =>
   createApiClient({ baseUrl: 'https://api.example/dev', getAccessToken: async () => token, fetchImpl, sleep: async () => {}, random: () => 0 });
 
 describe('API client', () => {
+  it('reports an ended session once per call, for a missing token and for HTTP 401', async () => {
+    const onUnauthenticated = vi.fn();
+    const make = (impl: typeof fetch, token: string | null) =>
+      createApiClient({ baseUrl: 'https://api.example/dev', getAccessToken: async () => token, fetchImpl: impl, sleep: async () => {}, random: () => 0, onUnauthenticated });
+    await expect(make(fakeFetch().impl, null).getCase('c')).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    await expect(make(fakeFetch({ status: 401 }).impl, 't').estimate('c', 1)).rejects.toMatchObject({ code: 'UNAUTHENTICATED' });
+    expect(onUnauthenticated).toHaveBeenCalledTimes(2);
+    await make(fakeFetch({ status: 200, body: { caseId: 'c', caseRevision: 1 } }).impl, 't').patchCase('c', { expectedRevision: 1, changes: { coverageMode: 'insured' } });
+    expect(onUnauthenticated).toHaveBeenCalledTimes(2);
+  });
+
   it('sends the bearer token and validates the response against the contract', async () => {
     const { impl, calls } = fakeFetch({ status: 201, body: { caseId: 'case-1', caseRevision: 1 } });
     await expect(client(impl).createCase({ currency: 'USD', coverageMode: 'unknown', policy: null, planYears: {}, procedures: [] })).resolves.toEqual({

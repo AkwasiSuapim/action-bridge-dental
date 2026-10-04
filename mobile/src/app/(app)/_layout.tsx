@@ -1,6 +1,7 @@
 import { Redirect, Stack } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 import { useAuth } from '../../features/auth/auth-context';
+import { RecentCasesProvider } from '../../features/activity/recent-cases';
 import { CaseProvider } from '../../features/case/case-store';
 import { useTheme } from '../../theme/theme';
 import { fonts } from '../../theme/tokens';
@@ -21,28 +22,30 @@ export default function SignedInLayout() {
 
   return (
     <CaseProvider>
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.text,
-          headerTitleStyle: { fontFamily: fonts.semibold },
-          headerShadowVisible: false,
-          contentStyle: { backgroundColor: colors.background },
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="case/new" options={{ title: 'New estimate' }} />
-        <Stack.Screen name="case/[caseId]/questions" options={{ title: 'A few details' }} />
-        <Stack.Screen name="case/[caseId]/rules" options={{ title: 'Plan coverage' }} />
-        <Stack.Screen name="case/[caseId]/facts" options={{ title: 'Check your details' }} />
-        <Stack.Screen name="case/[caseId]/edit" options={{ title: 'Update a detail' }} />
-        <Stack.Screen name="case/[caseId]/options" options={{ title: 'Your options' }} />
-        <Stack.Screen name="case/[caseId]/self-pay" options={{ title: 'Self-pay quotes', presentation: 'modal' }} />
-        <Stack.Screen name="case/[caseId]/plan" options={{ title: 'Plan details' }} />
-        <Stack.Screen name="case/[caseId]/sources" options={{ title: 'Where these numbers come from', presentation: 'modal' }} />
-        <Stack.Screen name="case/[caseId]/review" options={{ title: 'Review your plan' }} />
-        <Stack.Screen name="case/[caseId]/saved" options={{ headerShown: false, gestureEnabled: false }} />
-      </Stack>
+      <RecentCasesProvider>
+        <Stack
+          screenOptions={{
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.text,
+            headerTitleStyle: { fontFamily: fonts.semibold },
+            headerShadowVisible: false,
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="case/new" options={{ title: 'New estimate' }} />
+          <Stack.Screen name="case/[caseId]/questions" options={{ title: 'A few details' }} />
+          <Stack.Screen name="case/[caseId]/rules" options={{ title: 'Plan coverage' }} />
+          <Stack.Screen name="case/[caseId]/facts" options={{ title: 'Check your details' }} />
+          <Stack.Screen name="case/[caseId]/edit" options={{ title: 'Update a detail' }} />
+          <Stack.Screen name="case/[caseId]/options" options={{ title: 'Your options' }} />
+          <Stack.Screen name="case/[caseId]/self-pay" options={{ title: 'Self-pay quotes', presentation: 'modal' }} />
+          <Stack.Screen name="case/[caseId]/plan" options={{ title: 'Plan details' }} />
+          <Stack.Screen name="case/[caseId]/sources" options={{ title: 'Where these numbers come from', presentation: 'modal' }} />
+          <Stack.Screen name="case/[caseId]/review" options={{ title: 'Review your plan' }} />
+          <Stack.Screen name="case/[caseId]/saved" options={{ headerShown: false, gestureEnabled: false }} />
+        </Stack>
+      </RecentCasesProvider>
     </CaseProvider>
   );
 }
