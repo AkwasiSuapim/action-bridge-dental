@@ -18,7 +18,9 @@
     "build:lambda": "npm run build && npm run bundle -w backend",
     "dev:api": "npm run build:lambda && node backend/.build/local/index.mjs",
     "check:mobile": "npm --prefix mobile run typecheck && npx vitest run mobile",
-    "check:all": "npm run check && npm --prefix mobile run typecheck"
+    "check:all": "npm run check && npm --prefix mobile run typecheck",
+    "dev:web": "npm run build && npm --prefix web run dev",
+    "build:web": "npm run build && npm --prefix web ci && npm --prefix web run build"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
