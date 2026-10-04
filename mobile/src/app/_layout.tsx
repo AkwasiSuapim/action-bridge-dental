@@ -51,7 +51,6 @@ function Root() {
         <StatusBar style={dark ? 'light' : 'dark'} />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
           <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
-          <Stack.Screen name="sign-in" />
           <Stack.Screen name="(app)" options={{ animation: 'fade' }} />
         </Stack>
       </ApiProvider>

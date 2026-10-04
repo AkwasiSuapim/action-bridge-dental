@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sign-in handoff</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1944px; height: 1300px; box-sizing: border-box; padding: 48px; background: #EEF2EF; color: #101512; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; display: flex; flex-direction: column; gap: 28px">
+  <header style="display: flex; flex-direction: column; gap: 6px">
+    <span style="font-size: 13px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: #0E6B4D">Annotated flow · simulated in the prototype</span>
+    <h1 style="margin: 0; font-size: 34px; line-height: 40px; font-weight: 700; letter-spacing: -0.6px">Sign-in hands off to the system browser and back</h1>
+    <p style="margin: 0; max-width: 1200px; font-size: 16px; line-height: 24px; color: #3F4A44">The password is typed only on the hosted sign-in page, never inside the app. Users see plain language; the engineering notes below each frame are for the build team, not user copy.</p>
+  </header>
+  <div style="display: flex; align-items: flex-start">
+    <sc-for list="{{steps}}" as="s" hint-placeholder-count="4">
+      <div style="display: flex; align-items: flex-start">
+        <sc-if value="{{s.arrow}}" hint-placeholder-val="{{false}}">
+          <div aria-hidden="true" style="width: 96px; height: 844px; margin-top: 44px; display: flex; align-items: center; justify-content: center; color: #0E6B4D">
+            <svg width="44" height="24" viewBox="0 0 44 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h38 M30 3l10 9-10 9"></path></svg>
+          </div>
+        </sc-if>
+        <div style="width: 390px; display: flex; flex-direction: column; gap: 12px">
+          <span style="display: flex; align-items: center; gap: 10px; height: 32px"><span style="width: 28px; height: 28px; border-radius: 50%; background: #0E6B4D; color: #FFFFFF; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{s.n}}</span><span style="font-size: 17px; font-weight: 700">{{s.title}}</span></span>
+          <div style="width: 390px; height: 844px; border-radius: 28px; overflow: hidden; box-shadow: 0 0 0 1px #D3D8D4, 0 12px 32px rgba(7,17,13,0.12)">
+            <dc-import name="Dental-App" scene="{{s.scene}}" width="{{390}}" height="{{844}}" animate="{{false}}" hint-size="390px,844px"></dc-import>
+          </div>
+          <p style="margin: 4px 0 0; font-size: 14px; line-height: 21px; color: #101512">{{s.user}}</p>
+          <p style="margin: 0; font-size: 13px; line-height: 19px; color: #5C6861; font-family: ui-monospace, Menlo, monospace">{{s.eng}}</p>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1944,"height":1300}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      steps: [
+        { n: '1', arrow: false, scene: 'welcome', title: 'In the app: Welcome',
+          user: 'Sign in or Create account opens the secure sign-in page. Explore a sample stays in the app with sample data only.',
+          eng: 'Open managed login (authorization code + PKCE) in ASWebAuthenticationSession / Android Custom Tabs. No embedded web view.' },
+        { n: '2', arrow: true, scene: 'auth-loading', title: 'System browser: hosted sign-in',
+          user: 'Matching hosted form: email, password with show/hide, forgot password, create account. Wrong password and network errors stay on this page.',
+          eng: 'Cognito managed login, branded to the tokens. Cancel → app receives a user-cancel result → Welcome shows “Sign-in was cancelled.”' },
+        { n: '3', arrow: true, scene: 'auth-returning', title: 'Returning to the app',
+          user: '“Returning you to ActionBridge Dental.” The browser closes on its own.',
+          eng: 'Redirect to actionbridgedental://auth/callback; the app exchanges the code and keeps the session in Keychain / Keystore.' },
+        { n: '4', arrow: true, scene: 'home', title: 'Back in the app: Home',
+          user: 'Lands on Home. If the session later expires, the Recovery screen asks to sign in again; saved plans stay in the account.',
+          eng: 'Refresh silently when possible; on failure route to Recovery “expired”. Prototype simulates every step; no real account is created.' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
