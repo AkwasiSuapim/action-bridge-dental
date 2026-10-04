@@ -4,10 +4,10 @@ import { CognitoError } from './cognito';
 
 describe('welcomeNote', () => {
   it('prefers the route param, then the signed-out reason', () => {
-    expect(welcomeNote('cancelled', 'expired')).toMatch(/cancelled/);
+    expect(welcomeNote('signed_out', 'expired')).toBe('You’re signed out.');
     expect(welcomeNote(undefined, 'expired')).toMatch(/session expired/);
     expect(welcomeNote(undefined, 'signed_out')).toBe('You’re signed out.');
-    expect(welcomeNote(['expired', 'cancelled'], null)).toMatch(/session expired/);
+    expect(welcomeNote(['expired', 'signed_out'], null)).toMatch(/session expired/);
   });
 
   it('shows nothing on a fresh start or for an unknown param', () => {
