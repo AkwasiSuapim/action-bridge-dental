@@ -2,16 +2,16 @@ import type { DentalCase, ScenarioComparison } from '@actionbridge/contracts';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Check, X } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { AccessibilityInfo, Pressable, View } from 'react-native';
+import { AccessibilityInfo, View } from 'react-native';
 import { AgentOrb } from '../../components/orb';
 import { ErrorNotice, ErrorState, LoadingState } from '../../components/states';
-import { AppText, Badge, Button, Card, Notice, Row, Screen } from '../../components/ui';
+import { AppText, Badge, Button, Card, Checkbox, Notice, Row, Screen } from '../../components/ui';
 import { formatCents } from '../../lib/format';
 import { newIdempotencyKey } from '../../lib/idempotency';
 import { asApiError, type ApiError } from '../../services/api';
 import { useApi } from '../../services/api-context';
 import { ThemeProvider, useTheme } from '../../theme/theme';
-import { fonts, layout, space } from '../../theme/tokens';
+import { space } from '../../theme/tokens';
 import { useCase, useSavedStrategy } from '../case/case-store';
 import { buildFactGroups, isSampleCase } from '../case/facts';
 import { useRevisionResult } from '../case/use-revision-result';
@@ -44,7 +44,6 @@ type Phase = { kind: 'review' } | { kind: 'saving' } | { kind: 'retry'; attempt:
 
 function ReviewFlow({ record, comparison, scenarioId }: { record: DentalCase; comparison: ScenarioComparison; scenarioId: string }) {
   const api = useApi();
-  const { colors } = useTheme();
   const { putSave } = useSavedStrategy(record.caseId);
   const [consent, setConsent] = useState(false);
   const [phase, setPhase] = useState<Phase>({ kind: 'review' });
@@ -127,7 +126,6 @@ function ReviewFlow({ record, comparison, scenarioId }: { record: DentalCase; co
     >
       {isSampleCase(record) ? <Badge label="Sample data" tone="neutral" /> : null}
       <View style={{ gap: space(2) }}>
-        <AppText variant="title">Review your plan</AppText>
         <AppText muted>Saving keeps this comparison so you can come back to it.</AppText>
       </View>
       {phase.kind === 'error' ? <ErrorNotice error={phase.error} /> : null}
@@ -163,40 +161,7 @@ function ReviewFlow({ record, comparison, scenarioId }: { record: DentalCase; co
         <Point text="Submit a claim or use any of your benefits" />
       </Card>
 
-      <Pressable
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: consent }}
-        onPress={() => setConsent((value) => !value)}
-        style={{
-          flexDirection: 'row',
-          gap: space(3),
-          alignItems: 'center',
-          minHeight: layout.minHitArea,
-          padding: space(4),
-          borderRadius: layout.radius,
-          borderWidth: 1.5,
-          borderColor: consent ? colors.primary : colors.border,
-          backgroundColor: colors.surface,
-        }}
-      >
-        <View
-          style={{
-            width: 22,
-            height: 22,
-            borderRadius: 6,
-            borderWidth: 2,
-            borderColor: colors.primary,
-            backgroundColor: consent ? colors.primary : 'transparent',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {consent ? <Check size={14} color={colors.onPrimary} /> : null}
-        </View>
-        <AppText variant="caption" style={{ flex: 1 }}>
-          Store this plan and my answers in my account.
-        </AppText>
-      </Pressable>
+      <Checkbox boxed label="Store this plan and my answers in my account." checked={consent} onChange={setConsent} />
     </Screen>
   );
 }

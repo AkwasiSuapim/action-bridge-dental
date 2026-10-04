@@ -2,12 +2,12 @@ import type { DentalCase } from '@actionbridge/contracts';
 import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Check, ChevronDown, ChevronRight, ChevronUp, Copy, FileSearch, Share2 } from 'lucide-react-native';
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { AccessibilityInfo, Pressable, Share, View } from 'react-native';
 import { FactBadge } from '../../components/fact-badge';
 import { AgentOrb } from '../../components/orb';
 import { ErrorNotice, ErrorState, LoadingState } from '../../components/states';
-import { AppText, Badge, Button, Card, Notice, Row, Screen } from '../../components/ui';
+import { AppText, Badge, Button, Card, Disclosure, EstimateNote, Notice, Row, Screen, Section } from '../../components/ui';
 import { formatCents } from '../../lib/format';
 import { useApi } from '../../services/api-context';
 import { useTheme } from '../../theme/theme';
@@ -39,6 +39,7 @@ export function PlanScreen() {
       <Screen>
         <View style={{ alignItems: 'center', gap: space(4), paddingVertical: space(10) }} accessible accessibilityLabel="Loading your plan">
           <AgentOrb size={110} mode="active" />
+          <AppText muted>Loading your plan…</AppText>
         </View>
       </Screen>
     );
@@ -86,16 +87,39 @@ function PlanBody({ record, plan }: { record: DentalCase; plan: PlanDetails }) {
         <AppText variant="caption" muted>
           {plan.timing}
         </AppText>
-        <Row label="You pay · estimated" value={formatCents(plan.youPayCents)} strong />
-        <Row label="Plan pays · estimated" value={formatCents(plan.planPaysCents)} />
+        <Row label="You pay" value={formatCents(plan.youPayCents)} strong />
+        <Row label="Plan pays" value={formatCents(plan.planPaysCents)} />
         {plan.comparedToBaseline ? <AppText variant="caption">{plan.comparedToBaseline}</AppText> : null}
         <Button label="Compare options" variant="secondary" onPress={() => router.back()} />
       </Card>
 
-      <Section title="What needs confirmation">
+      <Section title="Cost breakdown">
         <Card style={{ padding: 0, gap: 0, overflow: 'hidden' }}>
+          {plan.items.map((item, index) => (
+            <BreakdownRow key={item.procedureId} item={item} first={index === 0} />
+          ))}
+          <View style={{ padding: space(4), gap: space(1), borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surfaceMuted }}>
+            <Row label="Total · you pay" value={formatCents(plan.youPayCents)} strong />
+            <Row label="Total · plan pays" value={formatCents(plan.planPaysCents)} />
+          </View>
+        </Card>
+      </Section>
+
+      <Section title="Benefits by year">
+        <AppText variant="caption" muted>
+          Each benefit year has its own maximum. We never add the years together.
+        </AppText>
+        <Card style={{ gap: space(6) }}>
+          {plan.bars.map((bar) => (
+            <BenefitBar key={bar.planYearId} bar={bar} />
+          ))}
+        </Card>
+      </Section>
+
+      <Disclosure title="What needs confirmation">
+        <View>
           {plan.confirmations.map((item, index) => (
-            <View key={item.text} style={{ padding: space(4), gap: space(1.5), borderTopWidth: index ? 1 : 0, borderTopColor: colors.border }}>
+            <View key={item.text} style={{ paddingVertical: space(3), gap: space(1.5), borderTopWidth: index ? 1 : 0, borderTopColor: colors.border }}>
               <AppText style={{ fontFamily: fonts.semibold }}>{item.text}</AppText>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(2), flexWrap: 'wrap' }}>
                 <AppText variant="caption" muted>
@@ -105,11 +129,11 @@ function PlanBody({ record, plan }: { record: DentalCase; plan: PlanDetails }) {
               </View>
             </View>
           ))}
-        </Card>
-      </Section>
+        </View>
+      </Disclosure>
 
-      <Section title="Treatment timeline">
-        <Card>
+      <Disclosure title="Treatment timeline">
+        <View style={{ gap: space(3) }}>
           {plan.timeline.map((entry) =>
             entry.kind === 'divider' ? (
               <View key={entry.key} style={{ flexDirection: 'row', alignItems: 'center', gap: space(2) }}>
@@ -135,34 +159,12 @@ function PlanBody({ record, plan }: { record: DentalCase; plan: PlanDetails }) {
               </View>
             ),
           )}
-        </Card>
-      </Section>
-
-      <Section title="Cost breakdown">
-        <Card style={{ padding: 0, gap: 0, overflow: 'hidden' }}>
-          {plan.items.map((item, index) => (
-            <BreakdownRow key={item.procedureId} item={item} first={index === 0} />
-          ))}
-          <View style={{ padding: space(4), gap: space(1), borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surfaceMuted }}>
-            <Row label="Total · you pay · estimated" value={formatCents(plan.youPayCents)} strong />
-            <Row label="Total · plan pays · estimated" value={formatCents(plan.planPaysCents)} />
-          </View>
-        </Card>
-      </Section>
-
-      <Section title="Benefits by year">
-        <AppText variant="caption" muted>
-          Each benefit year has its own maximum. We never add the years together.
-        </AppText>
-        <Card style={{ gap: space(6) }}>
-          {plan.bars.map((bar) => (
-            <BenefitBar key={bar.planYearId} bar={bar} />
-          ))}
-        </Card>
-      </Section>
+        </View>
+      </Disclosure>
 
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel="Where these numbers come from. Your answers, sample data and what we assumed."
         onPress={() => router.push(`/case/${record.caseId}/sources`)}
         style={({ pressed }) => ({
           flexDirection: 'row',
@@ -217,16 +219,9 @@ function PlanBody({ record, plan }: { record: DentalCase; plan: PlanDetails }) {
           </AppText>
         </Card>
       </Section>
-    </Screen>
-  );
-}
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <View style={{ gap: space(2.5) }}>
-      <AppText variant="heading">{title}</AppText>
-      {children}
-    </View>
+      <EstimateNote />
+    </Screen>
   );
 }
 
@@ -251,7 +246,7 @@ function BreakdownRow({ item, first }: { item: BreakdownItem; first: boolean }) 
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <AppText variant="caption" muted>
-            You pay · est.
+            You pay
           </AppText>
           <AppText style={{ fontFamily: fonts.semibold }}>{formatCents(item.youPayCents)}</AppText>
         </View>

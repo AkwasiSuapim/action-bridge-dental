@@ -1,16 +1,15 @@
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import type { ApiError } from '../services/api';
-import { useTheme } from '../theme/theme';
 import { space } from '../theme/tokens';
+import { AgentOrb } from './orb';
 import { AppText, Button, Notice, Screen } from './ui';
 
-/** Full-screen loading state with a spoken label; no fake progress. */
+/** Full-screen loading state with the agent orb and a spoken label; no fake progress. */
 export function LoadingState({ label }: { label: string }) {
-  const { colors } = useTheme();
   return (
     <Screen scroll={false}>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: space(3) }} accessible accessibilityLabel={label}>
-        <ActivityIndicator color={colors.primary} />
+        <AgentOrb size={72} mode="active" />
         <AppText muted>{label}</AppText>
       </View>
     </Screen>
