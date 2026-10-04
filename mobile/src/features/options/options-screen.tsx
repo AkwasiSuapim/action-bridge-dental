@@ -1,23 +1,23 @@
 import type { CoverageComparison, DentalCase, EstimateResult, ScenarioComparisonResult } from '@actionbridge/contracts';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, View, useWindowDimensions } from 'react-native';
 import { AgentOrb } from '../../components/orb';
 import { ErrorNotice, ErrorState, LoadingState } from '../../components/states';
 import { AppText, Badge, Button, Card, Notice, Row, Screen } from '../../components/ui';
 import { formatCents } from '../../lib/format';
 import { questionFor } from '../../lib/questions';
-import { asApiError, type ApiError } from '../../services/api';
 import { useApi } from '../../services/api-context';
 import { useTheme } from '../../theme/theme';
 import { fonts, layout, space } from '../../theme/tokens';
 import { useCase } from '../case/case-store';
 import { isSampleCase } from '../case/facts';
+import { useRevisionResult } from '../case/use-revision-result';
 import { buildOptions, selfPayView } from './options-model';
 import { ScenarioCard } from './scenario-card';
 
-type Results = { revision: number; estimate: EstimateResult; scenarios: ScenarioComparisonResult; coverage: CoverageComparison };
+type Results = { estimate: EstimateResult; scenarios: ScenarioComparisonResult; coverage: CoverageComparison };
 
 /**
  * "Your dental options" (design v3). Server-calculated timing options for the current revision,
@@ -27,35 +27,18 @@ export function OptionsScreen() {
   const { caseId } = useLocalSearchParams<{ caseId: string }>();
   const { record, loading, error, reload } = useCase(caseId);
   const api = useApi();
-  const [results, setResults] = useState<Results | null>(null);
-  const [failure, setFailure] = useState<ApiError | null>(null);
-
-  const revision = record?.caseRevision;
-  const calculate = useCallback(async () => {
-    if (!caseId || revision === undefined) return;
-    setFailure(null);
-    try {
-      const [estimate, scenarios, coverage] = await Promise.all([
-        api.estimate(caseId, revision),
-        api.scenarios(caseId, revision),
-        api.coverageComparison(caseId, revision),
-      ]);
-      setResults({ revision, estimate, scenarios, coverage });
-    } catch (caught) {
-      const apiError = asApiError(caught);
-      if (apiError.code === 'REVISION_CONFLICT') await reload();
-      else setFailure(apiError);
-    }
-  }, [api, caseId, revision, reload]);
-
-  useEffect(() => {
-    void calculate();
-  }, [calculate]);
+  const {
+    current,
+    failure,
+    retry: calculate,
+  } = useRevisionResult<Results>(caseId, record?.caseRevision, reload, async (id, revision) => {
+    const [estimate, scenarios, coverage] = await Promise.all([api.estimate(id, revision), api.scenarios(id, revision), api.coverageComparison(id, revision)]);
+    return { estimate, scenarios, coverage };
+  });
 
   if (loading) return <LoadingState label="Loading your details" />;
   if (!record) return error ? <ErrorState error={error} onRetry={reload} /> : <LoadingState label="Loading your details" />;
 
-  const current = results && results.revision === record.caseRevision ? results : null;
   if (!current) {
     return (
       <Screen>
@@ -212,7 +195,7 @@ function SelfPaySection({ record, coverage }: { record: DentalCase; coverage: Co
         {view.status === 'unavailable' ? (
           <>
             <AppText variant="caption">
-              No self-pay quote yet. If your dentist offers cash prices, add them to compare with using your insurance.
+              No self-pay quote yet. Add your dentist’s cash price to compare.
             </AppText>
             <Button label="Add a self-pay quote" variant="secondary" onPress={open} />
           </>

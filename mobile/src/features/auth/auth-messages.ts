@@ -6,10 +6,9 @@ import type { SignedOutReason } from './auth-context';
  * Accounts are admin-created for the demo (D-15), so there is no self-service reset or sign-up.
  */
 
-export type WelcomeNote = 'cancelled' | 'expired' | 'signed_out';
+export type WelcomeNote = 'expired' | 'signed_out';
 
 const NOTES: Record<WelcomeNote, string> = {
-  cancelled: 'Sign-in was cancelled. Nothing changed. Sign in when you’re ready.',
   expired: 'Your session expired. Sign in again to pick up where you left off.',
   signed_out: 'You’re signed out.',
 };
