@@ -2,6 +2,7 @@ import { SpeechRequestSchema, type SpeechResponse } from '@actionbridge/contract
 import { SynthesizeSpeechCommand, type PollyClient, type VoiceId } from '@aws-sdk/client-polly';
 import { resolveOwnerId, type AuthMode } from '../../shared/auth.js';
 import { HttpError, jsonResult, parseBody, type RouteHandler } from '../../shared/http.js';
+import { logEvent } from '../../shared/logger.js';
 
 /** Port: turns short text into speech audio. */
 export interface SpeechSynthesizer {
@@ -20,7 +21,8 @@ export function speechRoutes({ synthesizer, authMode }: { synthesizer: SpeechSyn
       let result: { audio: Uint8Array; voice: string };
       try {
         result = await synthesizer.synthesize(text);
-      } catch {
+      } catch (error) {
+        logEvent('error', 'speech_failed', { errorName: error instanceof Error ? error.name : 'UnknownError' });
         throw new HttpError('UPSTREAM_UNAVAILABLE', 'Reading aloud isn’t available right now.');
       }
       const body: SpeechResponse = { audioBase64: Buffer.from(result.audio).toString('base64'), contentType: 'audio/mpeg', voice: result.voice };
