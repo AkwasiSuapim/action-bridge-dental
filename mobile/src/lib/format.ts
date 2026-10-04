@@ -60,3 +60,13 @@ export function parsePercentToBps(input: string): number | null {
   const bps = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
   return bps <= 10_000 ? bps : null;
 }
+
+/** UTC timestamp → the device's local "Oct 3, 2026, 4:05 PM". */
+export function formatDateTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const clock = `${hours % 12 === 0 ? 12 : hours % 12}:${minutes} ${hours < 12 ? 'AM' : 'PM'}`;
+  return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}, ${clock}`;
+}

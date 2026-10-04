@@ -1,4 +1,4 @@
-import type { DentalCase } from '@actionbridge/contracts';
+import type { DentalCase, SaveStrategyResponse } from '@actionbridge/contracts';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { asApiError, type ApiError } from '../../services/api';
 import { useApi } from '../../services/api-context';
@@ -10,14 +10,19 @@ import { useApi } from '../../services/api-context';
 interface CaseStore {
   cases: Record<string, DentalCase>;
   put(record: DentalCase): void;
+  /** The last save per case this session (there is no "get strategy" endpoint; the ledger is the durable record). */
+  saves: Record<string, SaveStrategyResponse>;
+  putSave(caseId: string, save: SaveStrategyResponse): void;
 }
 
 const CaseContext = createContext<CaseStore | null>(null);
 
 export function CaseProvider({ children }: { children: ReactNode }) {
   const [cases, setCases] = useState<Record<string, DentalCase>>({});
+  const [saves, setSaves] = useState<Record<string, SaveStrategyResponse>>({});
   const put = useCallback((record: DentalCase) => setCases((current) => ({ ...current, [record.caseId]: record })), []);
-  return <CaseContext.Provider value={{ cases, put }}>{children}</CaseContext.Provider>;
+  const putSave = useCallback((caseId: string, save: SaveStrategyResponse) => setSaves((current) => ({ ...current, [caseId]: save })), []);
+  return <CaseContext.Provider value={{ cases, put, saves, putSave }}>{children}</CaseContext.Provider>;
 }
 
 export function useCase(caseId: string | undefined) {
@@ -51,4 +56,11 @@ export function useCase(caseId: string | undefined) {
   }, [caseId]);
 
   return { record, loading: loading && record === null, error, reload };
+}
+
+/** Remember and read this session's save for a case. */
+export function useSavedStrategy(caseId: string | undefined) {
+  const store = useContext(CaseContext);
+  if (!store) throw new Error('useSavedStrategy must be used inside CaseProvider');
+  return { save: caseId ? (store.saves[caseId] ?? null) : null, putSave: store.putSave };
 }

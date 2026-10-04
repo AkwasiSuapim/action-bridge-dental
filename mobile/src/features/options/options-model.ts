@@ -61,6 +61,13 @@ function timingLine(record: DentalCase, lines: { procedureId: string; date: stri
     .join(' · ');
 }
 
+/** Card title: as planned vs alternative, and whether it spans more than one benefit year. */
+export function scenarioTitle(scenario: Scenario): string {
+  const multiYear = new Set(scenario.estimate.lines.map((line) => line.planYearId)).size > 1;
+  if (scenario.kind === 'baseline') return multiYear ? 'As planned' : 'All treatment this benefit year';
+  return multiYear ? 'Split across benefit years' : 'Alternative timing';
+}
+
 function toCard(record: DentalCase, scenario: Scenario): Omit<OptionCard, 'lowest'> {
   const { estimate } = scenario;
   const years = orderedPlanYears(record)
@@ -76,7 +83,7 @@ function toCard(record: DentalCase, scenario: Scenario): Omit<OptionCard, 'lowes
   return {
     scenarioId: scenario.scenarioId,
     kind: scenario.kind,
-    title: scenario.kind === 'baseline' ? (multiYear ? 'As planned' : 'All treatment this benefit year') : multiYear ? 'Split across benefit years' : 'Alternative timing',
+    title: scenarioTitle(scenario),
     timing,
     span: years.length === 0 ? '' : multiYear ? `${years[0]!.label} and ${years.at(-1)!.label}` : years[0]!.label,
     youPayCents: estimate.totals.patientPaysCents,
