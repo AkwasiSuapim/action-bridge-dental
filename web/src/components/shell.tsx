@@ -18,6 +18,7 @@ import {
   useNavigate,
 } from 'react-router-dom';
 import { isSampleCase } from '../domain/provenance';
+import { LandingPage } from '../features/landing/landing-page';
 import { useAuth } from '../state/auth';
 import { CaseProvider, useCase } from '../state/case-store';
 import { Badge, Brand, Button } from './ui';
@@ -42,9 +43,13 @@ const titleFor = (path: string) =>
     ? 'Home'
     : (pages.find(([p]) => path.startsWith(p))?.[1] ?? 'ActionBridge Dental');
 
-/** Signed-in layout. Live data only: there are no demo controls or simulated states. */
+/**
+ * Signed-in layout. Live data only: there are no demo controls or simulated states. Signed-out
+ * visitors see the landing page at "/" and are sent to sign in for anything else.
+ */
 export function Shell() {
   const { status } = useAuth();
+  const location = useLocation();
   if (status === 'restoring')
     return (
       <div className="page narrow centered" role="status">
@@ -52,7 +57,16 @@ export function Shell() {
         <p className="muted">Restoring your session…</p>
       </div>
     );
-  if (status !== 'signed_in') return <Navigate to="/login" replace />;
+  if (status !== 'signed_in')
+    return location.pathname === '/' ? (
+      <LandingPage />
+    ) : (
+      <Navigate
+        to="/sign-in"
+        replace
+        state={{ from: location.pathname + location.search }}
+      />
+    );
   return (
     <CaseProvider>
       <ShellBody />
@@ -78,7 +92,7 @@ function ShellBody() {
   if (!session) return null;
   const leave = () => {
     void signOut();
-    navigate('/login', { replace: true });
+    navigate('/sign-in', { replace: true });
   };
   return (
     <div className={`app-shell ${dark ? 'dark' : 'light'}`}>

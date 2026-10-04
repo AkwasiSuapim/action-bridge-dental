@@ -5,9 +5,12 @@ import '@fontsource/plus-jakarta-sans/400.css';
 import '@fontsource/plus-jakarta-sans/500.css';
 import '@fontsource/plus-jakarta-sans/600.css';
 import '@fontsource/plus-jakarta-sans/700.css';
+import '@fontsource/geist/400.css';
+import '@fontsource/geist/500.css';
+import '@fontsource/geist/600.css';
 import './styles.css';
 import { Shell } from './components/shell';
-import { LoginPage } from './features/auth/login-page';
+import { SignInPage } from './features/auth/sign-in-page';
 import { HomePage } from './features/home/home-page';
 import { ComposerPage } from './features/intake/intake-pages';
 import { ManualPage } from './features/intake/manual-page';
@@ -30,7 +33,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
+          <Route path="/sign-in" element={<SignInPage />} />
+          <Route path="/login" element={<Navigate to="/sign-in" replace />} />
+          {/* Signed-out visitors see the landing page at "/" (handled by Shell). */}
           <Route element={<Shell />}>
             <Route index element={<HomePage />} />
             <Route path="intake/manual" element={<ManualPage />} />

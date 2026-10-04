@@ -7,7 +7,7 @@ import { mockBackend } from './mock-api';
  * benefits engine). Nothing here is simulated by the app itself.
  */
 async function signIn(page: Page, email = 'jordan@example.com') {
-  await page.goto('/login');
+  await page.goto('/sign-in');
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill('A-long-password-1');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
@@ -29,8 +29,13 @@ test('sign-in errors, first-sign-in password change, and session restore after r
   page,
 }) => {
   await mockBackend(page, { newPasswordFor: 'new@example.com' });
+  // Signed out: the landing page at /, and sign-in for any app page.
   await page.goto('/');
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(
+    page.getByRole('link', { name: 'Sign in' }).first(),
+  ).toBeVisible();
+  await page.goto('/options');
+  await expect(page).toHaveURL(/\/sign-in$/);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByText('Enter a valid email address.')).toBeVisible();
   await page.getByLabel('Email', { exact: true }).fill('jordan@example.com');
@@ -46,18 +51,20 @@ test('sign-in errors, first-sign-in password change, and session restore after r
   ).toBeVisible();
   await page.getByLabel('New password').fill('short');
   await page.getByRole('button', { name: 'Set password and continue' }).click();
-  await expect(page.getByText(/at least 12 characters/)).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('12 characters');
   await page.getByLabel('New password').fill('A-much-longer-Passw0rd');
   await page.getByLabel('Confirm password').fill('A-much-longer-Passw0rd');
   await page.getByRole('button', { name: 'Set password and continue' }).click();
-  await expect(page.getByText('Hi, New')).toBeVisible();
+  // Back to the page that was asked for before signing in.
+  await expect(page).toHaveURL(/\/options$/);
+  await expect(page.getByText('new@example.com')).toBeVisible();
 
   // Tokens never go to localStorage; the tab keeps its session across a reload.
   expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(
     'test-refresh',
   );
   await page.reload();
-  await expect(page.getByText('Hi, New')).toBeVisible();
+  await expect(page.getByText('new@example.com')).toBeVisible();
 });
 
 test('sample case: server amounts, choosing an option, saving once with retry, saved plan after reload', async ({
