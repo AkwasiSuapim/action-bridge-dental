@@ -18,10 +18,9 @@ Each fact sits on one line, so the reader returns it whole and the assistant can
 - Benefit year 2026-01-01 to 2026-12-31: annual maximum $800, already paid $500, deductible $50 (none met yet).
 - Plan pays: preventive 100%, basic 80% after the deductible, major 50% after the deductible.
 
-**Expected results (live check, 2026-10-04, three runs in a row):**
-- Confirmations quoted from the documents, including the crown's timing window (November 12, 2026 to January 15, 2027).
-- Up to three quick questions (network, deductible applies, counts toward the maximum): answer In network / Yes / Yes.
-- One more: *"Will your plan renew on January 1, 2027 with the same yearly maximum ($800) and deductible ($50)?"* Answer **Yes, the same**.
+**Expected results (live check, 2026-10-04, three runs in a row after the latest deploy):**
+- Six confirmations quoted from the documents: coverage, benefit year, plan rules (including "after the deductible" and "the yearly maximum applies to basic and major"), and the three procedures, all in network, with the crown's timing window (November 12, 2026 to January 15, 2027).
+- One question: *"Will your plan renew on January 1, 2027 with the same yearly maximum ($800) and deductible ($50)?"* Answer **Yes, the same**.
 - **You pay $1,200** doing everything now, or **$725 with the crown in January (save $475)**. Self-pay total **$1,300**.
 
 ## Demo walkthrough (about 3 minutes)
