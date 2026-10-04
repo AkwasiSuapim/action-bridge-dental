@@ -241,6 +241,33 @@ Resources:
             Method: POST
             Path: /v1/cases/{caseId}/coverage-comparison
 
+  UploadBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      # Voice notes and documents are deleted by the worker after reading; this is the backstop.
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireUploads
+            Status: Enabled
+            Prefix: uploads/
+            ExpirationInDays: 1
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+
   JobDeadLetterQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -268,6 +295,7 @@ Resources:
           TABLE_NAME: !Ref CasesTable
           RETENTION_DAYS: !Ref RetentionDays
           JOB_QUEUE_URL: !Ref JobQueue
+          UPLOAD_BUCKET: !Ref UploadBucket
       Policies:
         - Statement:
             - Effect: Allow
@@ -278,7 +306,17 @@ Resources:
             - Effect: Allow
               Action: sqs:SendMessage
               Resource: !GetAtt JobQueue.Arn
+            # Signs presigned POST upload slots (S3 enforces size and type).
+            - Effect: Allow
+              Action: s3:PutObject
+              Resource: !Sub ${UploadBucket.Arn}/uploads/*
       Events:
+        CreateUpload:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /v1/cases/{caseId}/uploads
         CreateJob:
           Type: HttpApi
           Properties:
@@ -322,6 +360,7 @@ Resources:
           TABLE_NAME: !Ref CasesTable
           RETENTION_DAYS: !Ref RetentionDays
           BEDROCK_MODEL_ID: !Ref BedrockModelId
+          UPLOAD_BUCKET: !Ref UploadBucket
       Policies:
         - Statement:
             - Effect: Allow
@@ -341,6 +380,20 @@ Resources:
               Action:
                 - aws-marketplace:ViewSubscriptions
                 - aws-marketplace:Subscribe
+              Resource: '*'
+            # Reads (Transcribe/Textract use these permissions too) and deletes uploads after reading.
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:DeleteObject
+              Resource: !Sub ${UploadBucket.Arn}/uploads/*
+            # Transcription and text detection APIs do not support resource-level scoping.
+            - Effect: Allow
+              Action:
+                - transcribe:StartTranscriptionJob
+                - transcribe:GetTranscriptionJob
+                - transcribe:DeleteTranscriptionJob
+                - textract:DetectDocumentText
               Resource: '*'
       Events:
         Jobs:

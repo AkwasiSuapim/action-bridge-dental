@@ -27,7 +27,7 @@ const YES_NO: Choice[] = [
   { id: 'no', label: 'No', value: false },
 ];
 
-function specFor(fact: MissingFact, input: DentalCaseInput): Spec | null {
+export function specFor(fact: MissingFact, input: DentalCaseInput): Spec | null {
   const [root, id, field] = fact.fieldPath.split('.');
   const procedure = root === 'procedures' ? input.procedures.find((p) => p.id === id) : undefined;
   const name = procedure?.label ?? 'this procedure';

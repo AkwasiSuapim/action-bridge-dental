@@ -4,11 +4,13 @@
  */
 export const capabilities = {
   /** Press-to-record → private upload → Amazon Transcribe job (`transcribe_audio`). */
-  voice: false,
+  voice: true,
   /** Document picker → private upload → `analyze_document` job. */
-  upload: false,
+  upload: true,
   /** Camera photo of a document → same pipeline as upload. */
-  photo: false,
+  photo: true,
+  /** Describe in your own words → agent job (`interpret`) → confirm → adaptive questions. Live since Phase 5. */
+  assistant: true,
   /** Manual entry; works with today's API. */
   typing: true,
 } as const;

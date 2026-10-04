@@ -63,14 +63,33 @@ The fillings are planned for 2026-11-10 and 2026-11-11 and the crown for 2026-11
       const charges = procedures(r).map((p) => p.providerChargeCents ?? -1).sort((a, b) => a - b);
       // Whatever the agent could not quote must be asked, never guessed. Answer those questions as the
       // user would (write-off $0, services count toward the maximum), then check the calculator result.
-      const asked = r.missingAfter.map((m) => m.fieldPath);
-      const answerable = asked.every((p) => /contractualWriteoffCents$|annualMaximumAppliesByCategory\.|allowedCents$/.test(p));
-      for (const p of input.procedures) {
-        p.contractualWriteoffCents ??= 0;
-        p.allowedCents ??= p.providerChargeCents;
+      // Simulate the adaptive loop: each round the engine asks, the user answers from the description.
+      const answers: Record<string, (path: string) => void> = {
+        contractualWriteoffCents: (path) => setProcedure(path, 'contractualWriteoffCents', 0),
+        allowedCents: (path) => setProcedure(path, 'allowedCents', input.procedures.find((p) => p.id === path.split('.')[1])?.providerChargeCents ?? null),
+        deductibleAlreadyMetCents: (path) => {
+          const year = input.planYears[path.split('.')[1] as string];
+          if (year) year.deductibleAlreadyMetCents = 0; // "I haven't met it yet"
+        },
+      };
+      const setProcedure = (path: string, field: 'contractualWriteoffCents' | 'allowedCents', value: number | null) => {
+        const procedure = input.procedures.find((p) => p.id === path.split('.')[1]);
+        if (procedure) procedure[field] = value;
+      };
+      const asked: string[] = [];
+      let answerable = true;
+      let estimate = estimateCase(input);
+      for (let round = 0; round < 3 && estimate.status === 'needs_information'; round++) {
+        for (const fact of estimate.missing) {
+          asked.push(fact.fieldPath);
+          const field = fact.fieldPath.split('.').pop() as string;
+          if (answers[field]) answers[field](fact.fieldPath);
+          else if (fact.fieldPath.startsWith('policy.annualMaximumAppliesByCategory.') && input.policy) {
+            input.policy = { ...input.policy, annualMaximumAppliesByCategory: { ...input.policy.annualMaximumAppliesByCategory, [field]: true } };
+          } else answerable = false;
+        }
+        estimate = estimateCase(input);
       }
-      if (input.policy) input.policy = { ...input.policy, annualMaximumAppliesByCategory: { basic: true, major: true, ...input.policy.annualMaximumAppliesByCategory } };
-      const estimate = estimateCase(input);
       return [
         { name: 'three procedures with charges 250, 250, 1,000', ok: JSON.stringify(charges) === JSON.stringify([25000, 25000, 100000]) },
         { name: 'benefit year, rates and coverage recorded', ok: ['coverageMode', 'benefitYear', 'coverageRules'].every((k) => r.groups.some((g) => g.kind === k)) },

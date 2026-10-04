@@ -1,8 +1,9 @@
 import { jobRoutes } from '../src/features/agent-jobs/api/job-routes.js';
 import { runJob, type JobRunnerDeps } from '../src/features/agent-jobs/application/job-runner.js';
 import { JobService } from '../src/features/agent-jobs/application/job-service.js';
+import { UploadService } from '../src/features/agent-jobs/application/upload-service.js';
 import { InMemoryJobQueue, InMemoryJobRepository } from '../src/features/agent-jobs/infrastructure/in-memory.js';
-import { ModelError, type AgentModel, type ContentBlock, type ModelTurn } from '../src/features/agent-jobs/ports.js';
+import { ModelError, type AgentModel, type ContentBlock, type DocumentReader, type ModelTurn, type Transcriber, type UploadStore } from '../src/features/agent-jobs/ports.js';
 import { caseRoutes } from '../src/features/cases/api/case-routes.js';
 import { CaseService } from '../src/features/cases/application/case-service.js';
 import { estimateRoutes } from '../src/features/estimates/estimate-routes.js';
@@ -31,7 +32,7 @@ export const toolTurn = (name: string, input: unknown = {}, id = `t-${name}`): M
 export const textTurn = (text: string): ModelTurn => ({ stopReason: 'end_turn', content: [{ text }] });
 export const throttled = () => new ModelError('Model call failed: ThrottlingException', true);
 
-export function createAgentHarness(model: AgentModel) {
+export function createAgentHarness(model: AgentModel, inputs: { uploads?: UploadStore; transcriber?: Transcriber; reader?: DocumentReader } = {}) {
   let ids = 0;
   let tick = 0;
   let requests = 0;
@@ -41,8 +42,9 @@ export function createAgentHarness(model: AgentModel) {
   const queue = new InMemoryJobQueue();
   const cases = new CaseService({ repository: store, ...clock });
   const jobs = new JobService({ jobs: jobsRepo, queue, cases, maxAttempts: 3, ...clock });
-  const runner: JobRunnerDeps = { jobs: jobsRepo, cases: store, model, leaseMs: 120_000, ...clock };
-  const router = createRouter({ ...caseRoutes({ cases, authMode: 'demo' }), ...estimateRoutes({ cases, authMode: 'demo' }), ...jobRoutes({ jobs, authMode: 'demo' }) });
+  const runner: JobRunnerDeps = { jobs: jobsRepo, cases: store, model, leaseMs: 120_000, sleep: async () => {}, ...inputs, ...clock };
+  const uploads = inputs.uploads ? new UploadService({ cases, uploads: inputs.uploads, ...clock }) : undefined;
+  const router = createRouter({ ...caseRoutes({ cases, authMode: 'demo' }), ...estimateRoutes({ cases, authMode: 'demo' }), ...jobRoutes({ jobs, ...(uploads ? { uploads } : {}), authMode: 'demo' }) });
 
   return {
     store,

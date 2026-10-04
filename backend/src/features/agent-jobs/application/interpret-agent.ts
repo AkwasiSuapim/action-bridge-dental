@@ -66,6 +66,7 @@ export async function runInterpretAgent(args: {
   text: string;
   today: string;
   report: StageReporter;
+  source?: 'description' | 'document';
 }): Promise<InterpretResult> {
   const { model, input, text, today, report } = args;
   let groups: FactGroup[] = [];
@@ -86,7 +87,7 @@ export async function runInterpretAgent(args: {
     },
   ];
 
-  await report('reading_input', 'started', 'Reading your description');
+  await report('reading_input', 'started', args.source === 'document' ? 'Understanding your document' : 'Reading your description');
 
   for (let turn = 0; turn < MAX_MODEL_TURNS; turn++) {
     const reply = await model.converse({ system: SYSTEM, messages, tools: toolSpecs(), maxTokens: MAX_TOKENS });

@@ -10,6 +10,8 @@ const EnvSchema = z.object({
   JOB_QUEUE_URL: z.string().url().optional(),
   /** Bedrock model or inference profile ID, e.g. us.anthropic.claude-haiku-4-5-20251001-v1:0. */
   BEDROCK_MODEL_ID: z.string().min(1).optional(),
+  /** Private bucket for voice notes and documents (short lifecycle). */
+  UPLOAD_BUCKET: z.string().min(3).optional(),
 });
 
 export interface AppConfig {
@@ -19,6 +21,7 @@ export interface AppConfig {
   retentionDays: number | null;
   jobQueueUrl: string | null;
   bedrockModelId: string | null;
+  uploadBucket: string | null;
 }
 
 /** Fails closed: a missing or unknown setting is a configuration error, never a silent default. */
@@ -31,6 +34,7 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     retentionDays: parsed.RETENTION_DAYS ?? null,
     jobQueueUrl: parsed.JOB_QUEUE_URL ?? null,
     bedrockModelId: parsed.BEDROCK_MODEL_ID ?? null,
+    uploadBucket: parsed.UPLOAD_BUCKET ?? null,
   };
 }
 
@@ -42,3 +46,4 @@ function required<T>(value: T | null, name: string): T {
 export const requireTableName = (config: AppConfig) => required(config.tableName, 'TABLE_NAME');
 export const requireJobQueueUrl = (config: AppConfig) => required(config.jobQueueUrl, 'JOB_QUEUE_URL');
 export const requireBedrockModelId = (config: AppConfig) => required(config.bedrockModelId, 'BEDROCK_MODEL_ID');
+export const requireUploadBucket = (config: AppConfig) => required(config.uploadBucket, 'UPLOAD_BUCKET');
