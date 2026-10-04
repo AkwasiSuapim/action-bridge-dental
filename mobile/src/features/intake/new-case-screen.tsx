@@ -22,6 +22,7 @@ import {
   type MoneyDraft,
   type ProcedureDraft,
 } from './draft';
+import { useRecentCases } from '../activity/recent-cases';
 import { RulesFields } from './rules-fields';
 
 const COVERAGE_OPTIONS = [
@@ -49,6 +50,7 @@ const PLAN_AMOUNTS: { field: 'annualMaximum' | 'deductible' | 'alreadyPaid' | 'd
  */
 export function NewCaseScreen() {
   const api = useApi();
+  const { remember } = useRecentCases();
   const [draft, setDraft] = useState<CaseDraft>(() => emptyDraft(randomUUID()));
   const [errors, setErrors] = useState<DraftErrors>({});
   const [failure, setFailure] = useState<ApiError | null>(null);
@@ -70,6 +72,7 @@ export function NewCaseScreen() {
     setFailure(null);
     try {
       const { caseId } = await api.createCase(toCreateCaseRequest(draft, { now: () => new Date(), newId: randomUUID }));
+      await remember(caseId);
       router.replace(`/case/${caseId}/questions`);
     } catch (caught) {
       setFailure(asApiError(caught));

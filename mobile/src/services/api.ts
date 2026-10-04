@@ -54,6 +54,8 @@ export interface ApiClientOptions {
   timeoutMs?: number;
   sleep?: (ms: number) => Promise<void>;
   random?: () => number;
+  /** Called once per call that finds the session ended (no token or HTTP 401), before the error is thrown. */
+  onUnauthenticated?: () => void;
 }
 
 export function createApiClient({
@@ -63,7 +65,13 @@ export function createApiClient({
   timeoutMs = 15_000,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   random = Math.random,
+  onUnauthenticated,
 }: ApiClientOptions) {
+  const sessionEnded = (error: ApiError) => {
+    onUnauthenticated?.();
+    return error;
+  };
+
   async function once<S extends z.ZodType>(
     method: string,
     path: string,
@@ -72,7 +80,7 @@ export function createApiClient({
     extraHeaders: Record<string, string> = {},
   ): Promise<z.infer<S>> {
     const token = await getAccessToken();
-    if (!token) throw new ApiError('UNAUTHENTICATED', 'Your session ended. Sign in again.');
+    if (!token) throw sessionEnded(new ApiError('UNAUTHENTICATED', 'Your session ended. Sign in again.'));
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -95,7 +103,7 @@ export function createApiClient({
     const json: unknown = await response.json().catch(() => undefined);
 
     if (response.status === 401) {
-      throw new ApiError('UNAUTHENTICATED', 'Your session ended. Sign in again.', { status: 401, ...(requestId ? { requestId } : {}) });
+      throw sessionEnded(new ApiError('UNAUTHENTICATED', 'Your session ended. Sign in again.', { status: 401, ...(requestId ? { requestId } : {}) }));
     }
     if (!response.ok) {
       const envelope = ErrorEnvelopeSchema.safeParse(json);

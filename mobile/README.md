@@ -1,8 +1,20 @@
-# ActionBridge Dental — mobile foundation
+# ActionBridge Dental — mobile app
 
 Expo SDK 57 · React Native 0.86 · Expo Router · TypeScript. A separate npm project (own lockfile), not part of the root workspace.
 
-This is the **foundation** for the team's UI: configuration, Cognito sign-in, a typed live API client, theme tokens and accessible primitives, plus two placeholder screens (sign-in and a live connection check). Replace the screens; keep the services.
+The dental app UI (design v3, `actionbridge-dental-v3/`), built on the foundation services: Cognito sign-in, the typed live API client, theme tokens and accessible primitives. Every amount shown comes from the live API; nothing is simulated.
+
+| Flow | Route (`src/app/`) | Feature folder |
+|---|---|---|
+| Welcome, Sign in | `welcome`, `sign-in` | `features/auth` (hero image slot: `welcome-image.ts`) |
+| Home, My plan, Activity, Profile (tabs) | `(app)/(tabs)/…` | `features/home`, `features/activity`, `features/profile` |
+| New estimate (typed) → questions → coverage rules | `(app)/case/new`, `case/[caseId]/questions`, `…/rules` | `features/intake`, `features/case` |
+| Check your details → update a detail | `case/[caseId]/facts`, `…/edit` | `features/case` |
+| Your options → self-pay quotes | `case/[caseId]/options`, `…/self-pay` | `features/options` |
+| Plan details → sources | `case/[caseId]/plan`, `…/sources` | `features/plan` |
+| Review and save → saved + history | `case/[caseId]/review`, `…/saved` | `features/saved` |
+
+Not built yet, because their backend does not exist: voice, document upload and camera, agent progress, reminders, and data deletion. Home shows those inputs as "Coming soon".
 
 ## Run on a phone (Expo Go)
 

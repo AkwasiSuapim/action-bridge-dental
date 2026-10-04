@@ -11,6 +11,9 @@ import { useApi } from '../../services/api-context';
 import { ThemeProvider, useTheme } from '../../theme/theme';
 import { useFocusStatusBar } from '../../theme/status-bar';
 import { fonts, layout, space } from '../../theme/tokens';
+import { CaseCard } from '../activity/case-card';
+import { useRecentCases } from '../activity/recent-cases';
+import { useRefreshOnFocus } from '../activity/use-refresh-on-focus';
 import { sampleCaseRequest } from '../intake/sample-case';
 
 /**
@@ -42,6 +45,9 @@ export function HomeScreen() {
 function HomeBody() {
   const { colors } = useTheme();
   const api = useApi();
+  const { remember } = useRecentCases();
+  const { items, summaries } = useRefreshOnFocus();
+  const latest = items[0] ? summaries[items[0].caseId] : undefined;
   const [starting, setStarting] = useState(false);
   const [failure, setFailure] = useState<ApiError | null>(null);
 
@@ -52,6 +58,7 @@ function HomeBody() {
     setFailure(null);
     try {
       const { caseId } = await api.createCase(sampleCaseRequest());
+      await remember(caseId);
       router.push(`/case/${caseId}/facts`);
     } catch (caught) {
       setFailure(asApiError(caught));
@@ -86,6 +93,8 @@ function HomeBody() {
           {anyUnavailable ? 'Speaking, uploading and photos are coming soon. ' : ''}Photos are for documents like estimates, not your teeth.
         </AppText>
       </View>
+
+      {latest?.status === 'ok' ? <CaseCard summary={latest.summary} label="Continue your plan" /> : null}
 
       <Pressable
         accessibilityRole="button"
