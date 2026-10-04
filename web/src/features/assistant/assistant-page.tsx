@@ -3,6 +3,7 @@ import {
   plainSummary,
   spokenAnswer,
   spokenChoice,
+  spokenMoney,
   termFor,
   type AgentJobView,
   type MissingFieldBlock,
@@ -302,15 +303,20 @@ function Step({ job }: { job: AgentJobView }) {
   const submitRef = useRef(submit);
   submitRef.current = submit;
 
-  // Voice guidance: read the key words of each item, then listen for the answer and move on.
+  // Voice guidance: read the key words of each item, listen, confirm what was heard, move on.
   const voiceOn = useVoiceGuidance();
   const [voice, setVoice] = useState<'speaking' | 'listening' | 'tap' | null>(
     null,
   );
+  const [heardText, setHeardText] = useState<string | null>(null);
+  /** A short "Got it" spoken at the start of the next item, so the voice keeps flowing. */
+  const ack = useRef('');
   useEffect(() => {
     if (!voiceOn) return setVoice(null);
     let cancelled = false;
     const q = questions[index];
+    const lead = ack.current;
+    ack.current = '';
     const say = async (text: string) => {
       setVoice('speaking');
       await speak(api, text);
@@ -319,42 +325,56 @@ function Step({ job }: { job: AgentJobView }) {
     const hear = async () => {
       if (!canListen()) return null;
       setVoice('listening');
+      setHeardText(null);
       const heard = await listenOnce(6000);
+      if (!cancelled && heard) setHeardText(heard);
       return cancelled ? null : heard;
     };
     /** Asks, listens, and asks once more if the reply was unclear. */
     const ask = async <T,>(
       prompt: string,
       understand: (heard: string) => T | null,
-      retry: string,
+      retry: string | ((heard: string | null) => string),
     ): Promise<T | null> => {
       if (!(await say(prompt))) return null;
+      let heard: string | null = null;
       for (let attempt = 0; attempt < 2 && !cancelled; attempt++) {
-        if (attempt > 0 && !(await say(retry))) return null;
-        const heard = await hear();
+        if (attempt > 0) {
+          const again = typeof retry === 'function' ? retry(heard) : retry;
+          if (!(await say(again))) return null;
+        }
+        heard = await hear();
         const meaning = heard ? understand(heard) : null;
         if (meaning !== null) return meaning;
       }
       if (!cancelled) setVoice('tap');
       return null;
     };
+    const advance = (spoken: string) => {
+      ack.current = spoken;
+      setIndex((i) => i + 1);
+    };
     void (async () => {
       if (!q) {
         const go = await ask(
-          `Check before I use these. ${questions.length} items. Say continue to use them, or tap an item to change it.`,
+          `${lead}That’s everything. Say continue to use these, or tap an item to change it.`,
           (heard) => (spokenAnswer(heard) === 'yes' ? true : null),
           'Say continue, or tap an item to change it.',
         );
-        if (go && !cancelled) void submitRef.current();
+        if (go && !cancelled) {
+          await say('Great. Working out your estimate now.');
+          void submitRef.current();
+        }
         return;
       }
       const first =
         index === 0
-          ? `I found ${questions.filter((x) => x.inputType === 'fact_review').length || questions.length} things to check. `
+          ? `I found ${questions.length} ${questions.length === 1 ? 'thing' : 'things'} to check. `
           : '';
+      const opening = `${lead}${first}`;
       if (q.inputType === 'fact_review') {
         const answer = await ask(
-          `${first}${q.label.replace(/^Is this right\?\s*/, '')}: ${String(q.candidateValue ?? '')}. Is this right?`,
+          `${opening}${q.label.replace(/^Is this right\?\s*/, '')}: ${String(q.candidateValue ?? '')}. Is this right?`,
           spokenAnswer,
           'Sorry, I didn’t catch that. Say yes, or not right.',
         );
@@ -365,12 +385,18 @@ function Step({ job }: { job: AgentJobView }) {
               ? { kind: 'unknown' }
               : { kind: 'confirm', value: answer === 'yes' },
           );
-          setIndex((i) => i + 1);
+          advance(
+            answer === 'yes'
+              ? 'Got it. '
+              : answer === 'no'
+                ? 'Okay, I’ll leave that out. '
+                : 'No problem. ',
+          );
         }
       } else if (q.inputType === 'single_select') {
         const choices = q.options.map((o) => o.label).join(', or ');
         const answer = await ask(
-          `${first}${q.label} Say ${choices}${q.allowUnknown ? ', or I don’t know' : ''}.`,
+          `${opening}${q.label} Say ${choices}${q.allowUnknown ? ', or I don’t know' : ''}.`,
           (heard) =>
             spokenAnswer(heard) === 'unknown'
               ? ({ kind: 'unknown' } as Draft)
@@ -384,17 +410,54 @@ function Step({ job }: { job: AgentJobView }) {
         );
         if (answer && !cancelled) {
           set(q.questionId, answer);
-          setIndex((i) => i + 1);
+          const label =
+            answer.kind === 'choice'
+              ? q.options.find((o) => o.id === answer.optionId)?.label
+              : null;
+          advance(label ? `Got it: ${label}. ` : 'No problem. ');
+        }
+      } else if (q.inputType === 'currency') {
+        const max = q.maximumCents;
+        const answer = await ask(
+          `${opening}${q.label} Say the amount, for example two hundred dollars, or say I don’t know.`,
+          (heard) => {
+            if (spokenAnswer(heard) === 'unknown')
+              return { kind: 'unknown' } as Draft;
+            const cents = spokenMoney(heard);
+            if (cents === null || (max !== undefined && cents > max))
+              return null;
+            return { kind: 'text', text: (cents / 100).toFixed(2) } as Draft;
+          },
+          (heard) => {
+            const cents = heard ? spokenMoney(heard) : null;
+            return cents !== null && max !== undefined && cents > max
+              ? `That’s more than ${money(max)}, which this can’t be. Say the amount again.`
+              : 'Sorry, I didn’t catch the amount. Say it again, for example two hundred dollars.';
+          },
+        );
+        if (answer && !cancelled) {
+          // The spoken amount appears in the box while it's confirmed aloud, then moves on;
+          // Back returns to it for a correction.
+          set(q.questionId, answer);
+          if (answer.kind === 'text') {
+            if (
+              !(await say(
+                `Got it: ${money(Math.round(Number(answer.text) * 100))}.`,
+              ))
+            )
+              return;
+            setIndex((i) => i + 1);
+          } else advance('No problem. ');
         }
       } else {
         const answer = await ask(
-          `${first}${q.label} Type your answer, or say I don’t know.`,
+          `${opening}${q.label} Type the date, or say I don’t know.`,
           (heard) => (spokenAnswer(heard) === 'unknown' ? true : null),
-          'Type your answer, or say I don’t know.',
+          'Type the date, or say I don’t know.',
         );
         if (answer && !cancelled) {
           set(q.questionId, { kind: 'unknown' });
-          setIndex((i) => i + 1);
+          advance('No problem. ');
         }
       }
     })();
@@ -411,7 +474,7 @@ function Step({ job }: { job: AgentJobView }) {
     <div className="page narrow assistant-page">
       <div className="voice-row">
         <VoiceToggle />
-        {voice && <VoiceStatus state={voice} />}
+        {voice && <VoiceStatus state={voice} heard={heardText} />}
       </div>
       {index === 0 &&
         notices.map((n) => (
@@ -527,7 +590,13 @@ function Step({ job }: { job: AgentJobView }) {
 }
 
 /** What the voice is doing, so people always know when to speak. */
-function VoiceStatus({ state }: { state: 'speaking' | 'listening' | 'tap' }) {
+function VoiceStatus({
+  state,
+  heard,
+}: {
+  state: 'speaking' | 'listening' | 'tap';
+  heard: string | null;
+}) {
   return (
     <p className={`voice-status ${state}`} role="status" aria-live="polite">
       {state === 'speaking' && (
@@ -541,6 +610,9 @@ function VoiceStatus({ state }: { state: 'speaking' | 'listening' | 'tap' }) {
         </>
       )}
       {state === 'tap' && <>I didn’t catch that — tap your answer</>}
+      {heard && state !== 'listening' && (
+        <span className="voice-heard">I heard: “{heard}”</span>
+      )}
     </p>
   );
 }

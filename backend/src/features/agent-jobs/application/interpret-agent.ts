@@ -15,6 +15,8 @@ Rules:
 - Record only facts the description states. Copy the exact words as each quote. If a group's facts come from several places, join the exact fragments with " … " so the quote covers every value in the group. Every number you record, including a zero such as "no write-off", must appear in that group's quote, copied exactly. Never guess amounts, dates, network status or plan rules. Omit anything not stated.
 - Money is integer cents ($250 = 25000). Percentages are numbers (80% = 80).
 - Timing is flexible only if the description says the dentist allowed it; set timingStatedBy to "dentist" only then.
+- When the dentist says a procedure can be done between two dates (for example "can safely be done any time from 2026-11-12 to 2027-01-15" or "can wait until 2027-01-15"), record those dates on that same procedure as dentistEarliestDate and dentistLatestDate with timingStatedBy "dentist", and join that sentence into the procedure's quote with " … ". Treatment timing is never a plan restriction.
+- planRestrictions are only plan limits that actually apply: a waiting period, an exclusion, or a frequency limit such as "one crown per tooth every 5 years". Never record a sentence that says no limit applies, and never record treatment timing or dates as a restriction.
 - Never judge whether treatment is necessary or safe to delay. Never compute costs yourself: the calculator does that.
 
 Steps: call record_case_facts once with everything you found, then check_missing_facts. If nothing is missing you may call calculate_estimate. Finish with one or two plain sentences saying what you found and what is still needed. Do not state any dollar amounts in that final message.`;

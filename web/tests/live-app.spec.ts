@@ -96,10 +96,14 @@ test('sample case: server amounts, choosing an option, saving once with retry, s
   await expect(page.locator('.meaning-card')).toContainText('$475 less');
   await expect(cards.nth(1)).toContainText('Save $475');
   await expect(page.locator('.benefits-left')).toContainText('$300');
+  // Reminder: Google Calendar with the event filled in, or a calendar file for Apple/Outlook.
+  const google = page.getByRole('link', { name: 'Add to Google Calendar' });
+  await expect(google).toHaveAttribute(
+    'href',
+    /^https:\/\/calendar\.google\.com\/calendar\/render\?action=TEMPLATE&text=Use\+your\+dental\+benefits/,
+  );
   const download = page.waitForEvent('download');
-  await page
-    .getByRole('button', { name: 'Remind me before they reset' })
-    .click();
+  await page.getByRole('button', { name: 'Apple or Outlook calendar' }).click();
   expect((await download).suggestedFilename()).toBe(
     'dental-benefits-reminder.ics',
   );

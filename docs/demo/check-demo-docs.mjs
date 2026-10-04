@@ -64,7 +64,9 @@ for (let round = 1; round <= 6; round++) {
     } else {
       console.log(`   ask (${b.inputType}): ${b.label} [${b.fieldPath}] options: ${b.options.map((o) => o.label).join(' / ')}`);
       // Answer as a demo presenter would: the first option ("In network", "Yes"); unknown for amounts.
-      answers.push(b.inputType === 'single_select' ? { questionId: b.questionId, value: b.options[0].id, unknown: false, responseMode: 'tap', attachmentId: null } : { questionId: b.questionId, value: null, unknown: true, responseMode: 'tap', attachmentId: null });
+      // Money: the value printed in the demo documents (deductible met $0); otherwise unknown.
+      const typed = b.inputType === 'currency' && /deductibleAlreadyMet/.test(b.fieldPath) ? 0 : null;
+      answers.push(b.inputType === 'single_select' ? { questionId: b.questionId, value: b.options[0].id, unknown: false, responseMode: 'tap', attachmentId: null } : typed !== null ? { questionId: b.questionId, value: typed, unknown: false, responseMode: 'type', attachmentId: null } : { questionId: b.questionId, value: null, unknown: true, responseMode: 'tap', attachmentId: null });
     }
   }
   const next = await call('POST', `/v1/jobs/${job.jobId}/answers`, { expectedRevision: job.caseRevision, answers });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GLOSSARY, jobSteps, speakable, spokenAnswer, spokenChoice, termFor, type JobStageEvent } from '../src/index.js';
+import { GLOSSARY, jobSteps, speakable, spokenAnswer, spokenChoice, spokenMoney, termFor, type JobStageEvent } from '../src/index.js';
 
 describe('plain-language terms', () => {
   it('explains the fields people ask about, from field paths and grouped questions', () => {
@@ -79,5 +79,18 @@ describe('voice guidance', () => {
     expect(spokenChoice('out of network', options)).toBe('out');
     expect(spokenChoice('it is in network', options)).toBe('in');
     expect(spokenChoice('maybe', options)).toBeNull();
+  });
+});
+
+describe('spoken amounts', () => {
+  it('turns what people say into cents', () => {
+    expect(spokenMoney('$500')).toBe(50000);
+    expect(spokenMoney('1,200 dollars')).toBe(120000);
+    expect(spokenMoney('about 250.50')).toBe(25050);
+    expect(spokenMoney('two hundred fifty dollars')).toBe(25000);
+    expect(spokenMoney('one thousand two hundred')).toBe(120000);
+    expect(spokenMoney('fifty')).toBe(5000);
+    expect(spokenMoney('nothing yet')).toBe(0);
+    expect(spokenMoney('I am not sure')).toBeNull();
   });
 });
