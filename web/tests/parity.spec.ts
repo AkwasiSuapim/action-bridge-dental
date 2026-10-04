@@ -1,16 +1,13 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import {
+  TEST_EMAIL,
+  TEST_PASSWORD,
+  login,
+  mockCognito,
+  signInForm,
+} from './auth-helpers';
 
-async function login(page: Page) {
-  await page.goto('/login');
-  await page.getByRole('button', { name: 'Fill demo credentials' }).click();
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(
-    page.getByRole('heading', {
-      name: "Let's make sense of your dental costs.",
-    }),
-  ).toBeVisible();
-}
 async function compare(page: Page) {
   await page.getByRole('button', { name: 'Try a sample case' }).click();
   await page.getByRole('button', { name: 'Confirm and compare' }).click();
@@ -328,13 +325,20 @@ test('date, conflicting deductible and missing-document questions are navigable'
 test('first sign-in challenge validates passwords without persisting them', async ({
   page,
 }) => {
-  await page.goto('/login');
-  await page
-    .getByRole('button', { name: 'Preview first-sign-in password change' })
-    .click();
+  await mockCognito(page, { newPassword: true });
+  await page.goto('/sign-in');
+  await signInForm(page, TEST_EMAIL, TEST_PASSWORD);
   await page.getByLabel('New password', { exact: true }).fill('short');
   await page.getByRole('button', { name: 'Set password and continue' }).click();
-  await expect(page.getByText(/Use at least 12 characters/)).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText('At least 12 characters');
+  await page
+    .getByLabel('New password', { exact: true })
+    .fill('newdemopassword12');
+  await page
+    .getByLabel('Confirm password', { exact: true })
+    .fill('newdemopassword12');
+  await page.getByRole('button', { name: 'Set password and continue' }).click();
+  await expect(page.getByRole('alert')).toContainText('upper and lower case');
   await page
     .getByLabel('New password', { exact: true })
     .fill('NewDemoPassword12!');
@@ -347,9 +351,11 @@ test('first sign-in challenge validates passwords without persisting them', asyn
       name: "Let's make sense of your dental costs.",
     }),
   ).toBeVisible();
-  expect(
-    await page.evaluate(() => localStorage.getItem('actionbridge.web.demo.v1')),
-  ).not.toContain('NewDemoPassword12!');
+  const stored = await page.evaluate(
+    () => JSON.stringify(localStorage) + JSON.stringify(sessionStorage),
+  );
+  expect(stored).not.toContain('NewDemoPassword12!');
+  expect(stored).not.toContain(TEST_PASSWORD);
 });
 
 for (const width of [1280, 390])
