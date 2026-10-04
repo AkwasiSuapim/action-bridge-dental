@@ -1,6 +1,12 @@
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, type S3Client } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
-import { DetectDocumentTextCommand, type TextractClient } from '@aws-sdk/client-textract';
+import {
+  DetectDocumentTextCommand,
+  GetDocumentTextDetectionCommand,
+  StartDocumentTextDetectionCommand,
+  type Block,
+  type TextractClient,
+} from '@aws-sdk/client-textract';
 import {
   DeleteTranscriptionJobCommand,
   GetTranscriptionJobCommand,
@@ -86,11 +92,61 @@ export class AwsTranscriber implements Transcriber {
 }
 
 /** Amazon Textract synchronous text detection (single-page PDF, JPEG or PNG). */
+/** Pages read from a multi-page PDF; estimates and benefit summaries put the numbers up front. */
+export const MAX_PDF_PAGES = 5;
+
+/**
+ * Text lines of an image or PDF. Images and single-page PDFs use the instant API; a multi-page PDF
+ * (which that API rejects) falls back to the asynchronous API, reading the first pages within a
+ * time budget so the worker always finishes.
+ */
 export class TextractReader implements DocumentReader {
-  constructor(private readonly client: TextractClient) {}
+  constructor(
+    private readonly client: Pick<TextractClient, 'send'>,
+    private readonly options: { sleep?: (ms: number) => Promise<void>; now?: () => number; maxWaitMs?: number } = {},
+  ) {}
 
   async readLines(bucket: string, key: string) {
-    const output = await this.client.send(new DetectDocumentTextCommand({ Document: { S3Object: { Bucket: bucket, Name: key } } }));
-    return (output.Blocks ?? []).filter((b) => b.BlockType === 'LINE' && b.Text).map((b) => b.Text as string);
+    const S3Object = { Bucket: bucket, Name: key };
+    try {
+      const output = await this.client.send(new DetectDocumentTextCommand({ Document: { S3Object } }));
+      return lines(output.Blocks);
+    } catch (error) {
+      if (!(error instanceof Error && error.name === 'UnsupportedDocumentException')) throw error;
+    }
+    const sleep = this.options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+    const now = this.options.now ?? Date.now;
+    const deadline = now() + (this.options.maxWaitMs ?? 35_000);
+    const { JobId } = await this.client.send(new StartDocumentTextDetectionCommand({ DocumentLocation: { S3Object } }));
+    for (;;) {
+      await sleep(1500);
+      const first = await this.client.send(new GetDocumentTextDetectionCommand({ JobId, MaxResults: 1000 }));
+      if (first.JobStatus === 'FAILED') throw named('UnsupportedDocumentException', first.StatusMessage ?? 'Textract could not read the document');
+      if (first.JobStatus === 'SUCCEEDED' || first.JobStatus === 'PARTIAL_SUCCESS') {
+        const found = lines(first.Blocks);
+        let token = first.NextToken;
+        let lastPage = Math.max(0, ...(first.Blocks ?? []).map((b) => b.Page ?? 0));
+        while (token && lastPage < MAX_PDF_PAGES) {
+          const next = await this.client.send(new GetDocumentTextDetectionCommand({ JobId, MaxResults: 1000, NextToken: token }));
+          found.push(...lines(next.Blocks));
+          lastPage = Math.max(lastPage, ...(next.Blocks ?? []).map((b) => b.Page ?? 0));
+          token = next.NextToken;
+        }
+        return found;
+      }
+      if (now() > deadline) throw named('TextractTimeout', 'Reading the document took too long');
+    }
+
+    function lines(blocks: Block[] | undefined): string[] {
+      return (blocks ?? [])
+        .filter((b) => b.BlockType === 'LINE' && b.Text && (b.Page ?? 1) <= MAX_PDF_PAGES)
+        .map((b) => b.Text as string);
+    }
   }
+}
+
+function named(name: string, message: string): Error {
+  const error = new Error(message);
+  error.name = name;
+  return error;
 }

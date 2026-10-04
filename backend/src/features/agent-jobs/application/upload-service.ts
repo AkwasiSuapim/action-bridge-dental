@@ -5,7 +5,7 @@ import { uploadKey, type UploadStore } from '../ports.js';
 const SLOT_SECONDS = 300;
 
 /**
- * Issues a short-lived, private upload slot for a voice note or a one-page document (doc 03 §7).
+ * Issues a short-lived, private upload slot for a voice note or a document; multi-page PDFs are read up to the first 5 pages (doc 03 §7).
  * The key is derived from the authenticated owner, so an upload ID alone can reach nothing.
  */
 export class UploadService {

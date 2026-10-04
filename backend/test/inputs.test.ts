@@ -188,13 +188,13 @@ describe('U-06 documents and photos: read → same verified assistant', () => {
     expect(record.sourceFacts.find((f: { fieldPath: string }) => f.fieldPath === 'procedures.proc-1')).toMatchObject({ sourceId: `upload-${uploadId}`, origin: 'agent_proposed' });
   });
 
-  it('a multi-page document asks for one page at a time', async () => {
+  it('a document Textract cannot read gets a clear way forward', async () => {
     const store = new FakeUploads();
     const error = Object.assign(new Error('multi-page'), { name: 'UnsupportedDocumentException' });
     const h = createAgentHarness(new ScriptedModel([]), { uploads: store, reader: reader(error) });
     const caseId = await caseFor(h);
     const uploadId = await uploaded(h, store, caseId, 'document', 'application/pdf', PDF);
-    expect(await startJob(h, caseId, 'analyze_document', uploadId)).toMatchObject({ status: 'failed', error: { message: expect.stringContaining('one page at a time') } });
+    expect(await startJob(h, caseId, 'analyze_document', uploadId)).toMatchObject({ status: 'failed', error: { message: expect.stringContaining('Take a photo') } });
     expect(store.objects.size).toBe(0);
   });
 

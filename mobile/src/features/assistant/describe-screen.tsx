@@ -304,7 +304,7 @@ export function DescribeScreen() {
               </AppText>
             ))}
             <AppText variant="caption" muted>
-              Anything you leave out, I’ll ask about. Photos are for documents like estimates, not your teeth — one page each, up to {MAX_ATTACHMENTS}.
+              Anything you leave out, I’ll ask about. Photos are for documents like estimates, not your teeth — up to {MAX_ATTACHMENTS} files; for long PDFs I read the first 5 pages.
             </AppText>
           </View>
         ) : null}

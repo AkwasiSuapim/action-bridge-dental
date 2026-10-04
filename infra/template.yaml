@@ -420,6 +420,9 @@ Resources:
                 - transcribe:GetTranscriptionJob
                 - transcribe:DeleteTranscriptionJob
                 - textract:DetectDocumentText
+                # Multi-page PDFs: the asynchronous text-detection API (first pages only).
+                - textract:StartDocumentTextDetection
+                - textract:GetDocumentTextDetection
               Resource: '*'
       Events:
         Jobs:

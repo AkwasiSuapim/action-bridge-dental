@@ -69,7 +69,7 @@ export interface Transcriber {
 }
 
 export interface DocumentReader {
-  /** Text lines of a single-page PDF or image. */
+  /** Text lines of an image or PDF (the first pages of a multi-page PDF). */
   readLines(bucket: string, key: string): Promise<string[]>;
 }
 
