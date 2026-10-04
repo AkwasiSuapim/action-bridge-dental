@@ -1,3 +1,4 @@
+import { termFor } from '@actionbridge/contracts';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AlertTriangle, ChevronDown, ChevronUp, Pencil } from 'lucide-react-native';
 import { useState } from 'react';
@@ -122,6 +123,11 @@ function FactRowView({ row, first, caseId, sample }: { row: FactRow; first: bool
           {row.label}
         </AppText>
         <AppText style={{ fontFamily: fonts.semibold }}>{row.value}</AppText>
+        {termFor(row.key) ? (
+          <AppText variant="caption" muted>
+            {termFor(row.key)!.definition}
+          </AppText>
+        ) : null}
         {showBadge ? <FactBadge source={row.source} /> : null}
       </View>
       {row.editPath ? (
