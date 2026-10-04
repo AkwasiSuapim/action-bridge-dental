@@ -71,7 +71,17 @@ function SavedBody() {
   };
 
   return (
-    <Screen headerless>
+    <Screen
+      headerless
+      footer={
+        <>
+          {scenario ? (
+            <Button label="View plan" onPress={() => router.push({ pathname: '/case/[caseId]/plan', params: { caseId: record.caseId, scenario: scenario.scenarioId } })} />
+          ) : null}
+          <Button label="Back to Home" variant={scenario ? 'ghost' : 'primary'} onPress={() => router.dismissTo('/')} />
+        </>
+      }
+    >
       <View style={{ alignItems: 'center', gap: space(3), paddingTop: space(4) }}>
         <AgentOrb size={120} mode="success" />
         <AppText variant="title" accessibilityRole="header" style={{ textAlign: 'center' }}>
@@ -136,16 +146,6 @@ function SavedBody() {
         )}
       </View>
 
-      <View style={{ gap: space(2) }}>
-        {scenario ? (
-          <Button
-            label="View plan"
-            variant="secondary"
-            onPress={() => router.push({ pathname: '/case/[caseId]/plan', params: { caseId: record.caseId, scenario: scenario.scenarioId } })}
-          />
-        ) : null}
-        <Button label="Back to Home" variant="ghost" onPress={() => router.dismissTo('/')} />
-      </View>
     </Screen>
   );
 }

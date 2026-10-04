@@ -93,5 +93,49 @@ for (const e of view?.events ?? []) console.log(`      event ${e.sequence}: ${e.
 for (const b of confirmations) console.log(`      confirm: ${b.candidateValue}\n               ${b.reason}`);
 if (view?.status === 'failed') console.log(`      error: ${view.error?.message}`);
 
+// Composer: the user's words plus two pages, analysed once (interpret with documentIds).
+const PLAN_PDF = samplePdf([
+  'SAMPLE - Fictional Dental Plan - Benefits Summary',
+  'Major services covered at 50%',
+  'Annual maximum $1,500.00',
+]);
+async function uploadPdf(targetCaseId, bytes, name) {
+  const s = await call('POST', `/v1/cases/${targetCaseId}/uploads`, { kind: 'document', mimeType: 'application/pdf', sizeBytes: bytes.length });
+  if (s.status !== 201) return null;
+  const f = new FormData();
+  for (const [k, v] of Object.entries(s.body.fields)) f.append(k, v);
+  f.append('file', new Blob([bytes], { type: 'application/pdf' }), name);
+  const r = await fetch(s.body.url, { method: 'POST', body: f });
+  return r.status >= 200 && r.status < 300 ? s.body.uploadId : null;
+}
+const composerCase = await call('POST', '/v1/cases', { currency: 'USD', coverageMode: 'unknown', policy: null, planYears: {}, procedures: [] });
+const composerCaseId = composerCase.body?.caseId;
+const uploadIds = [await uploadPdf(composerCaseId, PDF, 'estimate.pdf'), await uploadPdf(composerCaseId, PLAN_PDF, 'plan.pdf')].filter(Boolean);
+check('composer: two PDFs uploaded as draft attachments', uploadIds.length === 2, `${uploadIds.length} uploaded`);
+const composer = await call('POST', `/v1/cases/${composerCaseId}/jobs`, {
+  expectedRevision: 1,
+  operation: 'interpret',
+  input: { text: 'I have dental insurance through work. My dentist says the crown can wait until early next year.', documentIds: uploadIds },
+});
+check('composer: one interpret job for text + 2 PDFs', composer.status === 202, `status ${composer.status}`);
+const composerStarted = Date.now();
+let composerView;
+for (;;) {
+  composerView = (await call('GET', `/v1/jobs/${composer.body.jobId}`)).body;
+  if (!['queued', 'running'].includes(composerView?.status) || Date.now() - composerStarted > 90_000) break;
+  await new Promise((r) => setTimeout(r, 1500));
+}
+const composerConfirms = composerView?.questions?.blocks?.filter((b) => b.inputType === 'fact_review') ?? [];
+const fromWords = composerConfirms.filter((b) => b.reason.startsWith('From your description')).length;
+const fromDocs = composerConfirms.filter((b) => b.reason.startsWith('From your document')).length;
+check(
+  'composer: confirmations cite both the words and the documents',
+  composerView?.status === 'needs_information' && fromWords > 0 && fromDocs > 0,
+  `${composerView?.status}, ${fromWords} from words, ${fromDocs} from documents, ${Date.now() - composerStarted} ms`,
+);
+for (const e of composerView?.events ?? []) console.log(`      event ${e.sequence}: ${e.stage} ${e.status} — ${e.summary}`);
+for (const b of composerConfirms) console.log(`      confirm: ${b.candidateValue}\n               ${b.reason}`);
+if (composerView?.status === 'failed') console.log(`      error: ${composerView.error?.message}`);
+
 console.log(failures === 0 ? '\nAll input smoke checks passed.' : `\n${failures} input smoke check(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);

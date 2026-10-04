@@ -208,3 +208,101 @@ describe('U-06 documents and photos: read → same verified assistant', () => {
     expect(job.resultBlocks.blocks[0]).toMatchObject({ title: 'I couldn’t read this document', body: expect.stringContaining('Retake') });
   });
 });
+
+describe('composer: one analysis over the user’s words and several pages', () => {
+  const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0]);
+  /** Returns different text per uploaded file, keyed by the upload ID at the end of the S3 key. */
+  const keyedReader = (pages: Record<string, string[]>): DocumentReader => ({
+    readLines: async (_bucket, key) => pages[key.split('/').pop() ?? ''] ?? [],
+  });
+
+  async function composerJob(h: ReturnType<typeof createAgentHarness>, caseId: string, text: string, documentIds: string[]) {
+    const job = await h.call('POST /v1/cases/{caseId}/jobs', { caseId }, { expectedRevision: 1, operation: 'interpret', input: { text, documentIds } });
+    expect(job.status).toBe(202);
+    await h.drain();
+    return (await h.call('GET /v1/jobs/{jobId}', { jobId: job.body.jobId })).body;
+  }
+
+  it('reads every page, runs the agent once, and cites each confirmation from where it was found', async () => {
+    const store = new FakeUploads();
+    const pages: Record<string, string[]> = {};
+    const model = new ScriptedModel([
+      toolTurn('record_case_facts', {
+        coverageMode: { value: 'insured', quote: 'I have dental insurance' },
+        procedures: [{ label: 'Crown', category: 'major', providerChargeCents: 100000, quote: 'Crown (D2740) fee $1,000.00' }],
+      }),
+      textTurn('I found your coverage and one procedure.'),
+    ]);
+    const h = createAgentHarness(model, { uploads: store, reader: keyedReader(pages) });
+    const caseId = await caseFor(h);
+    const first = await uploaded(h, store, caseId, 'document', 'application/pdf', PDF);
+    const second = await uploaded(h, store, caseId, 'document', 'image/jpeg', JPEG);
+    pages[first] = ['Benefits summary', 'Major services covered at 50 percent'];
+    pages[second] = ['Treatment estimate', 'Crown (D2740) fee $1,000.00'];
+
+    const job = await composerJob(h, caseId, 'I have dental insurance and my dentist wants a crown.', [first, second]);
+
+    expect(job.status).toBe('needs_information');
+    expect(model.requests[0]?.messages[0]?.content[0]).toMatchObject({ text: expect.stringContaining('Document 2:\nTreatment estimate') });
+    const confirms = job.questions.blocks.filter((b: { inputType?: string }) => b.inputType === 'fact_review');
+    expect(confirms.map((c: { reason: string }) => c.reason)).toEqual([
+      'From your description: “I have dental insurance”',
+      'From your document: “Crown (D2740) fee $1,000.00”',
+    ]);
+    expect(job.events.map((e: { summary: string }) => e.summary)).toEqual(expect.arrayContaining(['Reading document 1', 'Reading document 2']));
+    expect(store.objects.size).toBe(0);
+
+    await h.call('POST /v1/jobs/{jobId}/answers', { jobId: job.jobId }, {
+      expectedRevision: 1,
+      answers: confirms.map((c: { questionId: string }) => ({ questionId: c.questionId, value: true, unknown: false, responseMode: 'tap', attachmentId: null })),
+    });
+    const facts = (await h.call('GET /v1/cases/{caseId}', { caseId })).body.sourceFacts as { fieldPath: string; sourceId: string | null }[];
+    expect(facts.find((f) => f.fieldPath === 'coverageMode')?.sourceId).toBe('user-description');
+    expect(facts.find((f) => f.fieldPath === 'procedures.proc-1')?.sourceId).toBe(`upload-${second}`);
+  });
+
+  it('skips an unreadable page with a notice and still analyses the rest', async () => {
+    const store = new FakeUploads();
+    const pages: Record<string, string[]> = {};
+    const model = new ScriptedModel([
+      toolTurn('record_case_facts', { procedures: [{ label: 'Crown', category: 'major', quote: 'a crown' }] }),
+      textTurn('One procedure.'),
+    ]);
+    const h = createAgentHarness(model, { uploads: store, reader: keyedReader(pages) });
+    const caseId = await caseFor(h);
+    const blurry = await uploaded(h, store, caseId, 'document', 'image/jpeg', JPEG);
+    const job = await composerJob(h, caseId, 'My dentist recommends a crown.', [blurry]);
+    expect(job.status).toBe('needs_information');
+    expect(job.questions.blocks).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'notice', title: 'I couldn’t read Document 1' })]));
+    expect(store.objects.size).toBe(0);
+  });
+
+  it('only unreadable pages and no words: an honest notice, no model call', async () => {
+    const store = new FakeUploads();
+    const model = new ScriptedModel([]);
+    const h = createAgentHarness(model, { uploads: store, reader: keyedReader({}) });
+    const caseId = await caseFor(h);
+    const blurry = await uploaded(h, store, caseId, 'document', 'image/jpeg', JPEG);
+    const job = await composerJob(h, caseId, '', [blurry]);
+    expect(job).toMatchObject({ status: 'completed', resultBlocks: { blocks: [{ title: 'I couldn’t read your documents' }] } });
+    expect(model.requests).toHaveLength(0);
+  });
+
+  it('a page that is not a document fails the job and names which one', async () => {
+    const store = new FakeUploads();
+    const h = createAgentHarness(new ScriptedModel([]), { uploads: store, reader: keyedReader({}) });
+    const caseId = await caseFor(h);
+    const ok = await uploaded(h, store, caseId, 'document', 'application/pdf', PDF);
+    const bad = await uploaded(h, store, caseId, 'document', 'image/png', new Uint8Array(Buffer.from('<html>')));
+    const job = await composerJob(h, caseId, 'A crown.', [ok, bad]);
+    expect(job).toMatchObject({ status: 'failed', error: { code: 'BAD_REQUEST', message: expect.stringMatching(/^Document 2: /) } });
+    expect(store.objects.size).toBe(0);
+  });
+
+  it('accepts at most three pages', async () => {
+    const h = createAgentHarness(new ScriptedModel([]), { uploads: new FakeUploads() });
+    const caseId = await caseFor(h);
+    const ids = ['a1', 'a2', 'a3', 'a4'];
+    expect((await h.call('POST /v1/cases/{caseId}/jobs', { caseId }, { expectedRevision: 1, operation: 'interpret', input: { text: 'x', documentIds: ids } })).status).toBe(400);
+  });
+});

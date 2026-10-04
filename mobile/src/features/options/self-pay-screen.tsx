@@ -1,13 +1,11 @@
 import type { DentalCase } from '@actionbridge/contracts';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { AccessibilityInfo, Pressable, View } from 'react-native';
+import { AccessibilityInfo } from 'react-native';
 import { ErrorNotice, ErrorState, LoadingState } from '../../components/states';
-import { AppText, Button, Notice, Screen, TextField } from '../../components/ui';
+import { AppText, Button, Checkbox, Notice, Screen, TextField } from '../../components/ui';
 import { asApiError, type ApiError } from '../../services/api';
 import { useApi } from '../../services/api-context';
-import { useTheme } from '../../theme/theme';
-import { layout, space } from '../../theme/tokens';
 import { useCase } from '../case/case-store';
 import { localToday, quoteTexts, selfPayChanges } from './self-pay';
 
@@ -22,7 +20,6 @@ export function SelfPayScreen() {
 
 function SelfPayForm({ record, reload }: { record: DentalCase; reload: () => Promise<unknown> }) {
   const api = useApi();
-  const { colors } = useTheme();
   const [texts, setTexts] = useState(() => quoteTexts(record));
   const [scopeConfirmed, setScopeConfirmed] = useState(record.procedures.some((p) => p.selfPayQuote));
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -60,10 +57,7 @@ function SelfPayForm({ record, reload }: { record: DentalCase; reload: () => Pro
 
   return (
     <Screen footer={<Button label="Save quotes" onPress={save} loading={busy} />}>
-      <View style={{ gap: space(2) }}>
-        <AppText variant="title">Self-pay quotes</AppText>
-        <AppText muted>Use the written cash price from your dentist’s office.</AppText>
-      </View>
+      <AppText muted>Use the written cash price from your dentist’s office.</AppText>
       {notice ? <Notice tone="warning" title={notice} /> : null}
       {failure ? <ErrorNotice error={failure} /> : null}
 
@@ -79,17 +73,7 @@ function SelfPayForm({ record, reload }: { record: DentalCase; reload: () => Pro
         />
       ))}
 
-      <Pressable
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: scopeConfirmed }}
-        onPress={() => setScopeConfirmed((value) => !value)}
-        style={{ flexDirection: 'row', gap: space(3), alignItems: 'center', minHeight: layout.minHitArea }}
-      >
-        <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.primary, backgroundColor: scopeConfirmed ? colors.primary : 'transparent' }} />
-        <AppText variant="caption" style={{ flex: 1 }}>
-          Each quote covers the same service as the treatment estimate.
-        </AppText>
-      </Pressable>
+      <Checkbox label="Each quote covers the same service as the treatment estimate." checked={scopeConfirmed} onChange={setScopeConfirmed} />
       {errors.scope ? <Notice tone="danger" title={errors.scope} /> : null}
     </Screen>
   );

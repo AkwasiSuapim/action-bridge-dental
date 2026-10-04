@@ -49,6 +49,8 @@ export const CreateJobRequestSchema = z.strictObject({
   input: z.strictObject({
     text: z.string().max(8000).optional(),
     documentId: IdSchema.optional(),
+    /** For `interpret`: up to three uploaded pages read together with the text, in one analysis. */
+    documentIds: z.array(IdSchema).max(3).optional(),
   }),
 });
 

@@ -13,7 +13,7 @@ import { expiresAtFrom } from '../../../shared/dynamo.js';
 import { logEvent } from '../../../shared/logger.js';
 import { toEngineInput } from '../../cases/application/case-service.js';
 import type { CaseRepository } from '../../cases/ports/case-repository.js';
-import type { FactGroup } from '../domain/extraction.js';
+import { verifiedQuote, type FactGroup } from '../domain/extraction.js';
 import { nextStepItems, planStep } from '../domain/adaptive.js';
 import { ModelError, uploadKey, type AgentModel, type DocumentReader, type JobRecord, type JobRepository, type Transcriber, type UploadStore } from '../ports.js';
 import { explainComparison } from './explain.js';
@@ -81,27 +81,52 @@ export async function runJob(deps: JobRunnerDeps, message: { ownerId: string; jo
       return 'completed';
     }
 
-    let text = job.inputText;
-    let source: 'description' | 'document' = 'description';
+    // Everything the user shared: their own words and any uploaded pages (each read, then deleted).
+    const words = job.inputText?.trim() ?? '';
+    const docs: { id: string; label: string; text: string }[] = [];
+    const unreadable: string[] = [];
     if (job.operation === 'analyze_document') {
-      text = await readDocument();
-      if (text === null) return 'completed';
-      source = 'document';
+      const read = await readDocument(job.documentId ?? '', '', false);
+      if (read === null || read === UNREADABLE) return 'completed';
+      docs.push({ id: job.documentId ?? '', label: '', text: read });
     }
+    for (const [index, id] of (job.documentIds ?? []).entries()) {
+      const label = `Document ${index + 1}`;
+      const read = await readDocument(id, label, true);
+      if (read === null) return 'completed';
+      if (read === UNREADABLE) unreadable.push(label);
+      else docs.push({ id, label, text: read });
+    }
+    const text = [words, ...docs.map((d) => (d.label ? `${d.label}:\n${d.text}` : d.text))].filter(Boolean).join('\n\n');
+    const unreadableNotice: UiBlock[] =
+      unreadable.length > 0
+        ? [notice('warning', `I couldn’t read ${unreadable.join(' and ')}`, 'It may be blurry or cut off. Retake it in good light, upload a PDF, or add the details in your own words.')]
+        : [];
 
     if (text) {
+      const source = words ? 'description' : 'document';
       const result = await runInterpretAgent({ model: deps.model, input, text, today: deps.now().toISOString().slice(0, 10), report, source });
+      for (const group of result.groups) {
+        // Attribute each confirmation to where its verified quote actually appears.
+        const doc = docs.find((d) => verifiedQuote(group.quote, d.text) !== null);
+        if (words && verifiedQuote(group.quote, words) !== null) Object.assign(group, { source: 'description', sourceId: 'user-description' });
+        else if (doc) Object.assign(group, { source: 'document', sourceId: `upload-${doc.id}` });
+      }
       if (result.groups.length > 0) {
         await report('preparing_explanation', 'completed', 'Ready for you to confirm');
-        const questions = envelope(job.caseRevision, [...confirmationBlocks(result.groups, job.caseRevision, source), foundNotice(result)]);
+        const questions = envelope(job.caseRevision, [...confirmationBlocks(result.groups, job.caseRevision, source), foundNotice(result), ...unreadableNotice].slice(0, 10));
         await finish('needs_information', questions, null, null, result.groups);
         return 'completed';
       }
+    } else if (unreadable.length > 0) {
+      // Every page was unreadable and nothing else was shared.
+      await finish('completed', null, envelope(job.caseRevision, [notice('warning', 'I couldn’t read your documents', 'The photos may be blurry or cut off. Retake them in good light with the whole page in view, upload a PDF, or type the details instead.')]), null);
+      return 'completed';
     }
 
-    // No description, or nothing quotable in it: let the engine decide what to ask or show.
+    // Nothing shared, or nothing quotable in it: let the engine decide what to ask or show.
     await report('checking_missing_facts', 'started', 'Checking what is still needed');
-    await assess(input, Boolean(text));
+    await assess(input, Boolean(text), unreadableNotice);
     return 'completed';
   } catch (error) {
     if (error instanceof LeaseLost) return 'skipped';
@@ -124,14 +149,14 @@ export async function runJob(deps: JobRunnerDeps, message: { ownerId: string; jo
   }
 
   /** Size and real file type (first bytes), never the file name. Removes the object when it fails. */
-  async function verifiedUpload(kind: 'audio' | 'document'): Promise<{ key: string; type: 'm4a' | 'pdf' | 'jpeg' | 'png' } | null> {
+  async function verifiedUpload(kind: 'audio' | 'document', documentId = job.documentId ?? '', label = ''): Promise<{ key: string; type: 'm4a' | 'pdf' | 'jpeg' | 'png' } | null> {
     const store = deps.uploads;
-    if (!store || !job.documentId) throw new Error('Uploads are not configured');
-    const key = uploadKey(job.ownerId, job.caseId, job.documentId);
+    if (!store || !documentId) throw new Error('Uploads are not configured');
+    const key = uploadKey(job.ownerId, job.caseId, documentId);
     const head = await store.head(key);
     const reject = async (message: string) => {
       await store.remove(key).catch(() => undefined);
-      await finish('failed', null, null, { code: 'BAD_REQUEST', message, retryable: false, requestId: job.jobId });
+      await finish('failed', null, null, { code: 'BAD_REQUEST', message: label ? `${label}: ${message}` : message, retryable: false, requestId: job.jobId });
       return null;
     };
     if (!head) return reject('The upload was not found. It may have expired — please upload it again.');
@@ -181,11 +206,15 @@ export async function runJob(deps: JobRunnerDeps, message: { ownerId: string; jo
     }
   }
 
-  async function readDocument(): Promise<string | null> {
+  /**
+   * Reads one uploaded page and deletes it. Returns its text; UNREADABLE when no text was found and
+   * the caller can carry on without it; null when the job has already been finished with a message.
+   */
+  async function readDocument(documentId: string, label: string, skipUnreadable: boolean): Promise<string | typeof UNREADABLE | null> {
     const reader = deps.reader;
     if (!reader || !deps.uploads) throw new Error('Document reading is not configured');
-    await report('reading_input', 'started', 'Reading your document');
-    const upload = await verifiedUpload('document');
+    await report('reading_input', 'started', label ? `Reading ${label.toLowerCase()}` : 'Reading your document');
+    const upload = await verifiedUpload('document', documentId, label);
     if (!upload) return null;
     let lines: string[];
     try {
@@ -193,7 +222,8 @@ export async function runJob(deps: JobRunnerDeps, message: { ownerId: string; jo
     } catch (error) {
       await deps.uploads.remove(upload.key).catch(() => undefined);
       if (error instanceof Error && /UnsupportedDocument|BadDocument|DocumentTooLarge|InvalidParameter/.test(error.name)) {
-        await finish('failed', null, null, { code: 'BAD_REQUEST', message: 'I can read one page at a time. Upload a single page, or take a photo of it.', retryable: false, requestId: job.jobId });
+        const message = 'I can read one page at a time. Upload a single page, or take a photo of it.';
+        await finish('failed', null, null, { code: 'BAD_REQUEST', message: label ? `${label}: ${message}` : message, retryable: false, requestId: job.jobId });
         return null;
       }
       throw error;
@@ -202,6 +232,7 @@ export async function runJob(deps: JobRunnerDeps, message: { ownerId: string; jo
     const text = lines.join('\n').slice(0, 8000);
     if (text.replace(/\s/g, '').length < 20) {
       await report('reading_input', 'completed', 'No readable text found');
+      if (skipUnreadable) return UNREADABLE;
       await finish('completed', null, envelope(job.caseRevision, [notice('warning', 'I couldn’t read this document', 'The photo may be blurry or cut off. Retake it in good light with the whole page in view, upload a PDF, or type the details instead.')]), null);
       return null;
     }
@@ -209,11 +240,14 @@ export async function runJob(deps: JobRunnerDeps, message: { ownerId: string; jo
     return text;
   }
 
-  async function assess(input: DentalCaseInput, afterDescription: boolean) {
+  async function assess(input: DentalCaseInput, afterDescription: boolean, extraLead: UiBlock[] = []) {
     const estimate = estimateCase(input);
-    const lead: UiBlock[] = afterDescription
-      ? [notice('info', 'Nothing to confirm from your description', 'We could not find plan or treatment details stated in your words. Answer the questions below or enter the details yourself.')]
-      : [];
+    const lead: UiBlock[] = [
+      ...extraLead,
+      ...(afterDescription
+        ? [notice('info', 'Nothing to confirm from what you shared', 'I could not find plan or treatment details stated there. Answer the questions below or enter the details yourself.')]
+        : []),
+    ];
 
     if (estimate.status === 'needs_information') {
       const state = { skipped: job.skippedFieldPaths ?? [], expanded: job.expandedGroups ?? [] };
@@ -320,6 +354,9 @@ export function fileTypeOf(bytes: Uint8Array): 'm4a' | 'pdf' | 'jpeg' | 'png' | 
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/** A page with no readable text, which a multi-document job skips with a notice. */
+const UNREADABLE = Symbol('unreadable');
+
 /** One "Is this right?" confirmation per group of proposed facts (`confirm-N` ↔ proposals[N-1]). */
 export function confirmationBlocks(groups: FactGroup[], caseRevision: number, source: 'description' | 'document' = 'description'): MissingFieldBlock[] {
   return groups.slice(0, 9).map((group, index) => ({
@@ -329,7 +366,7 @@ export function confirmationBlocks(groups: FactGroup[], caseRevision: number, so
     fieldPath: group.fieldPath,
     inputType: 'fact_review',
     label: GROUP_LABEL[group.kind],
-    reason: `From your ${source}: “${group.quote}”`.slice(0, 300),
+    reason: `From your ${group.source ?? source}: “${group.quote}”`.slice(0, 300),
     options: [],
     allowedResponseModes: ['tap'],
     required: false,

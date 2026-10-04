@@ -25,6 +25,8 @@ export interface JobRecord {
   expandedGroups?: string[];
   /** Upload behind `transcribe_audio` / `analyze_document` jobs. */
   documentId?: string | null;
+  /** Uploads read together with the text by an `interpret` job (composer). */
+  documentIds?: string[];
   /** `transcribe_audio` result, shown to the user for editing before any use. */
   transcript?: string | null;
   leaseToken: string | null;

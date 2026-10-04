@@ -23,6 +23,7 @@ import {
   type ProcedureDraft,
 } from './draft';
 import { useRecentCases } from '../activity/recent-cases';
+import { errorsForStep, firstStepWithErrors, STEP_TITLES, stepsFor, type FormStep } from './form-steps';
 import { RulesFields } from './rules-fields';
 
 const COVERAGE_OPTIONS = [
@@ -45,8 +46,8 @@ const PLAN_AMOUNTS: { field: 'annualMaximum' | 'deductible' | 'alreadyPaid' | 'd
 ];
 
 /**
- * New estimate by typing (manual entry). Collects the treatment and the plan rules only the user
- * can supply up front; anything left empty is asked one question at a time afterwards.
+ * New estimate by typing (manual entry), in three short steps: coverage, treatment, and the plan
+ * (insured only). Anything left empty is asked one question at a time afterwards.
  */
 export function NewCaseScreen() {
   const api = useApi();
@@ -60,11 +61,36 @@ export function NewCaseScreen() {
   const updateProcedure = (key: string, patch: Partial<ProcedureDraft>) =>
     setDraft((current) => ({ ...current, procedures: current.procedures.map((p) => (p.key === key ? { ...p, ...patch } : p)) }));
 
-  const submit = async () => {
+  const steps = stepsFor(draft.coverage);
+  const [step, setStep] = useState<FormStep>('coverage');
+  const index = Math.max(0, steps.indexOf(step));
+  const last = index === steps.length - 1;
+  const stepErrors = errorsForStep(errors, step);
+  const hasErrors = Object.keys(stepErrors).length > 0;
+
+  const goTo = (next: FormStep) => {
+    setStep(next);
+    AccessibilityInfo.announceForAccessibility(`Step ${steps.indexOf(next) + 1} of ${steps.length}: ${STEP_TITLES[next]}`);
+  };
+
+  /** Checks only this step before moving on; the last step submits exactly as before. */
+  const next = async () => {
     if (busy) return;
     const found = validateDraft(draft);
-    setErrors(found);
-    if (Object.keys(found).length > 0) {
+    // Before the last step, flag only this step's fields; the next step starts clean.
+    setErrors(last ? found : errorsForStep(found, step));
+    if (!last) {
+      if (Object.keys(errorsForStep(found, step)).length > 0) {
+        AccessibilityInfo.announceForAccessibility('Some details need fixing. Check the highlighted fields.');
+        return;
+      }
+      const following = steps[index + 1];
+      if (following) goTo(following);
+      return;
+    }
+    const firstProblem = firstStepWithErrors(found, steps);
+    if (firstProblem) {
+      if (firstProblem !== step) goTo(firstProblem);
       AccessibilityInfo.announceForAccessibility('Some details need fixing. Check the highlighted fields.');
       return;
     }
@@ -81,66 +107,103 @@ export function NewCaseScreen() {
     }
   };
 
-  const hasErrors = Object.keys(errors).length > 0;
+  const back = () => {
+    const previous = steps[index - 1];
+    if (previous) goTo(previous);
+    else router.back();
+  };
 
   return (
-    <Screen footer={<Button label="Continue" onPress={submit} loading={busy} />}>
+    <Screen
+      footer={
+        <View style={{ flexDirection: 'row', gap: space(3) }}>
+          <View style={{ flex: 1 }}>
+            <Button label="Back" variant="secondary" onPress={back} disabled={busy} />
+          </View>
+          <View style={{ flex: 2 }}>
+            <Button label={last ? 'Continue to questions' : 'Continue'} onPress={next} loading={busy} />
+          </View>
+        </View>
+      }
+    >
       <View style={{ gap: space(2) }}>
-        <AppText variant="title">Tell us about your treatment</AppText>
-        <AppText muted>Add what you know. Leave anything else empty and we’ll ask for it next.</AppText>
+        <AppText variant="label" muted accessibilityRole="text">
+          {`Step ${index + 1} of ${steps.length} · ${STEP_TITLES[step]}`}
+        </AppText>
+        <StepBar count={steps.length} current={index} />
+        <AppText variant="title">Enter your details</AppText>
+        <AppText muted>Add what you know. Leave anything else empty and I’ll ask for it next.</AppText>
       </View>
 
       {hasErrors ? <Notice tone="danger" title="Some details need fixing. Check the highlighted fields." /> : null}
-      {failure ? <ErrorNotice error={failure} onRetry={submit} /> : null}
+      {failure ? <ErrorNotice error={failure} onRetry={next} /> : null}
 
-      <Section title="Coverage">
-        <RadioCards
-          label="Do you have dental insurance for this treatment?"
-          options={[...COVERAGE_OPTIONS]}
-          value={draft.coverage}
-          onChange={(coverage) => update({ coverage })}
-        />
-        <FieldError message={errors.coverage} />
-      </Section>
-
-      <Section title="Treatment">
-        {draft.procedures.map((procedure, index) => (
-          <ProcedureCard
-            key={procedure.key}
-            procedure={procedure}
-            index={index}
-            errors={errors}
-            canRemove={draft.procedures.length > 1}
-            onChange={(patch) => updateProcedure(procedure.key, patch)}
-            onRemove={() => update({ procedures: draft.procedures.filter((p) => p.key !== procedure.key) })}
+      {step === 'coverage' ? (
+        <Section title="Coverage">
+          <RadioCards
+            label="Do you have dental insurance for this treatment?"
+            options={[...COVERAGE_OPTIONS]}
+            value={draft.coverage}
+            onChange={(coverage) => update({ coverage })}
           />
-        ))}
-        <FieldError message={errors.procedures} />
-        {draft.procedures.length < MAX_PROCEDURES ? (
-          <Button
-            label="Add another procedure"
-            variant="secondary"
-            icon={<AddIcon />}
-            onPress={() => update({ procedures: [...draft.procedures, emptyProcedure(randomUUID())] })}
-          />
-        ) : null}
-      </Section>
+          <FieldError message={stepErrors.coverage} />
+        </Section>
+      ) : null}
 
-      {draft.coverage === 'insured' ? (
+      {step === 'treatment' ? (
+        <Section title="Treatment">
+          <AppText variant="caption" muted>
+            {CATEGORIES.map((c) => `${c.label}: ${c.hint.toLowerCase()}`).join(' · ')}
+          </AppText>
+          {draft.procedures.map((procedure, i) => (
+            <ProcedureCard
+              key={procedure.key}
+              procedure={procedure}
+              index={i}
+              errors={stepErrors}
+              canRemove={draft.procedures.length > 1}
+              onChange={(patch) => updateProcedure(procedure.key, patch)}
+              onRemove={() => update({ procedures: draft.procedures.filter((p) => p.key !== procedure.key) })}
+            />
+          ))}
+          <FieldError message={stepErrors.procedures} />
+          {draft.procedures.length < MAX_PROCEDURES ? (
+            <Button
+              label="Add another procedure"
+              variant="secondary"
+              icon={<AddIcon />}
+              onPress={() => update({ procedures: [...draft.procedures, emptyProcedure(randomUUID())] })}
+            />
+          ) : null}
+        </Section>
+      ) : null}
+
+      {step === 'plan' && draft.coverage === 'insured' ? (
         <Section title="Your plan">
           <RulesFields
             rules={draft.rules}
             categories={usedCategories(draft.procedures)}
             showYearStart
-            errors={errors}
+            errors={stepErrors}
             onChange={(rules) => update({ rules })}
           />
           {PLAN_AMOUNTS.map(({ field, label }) => (
-            <PlanAmount key={field} label={label} value={draft[field]} error={errors[`money.${field}`]} onChange={(value) => update({ [field]: value })} />
+            <PlanAmount key={field} label={label} value={draft[field]} error={stepErrors[`money.${field}`]} onChange={(value) => update({ [field]: value })} />
           ))}
         </Section>
       ) : null}
     </Screen>
+  );
+}
+
+function StepBar({ count, current }: { count: number; current: number }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', gap: space(1.5) }} aria-hidden>
+      {Array.from({ length: count }, (_, i) => (
+        <View key={i} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: i <= current ? colors.primary : colors.border }} />
+      ))}
+    </View>
   );
 }
 
@@ -220,9 +283,6 @@ function ProcedureCard({
         error={errors[`${at}.label`] ?? null}
       />
       <ChoiceChips label="Type" options={CATEGORIES.map((c) => ({ id: c.id, label: c.label }))} value={procedure.category} onChange={(category) => onChange({ category })} />
-      <AppText variant="caption" muted>
-        {CATEGORIES.map((c) => `${c.label}: ${c.hint.toLowerCase()}`).join(' · ')}
-      </AppText>
       <FieldError message={errors[`${at}.category`]} />
       <MoneyField label="Dentist’s charge" text={procedure.charge.text} unknown={procedure.charge.unknown} onChange={(charge) => onChange({ charge })} />
       <FieldError message={errors[`${at}.charge`]} />

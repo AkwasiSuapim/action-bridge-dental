@@ -1,10 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { AlertTriangle, ChevronDown, ChevronUp, Pencil } from 'lucide-react-native';
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { FactBadge, factSourceLabel } from '../../components/fact-badge';
 import { ErrorState, LoadingState } from '../../components/states';
-import { AppText, Badge, Button, Card, Screen } from '../../components/ui';
+import { AppText, Badge, Button, Card, Screen, Section } from '../../components/ui';
 import { useTheme } from '../../theme/theme';
 import { fonts, layout, space } from '../../theme/tokens';
 import { useCase } from './case-store';
@@ -57,15 +57,6 @@ export function FactsScreen() {
         </Section>
       ))}
     </Screen>
-  );
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <View style={{ gap: space(2) }}>
-      <AppText variant="heading">{title}</AppText>
-      {children}
-    </View>
   );
 }
 

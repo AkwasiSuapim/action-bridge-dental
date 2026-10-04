@@ -1,11 +1,11 @@
 import { router } from 'expo-router';
-import { Camera, Keyboard, MessageSquareText, Mic, Upload, type LucideIcon } from 'lucide-react-native';
-import { useState } from 'react';
+import { Camera, ChevronRight, Keyboard, Mic, Upload, type LucideIcon } from 'lucide-react-native';
+import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { BrandLockup } from '../../components/brand';
 import { AgentOrb } from '../../components/orb';
 import { ErrorNotice } from '../../components/states';
-import { AppText, Badge, Card, Screen } from '../../components/ui';
+import { AppText, Badge, Screen } from '../../components/ui';
 import { capabilities } from '../../lib/capabilities';
 import { asApiError, type ApiError } from '../../services/api';
 import { useApi } from '../../services/api-context';
@@ -17,19 +17,21 @@ import { useRecentCases } from '../activity/recent-cases';
 import { useRefreshOnFocus } from '../activity/use-refresh-on-focus';
 import { sampleCaseRequest } from '../intake/sample-case';
 
-/** Intake methods (design v3 "Home · multimodal start"), switched on in `lib/capabilities.ts`. */
-const METHODS: { id: 'describe' | 'speak' | 'upload' | 'photo' | 'type'; label: string; Icon: LucideIcon; available: boolean }[] = [
-  { id: 'describe', label: 'Describe your situation', Icon: MessageSquareText, available: capabilities.assistant },
-  { id: 'speak', label: 'Speak', Icon: Mic, available: capabilities.voice },
-  { id: 'upload', label: 'Upload', Icon: Upload, available: capabilities.upload },
-  { id: 'photo', label: 'Take photo', Icon: Camera, available: capabilities.photo },
-  { id: 'type', label: 'Form', Icon: Keyboard, available: capabilities.typing },
+/**
+ * Every way in opens the same composer, starting with what the user picked (switched on in
+ * `lib/capabilities.ts`). Nothing is analysed until they tap Analyse there.
+ */
+const METHODS: { start: 'voice' | 'upload' | 'photo' | 'type'; label: string; hint: string; Icon: LucideIcon; available: boolean }[] = [
+  { start: 'voice', label: 'Speak', hint: 'Starts recording. Tap stop when you’re done.', Icon: Mic, available: capabilities.voice && capabilities.assistant },
+  { start: 'upload', label: 'Upload', hint: 'Add a PDF or image of your estimate or plan.', Icon: Upload, available: capabilities.upload && capabilities.assistant },
+  { start: 'photo', label: 'Photo', hint: 'Photograph a document, not your teeth.', Icon: Camera, available: capabilities.photo && capabilities.assistant },
+  { start: 'type', label: 'Type', hint: 'Write it in your own words.', Icon: Keyboard, available: capabilities.assistant },
 ];
 
 const STEPS = [
-  ['Add your information.', 'Speak, type, or add your estimate and benefits.'],
-  ['Review what matters.', 'Confirm the details we found and answer what’s missing.'],
-  ['Compare and save.', 'See estimated costs by timing and save the plan you choose.'],
+  ['Tell me', 'Speak, type or add a page'],
+  ['Check', 'Confirm what I found'],
+  ['Compare', 'Costs by timing, then save'],
 ] as const;
 
 export function HomeScreen() {
@@ -77,77 +79,49 @@ function HomeBody() {
 
       <View style={{ gap: space(3) }}>
         <AppText variant="display">Let’s make sense of your dental costs.</AppText>
-        <AppText muted>Tell us about your treatment or add an estimate. We’ll ask only for what’s missing.</AppText>
+        <AppText muted>Tell me about your treatment or add an estimate. I’ll ask only for what’s missing.</AppText>
       </View>
 
       <View style={{ gap: space(3) }}>
         {primary ? <MethodButton method={primary} large /> : null}
         <View style={{ flexDirection: 'row', gap: space(3) }}>
           {others.map((method) => (
-            <MethodButton key={method.id} method={method} />
+            <MethodButton key={method.start} method={method} />
           ))}
         </View>
-        {capabilities.photo ? (
-          <AppText variant="caption" muted>
-            Photos are for documents like estimates, not your teeth.
-          </AppText>
-        ) : null}
       </View>
 
       {latest?.status === 'ok' ? <CaseCard summary={latest.summary} label="Continue your plan" /> : null}
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Try a sample. Sample data."
-        accessibilityState={{ busy: starting }}
-        disabled={starting}
-        onPress={trySample}
-        style={({ pressed }) => ({
-          minHeight: layout.minHitArea + 8,
-          borderRadius: layout.radius,
-          borderWidth: 1.5,
-          borderColor: colors.border,
-          paddingHorizontal: space(5),
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: space(3),
-          opacity: pressed ? 0.85 : 1,
-        })}
-      >
-        {starting ? <ActivityIndicator color={colors.primary} /> : null}
-        <AppText variant="label" color={colors.primary} style={{ fontFamily: fonts.semibold, fontSize: 16 }}>
-          {starting ? 'Starting the sample…' : 'Try a sample'}
-        </AppText>
-        <View>
-          <Badge label="Sample data" tone="neutral" />
-        </View>
-      </Pressable>
+      <View>
+        {capabilities.typing ? <QuietLink label="Prefer a form? Enter details step by step" onPress={() => router.push('/case/new')} /> : null}
+        <QuietLink
+          label={starting ? 'Starting the sample…' : 'Try a sample'}
+          accessibilityLabel="Try a sample. Sample data."
+          onPress={trySample}
+          busy={starting}
+          trailing={<Badge label="Sample data" tone="neutral" />}
+        />
+      </View>
       {failure ? <ErrorNotice error={failure} onRetry={trySample} /> : null}
 
-      <Card>
-        <AppText variant="heading">How it works</AppText>
+      <View accessible accessibilityLabel="How it works: tell me, check what I found, then compare costs and save." style={{ flexDirection: 'row', gap: space(3) }}>
         {STEPS.map(([title, body], index) => (
-          <View key={title} style={{ flexDirection: 'row', gap: space(3), alignItems: 'flex-start' }}>
-            <View
-              style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}
-              aria-hidden
-            >
-              <AppText variant="label" color={colors.primary} style={{ fontFamily: fonts.bold }}>
+          <View key={title} style={{ flex: 1, gap: space(1.5) }}>
+            <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+              <AppText variant="label" color={colors.primary} style={{ fontFamily: fonts.bold, fontSize: 13 }}>
                 {String(index + 1)}
               </AppText>
             </View>
-            <AppText variant="caption" style={{ flex: 1 }}>
-              <AppText variant="caption" style={{ fontFamily: fonts.semibold }}>
-                {title}
-              </AppText>{' '}
-              <AppText variant="caption" muted>
-                {body}
-              </AppText>
+            <AppText variant="label" style={{ fontFamily: fonts.semibold }}>
+              {title}
+            </AppText>
+            <AppText variant="caption" muted>
+              {body}
             </AppText>
           </View>
         ))}
-      </Card>
+      </View>
     </Screen>
   );
 }
@@ -160,18 +134,13 @@ function MethodButton({ method, large = false }: { method: (typeof METHODS)[numb
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={available ? label : `${label}, coming soon`}
+      accessibilityHint={available ? method.hint : undefined}
       accessibilityState={{ disabled: !available }}
       disabled={!available}
-      onPress={() => {
-        if (method.id === 'describe') router.push('/case/describe');
-        if (method.id === 'speak' || method.id === 'upload' || method.id === 'photo') {
-          router.push({ pathname: '/case/describe', params: { start: method.id === 'speak' ? 'voice' : method.id } });
-        }
-        if (method.id === 'type') router.push('/case/new');
-      }}
+      onPress={() => router.push({ pathname: '/case/describe', params: { start: method.start } })}
       style={({ pressed }) => ({
         flex: large ? undefined : 1,
-        minHeight: large ? layout.minHitArea + 12 : layout.minHitArea + 32,
+        minHeight: large ? layout.minHitArea + 20 : layout.minHitArea + 32,
         borderRadius: layout.radius,
         borderWidth: 1,
         borderColor: colors.border,
@@ -185,8 +154,8 @@ function MethodButton({ method, large = false }: { method: (typeof METHODS)[numb
         opacity: pressed ? 0.85 : 1,
       })}
     >
-      <Icon size={20} color={foreground} />
-      <AppText variant="label" color={foreground} style={{ fontFamily: fonts.semibold, textAlign: 'center' }}>
+      <Icon size={large ? 24 : 20} color={foreground} />
+      <AppText variant="label" color={foreground} style={{ fontFamily: fonts.semibold, textAlign: 'center', ...(large ? { fontSize: 17 } : {}) }}>
         {label}
       </AppText>
       {available ? null : (
@@ -194,6 +163,28 @@ function MethodButton({ method, large = false }: { method: (typeof METHODS)[numb
           Coming soon
         </AppText>
       )}
+    </Pressable>
+  );
+}
+
+function QuietLink({ label, onPress, accessibilityLabel, busy = false, trailing }: { label: string; onPress: () => void; accessibilityLabel?: string; busy?: boolean; trailing?: ReactNode }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={{ busy, disabled: busy }}
+      disabled={busy}
+      onPress={onPress}
+      style={({ pressed }) => ({ minHeight: layout.minHitArea + 4, flexDirection: 'row', alignItems: 'center', gap: space(2), opacity: pressed ? 0.7 : 1 })}
+    >
+      {busy ? <ActivityIndicator size="small" color={colors.primary} /> : null}
+      <AppText variant="label" color={colors.primary} style={{ fontFamily: fonts.semibold, flexShrink: 1 }}>
+        {label}
+      </AppText>
+      {trailing}
+      <View style={{ flex: 1 }} />
+      <ChevronRight size={18} color={colors.textMuted} />
     </Pressable>
   );
 }
