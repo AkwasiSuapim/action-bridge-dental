@@ -336,7 +336,17 @@ Resources:
             - Effect: Allow
               Action: s3:PutObject
               Resource: !Sub ${UploadBucket.Arn}/uploads/*
+            # Read-aloud (accessibility). Polly has no resource-level scoping for this action.
+            - Effect: Allow
+              Action: polly:SynthesizeSpeech
+              Resource: '*'
       Events:
+        Speech:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /v1/speech
         CreateUpload:
           Type: HttpApi
           Properties:

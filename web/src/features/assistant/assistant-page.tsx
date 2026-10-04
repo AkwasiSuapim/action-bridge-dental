@@ -38,6 +38,7 @@ import { asApiError, type ApiError } from '../../services/api';
 import { useApi } from '../../state/auth';
 import { useCase, useResults } from '../../state/case-store';
 import { useJob } from '../../state/use-job';
+import { ListenButton } from '../../components/listen';
 
 /**
  * Assistant workspace. Renders only server-validated UI blocks: real stage events while working,
@@ -464,6 +465,19 @@ function UnderstoodCard({
         {quote}
       </blockquote>
       <Meaning fieldPath={block.fieldPath} />
+      <div>
+        <ListenButton
+          text={[
+            block.label.replace(/^Is this right\?\s*/, ''),
+            String(block.candidateValue ?? ''),
+            quote ? 'From what you shared: ' + quote : '',
+            termFor(block.fieldPath)?.definition ?? '',
+            'Is this right?',
+          ]
+            .filter(Boolean)
+            .join('. ')}
+        />
+      </div>
       <div className="confirm-buttons">
         <Button
           variant={answered === false ? 'danger' : 'secondary'}
@@ -505,6 +519,17 @@ function QuestionCard({
         <p className="small muted">{block.reason}</p>
       </div>
       <Meaning fieldPath={block.fieldPath} />
+      <div>
+        <ListenButton
+          text={[
+            block.label,
+            block.reason,
+            termFor(block.fieldPath)?.definition ?? '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        />
+      </div>
       {block.inputType === 'single_select' && (
         <fieldset className="choice-list">
           <legend className="visually-hidden">{block.label}</legend>

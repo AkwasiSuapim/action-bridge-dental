@@ -18,6 +18,7 @@ import { isSampleCase } from '../case/facts';
 import { scenarioTitle } from '../options/options-model';
 import { ledgerView } from './ledger';
 import { nextStepFor } from './saved-model';
+import { BenefitsLeft } from '../options/benefits-left';
 
 /** "Your plan is saved" (design v3, dark): the saved choice, one next step and the real plan history. */
 export function SavedScreen() {
@@ -101,6 +102,8 @@ function SavedBody() {
       </View>
 
       {save?.replayed ? <Notice tone="info" title="This plan was already saved. Nothing was duplicated." /> : null}
+
+      {scenario ? <BenefitsLeft scenario={scenario} record={record} /> : null}
 
       {next ? (
         <Card>

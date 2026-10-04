@@ -1,3 +1,10 @@
+import {
+  plainDate,
+  plainSummary,
+  type DentalCase,
+  type PlainSummary,
+  type Scenario,
+} from '@actionbridge/contracts';
 import { BookOpen, ClipboardList, Pencil } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -24,6 +31,8 @@ import {
   ScenarioCard,
 } from './financial-components';
 import { SelfPay } from './self-pay';
+import { ListenButton } from '../../components/listen';
+import { ReminderActions } from '../saved/reminder';
 
 /**
  * Server-calculated timing options for the current revision, plus the self-pay comparison.
@@ -138,7 +147,20 @@ export function OptionsPage() {
     );
   }
 
-  const alternative = comparison.alternatives[0];
+  const alternative = comparison.alternatives[0] ?? null;
+  const summary = plainSummary({
+    comparison: comparison.baseline,
+    alternative,
+    outcome: comparison.outcome,
+    procedures: record.procedures,
+    selfPay:
+      data.coverage.selfPay.status === 'available'
+        ? {
+            totalCents: data.coverage.selfPay.totalCents,
+            minusInsuredCents: data.coverage.selfPayMinusInsuredCents,
+          }
+        : null,
+  });
   const assumedNextYear = Object.values(record.planYears).some(
     (y) => y.sourceStatus === 'explicit_unchanged_plan_assumption',
   );
@@ -147,21 +169,9 @@ export function OptionsPage() {
       <PageHeading
         eyebrow={`${isSampleCase(record) ? 'Sample case' : 'Your case'} · Estimated`}
         title={treatmentTitle(record)}
-        description="Compare treatment timing against your benefit years."
+        description="Your choices, what each costs, and what it means."
         actions={
           <>
-            <div className="segmented" aria-label="How you'll pay">
-              {(['insured', 'self-pay'] as const).map((m) => (
-                <button
-                  key={m}
-                  aria-pressed={mode === m}
-                  className={mode === m ? 'active' : ''}
-                  onClick={() => setMode(m)}
-                >
-                  {m === 'insured' ? 'Using my plan' : 'Self-pay'}
-                </button>
-              ))}
-            </div>
             <Button
               variant="secondary"
               icon={BookOpen}
@@ -179,60 +189,45 @@ export function OptionsPage() {
           </>
         }
       />
+      <div className="segmented" aria-label="How you'll pay">
+        {(['insured', 'self-pay'] as const).map((m) => (
+          <button
+            key={m}
+            aria-pressed={mode === m}
+            className={mode === m ? 'active' : ''}
+            onClick={() => setMode(m)}
+          >
+            {m === 'insured'
+              ? 'Using my insurance'
+              : 'Paying without insurance'}
+          </button>
+        ))}
+      </div>
       {mode === 'insured' ? (
         <>
-          <fieldset className="scenario-grid">
-            <legend className="visually-hidden">Choose a schedule</legend>
+          <MeaningCard summary={summary} />
+          <BenefitsLeft scenario={comparison.baseline} record={record} />
+          <fieldset className="choice-grid">
+            <legend className="eyebrow">Your choices</legend>
             {scenarios.map((scenario) => (
               <ScenarioCard
                 key={scenario.scenarioId}
                 scenario={scenario}
                 selected={selected.scenarioId === scenario.scenarioId}
                 onSelect={() => select(scenario.scenarioId)}
-                onSources={() => setSources(true)}
               />
             ))}
           </fieldset>
-          {alternative ? (
-            <div className="difference-banner">
-              <div>
-                <p className="eyebrow">Conditional estimated difference</p>
-                <strong>
-                  {money(alternative.differenceFromBaselineCents)}
-                </strong>
-              </div>
-              <p>
-                Using the alternative permitted schedule could lower your
-                estimated cost.{' '}
-                <strong>
-                  This depends on the dentist-supplied window and next year’s
-                  coverage and prices.
-                </strong>{' '}
-                ActionBridge doesn't decide whether care can wait.
-              </p>
-            </div>
-          ) : (
-            <Notice>
-              {comparison.outcome === 'no_flexible_timing'
-                ? 'No dentist-supplied flexible window is available. I show your original dates without moving treatment.'
-                : comparison.outcome === 'comparison_incomplete'
-                  ? 'The original estimate is available, but an alternative could not be compared. Check future benefit dates and balances.'
-                  : 'No lower-cost permitted alternative was found for these details. The original estimate still shows what your plan covers.'}
-            </Notice>
-          )}
-          {comparison.limitations.length > 0 && (
-            <Notice>
-              {comparison.limitations.map((l) => l.message).join(' ')}
-            </Notice>
-          )}
-          <div className="financial-grid">
-            <ProcedureTable
-              scenario={selected}
-              onSources={() => setSources(true)}
-            />
-            <BenefitYears scenario={selected} />
-          </div>
-          <Card>
+          <div className="stack">
+            <Disclosure title="See the cost breakdown for your choice">
+              <ProcedureTable
+                scenario={selected}
+                onSources={() => setSources(true)}
+              />
+            </Disclosure>
+            <Disclosure title="See how your yearly benefits are used">
+              <BenefitYears scenario={selected} />
+            </Disclosure>
             <Disclosure title="What could change this estimate?">
               <Row
                 label="Next year's coverage and fees"
@@ -245,32 +240,21 @@ export function OptionsPage() {
                 }
               />
               <Row
-                label="Dentist-permitted treatment dates"
-                value={
-                  <Badge>
-                    {isSampleCase(record)
-                      ? 'Sample instruction'
-                      : 'Only dates your dentist gave'}
-                  </Badge>
-                }
+                label="Treatment dates"
+                value={<Badge>Only dates your dentist allows</Badge>}
               />
               <Row
-                label="Additional claims before treatment"
-                value={<Badge tone="assumed">Not modeled</Badge>}
+                label="Other claims before treatment"
+                value={<Badge tone="assumed">Not included</Badge>}
               />
-              <Row
-                label="Network, eligibility and allowed amount"
-                value={
-                  <Badge>
-                    {isSampleCase(record)
-                      ? 'Sample plan and your edits'
-                      : 'Provided by you'}
-                  </Badge>
-                }
-              />
+              {comparison.limitations.map((l) => (
+                <p key={l.code} className="small muted">
+                  {l.message}
+                </p>
+              ))}
             </Disclosure>
-          </Card>
-          <FooterActions note="Same procedure scope. Differences depend on timing and assumptions.">
+          </div>
+          <FooterActions note="Same treatment either way. Only the timing and the cost change.">
             <Button variant="secondary" onClick={() => navigate('/details')}>
               View details
             </Button>
@@ -285,11 +269,77 @@ export function OptionsPage() {
           </FooterActions>
         </>
       ) : (
-        <SelfPay coverage={data.coverage} scenarios={scenarios} />
+        <>
+          <p className="term-meaning">
+            <strong>Paying without insurance:</strong> you pay the dentist’s
+            cash price yourself and don’t use your plan. Some dentists charge
+            less for cash, so it’s worth comparing.
+          </p>
+          <SelfPay coverage={data.coverage} scenarios={scenarios} />
+        </>
       )}
       {sources && <Evidence onClose={() => setSources(false)} />}
     </div>
   );
+}
+
+/** The calculator's results in plain words, at the top of the page. */
+export function MeaningCard({
+  summary,
+  title = 'What this means for you',
+}: {
+  summary: PlainSummary;
+  title?: string;
+}) {
+  return (
+    <Card className="meaning-card">
+      <div className="section-title">
+        <h3>{title}</h3>
+        <ListenButton text={summary.speech} />
+      </div>
+      {summary.paragraphs.map((p) => (
+        <p key={p}>{p}</p>
+      ))}
+    </Card>
+  );
+}
+
+/** "You have $300 of your $800 left this year · resets January 1, 2027." */
+export function BenefitsLeft({
+  scenario,
+  record,
+}: {
+  scenario: Scenario;
+  record: DentalCase;
+}) {
+  const year = Object.values(scenario.estimate.yearProjections)[0];
+  const terms = year ? record.planYears[year.planYearId] : undefined;
+  if (!year || !terms) return null;
+  const left = Math.max(
+    0,
+    year.annualMaximumCents - year.reportedInsurerPaidCents,
+  );
+  return (
+    <Card className="benefits-left">
+      <div>
+        <span className="small muted">Benefits left this year</span>
+        <strong>
+          {money(left)}{' '}
+          <small className="muted">of {money(year.annualMaximumCents)}</small>
+        </strong>
+        <span className="small muted">
+          Unused benefits don’t carry over. They reset on{' '}
+          {plainDate(nextDay(terms.endDate))}.
+        </span>
+      </div>
+      <ReminderActions leftCents={left} yearEnd={terms.endDate} />
+    </Card>
+  );
+}
+
+function nextDay(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
 }
 
 function Calculating() {

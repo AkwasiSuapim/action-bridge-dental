@@ -3335,3 +3335,99 @@ tfoot td {
     padding: 20px;
   }
 }
+
+/* ---- Options: plain summary, choices, benefits left, reminder -------------------------- */
+.meaning-card {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+.meaning-card p {
+  font-size: 15px;
+  line-height: 1.6;
+}
+.meaning-card .section-title {
+  justify-content: space-between;
+}
+.listen-button {
+  flex: none;
+}
+.choice-grid {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.choice-grid > legend {
+  margin-bottom: 10px;
+}
+.choice-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px;
+  border: 1.5px solid var(--border);
+  border-radius: 21px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.choice-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.choice-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.choice-card-head h3 {
+  flex: 1;
+  font-size: 17px;
+}
+.choice-card-head input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+.choice-card-money {
+  display: flex;
+  flex-direction: column;
+}
+.choice-card-money strong {
+  font-size: 34px;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+.benefits-left {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.benefits-left > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 220px;
+}
+.benefits-left strong {
+  font-size: 26px;
+  letter-spacing: -0.02em;
+}
+.reminder-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 360px;
+}
+@media (max-width: 640px) {
+  .benefits-left {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .reminder-actions {
+    max-width: none;
+  }
+}

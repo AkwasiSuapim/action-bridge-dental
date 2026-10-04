@@ -1,3 +1,4 @@
+import type { Scenario } from './estimate.js';
 import type { JobStageEvent } from './job.js';
 
 /**
@@ -124,4 +125,88 @@ export function jobSteps(events: readonly JobStageEvent[]): JobStep[] {
     }
   }
   return steps;
+}
+
+// ---- "What this means for you" ------------------------------------------------------------
+
+/** "$1,200" or "$1,200.50": whole dollars without cents. */
+export function plainMoney(cents: number): string {
+  const dollars = Math.floor(Math.abs(cents) / 100).toLocaleString('en-US');
+  const rest = Math.abs(cents) % 100;
+  return `${cents < 0 ? '-' : ''}$${dollars}${rest ? `.${String(rest).padStart(2, '0')}` : ''}`;
+}
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/** "January 15, 2027" from an ISO date, without time zones. */
+export function plainDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number) as [number, number, number];
+  return `${MONTHS[m - 1]} ${d}, ${y}`;
+}
+
+export interface PlainSummary {
+  /** Short paragraphs, in reading order. */
+  paragraphs: string[];
+  /** The same text as one string, for reading aloud. */
+  speech: string;
+}
+
+interface SummaryInput {
+  comparison: Scenario;
+  alternative: Scenario | null;
+  outcome: 'alternatives_found' | 'no_lower_cost_alternative' | 'no_flexible_timing' | 'comparison_incomplete';
+  procedures: { id: string; label: string; dentistLatestDate: string | null }[];
+  selfPay: { totalCents: number; minusInsuredCents: number | null } | null;
+}
+
+/**
+ * Plain-language explanation of the calculator's results, built only from its numbers (no AI).
+ * Money values all come from the server; the one derived figure is what is left of the current
+ * year's maximum before treatment (maximum minus reported paid), which both apps already show.
+ */
+export function plainSummary({ comparison: baseline, alternative, outcome, procedures, selfPay }: SummaryInput): PlainSummary {
+  const label = (id: string) => procedures.find((p) => p.id === id)?.label.toLowerCase() ?? 'treatment';
+  const totals = baseline.estimate.totals;
+  const paragraphs: string[] = [
+    `If you do everything as planned, you pay about ${plainMoney(totals.patientPaysCents)} and your plan pays ${plainMoney(totals.insurerPaysCents)}.`,
+  ];
+
+  const firstYear = Object.values(baseline.estimate.yearProjections)[0];
+  if (firstYear) {
+    const left = Math.max(0, firstYear.annualMaximumCents - firstYear.reportedInsurerPaidCents);
+    const capped = baseline.estimate.lines.some((l) => l.capShortfallCents > 0);
+    paragraphs.push(
+      capped
+        ? `Your plan has only ${plainMoney(left)} left of its ${plainMoney(firstYear.annualMaximumCents)} yearly maximum, so part of your treatment isn't covered this year.`
+        : `Your plan has ${plainMoney(left)} left of its ${plainMoney(firstYear.annualMaximumCents)} yearly maximum this year.`,
+    );
+  }
+
+  if (alternative) {
+    const moved = alternative.schedule.filter((s) => alternative.movedProcedureIds.includes(s.procedureId));
+    const what = moved.map((s) => `the ${label(s.procedureId)} on ${plainDate(s.date)}`).join(' and ');
+    const latest = moved
+      .map((s) => procedures.find((p) => p.id === s.procedureId)?.dentistLatestDate)
+      .find((d): d is string => Boolean(d));
+    paragraphs.push(
+      `If your dentist does ${what || 'some treatment later'}${latest ? ` (they said it can safely wait until ${plainDate(latest)})` : ''}, a new benefit year starts and your plan pays again: you'd pay about ${plainMoney(alternative.estimate.totals.patientPaysCents)}, which is ${plainMoney(alternative.differenceFromBaselineCents)} less.` +
+        (alternative.conditional ? ' This assumes next year’s plan stays the same.' : ''),
+    );
+  } else if (outcome === 'no_flexible_timing') {
+    paragraphs.push('Your dentist didn’t give a window for moving any treatment, so I kept your original dates.');
+  } else if (outcome === 'comparison_incomplete') {
+    paragraphs.push('Moving treatment into next year could change the cost, but I need next year’s plan details to compare it.');
+  } else {
+    paragraphs.push('Moving treatment within your dentist’s window wouldn’t lower your cost, so the original dates are your best option.');
+  }
+
+  if (selfPay) {
+    const diff = selfPay.minusInsuredCents;
+    paragraphs.push(
+      diff === null || diff === 0
+        ? `Paying cash without insurance would cost ${plainMoney(selfPay.totalCents)}.`
+        : `Paying cash without insurance would cost ${plainMoney(selfPay.totalCents)}, ${plainMoney(Math.abs(diff))} ${diff > 0 ? 'more' : 'less'} than using your plan.`,
+    );
+  }
+  paragraphs.push('These are estimates. Your dentist decides the timing and your insurer decides the final payment.');
+  return { paragraphs, speech: paragraphs.join(' ') };
 }

@@ -14,6 +14,7 @@ import { useTheme } from '../../theme/theme';
 import { fonts, layout, space } from '../../theme/tokens';
 import { buildAnswers, initialDrafts, questionsOf, type Draft, type Drafts } from './answers';
 import { useJob } from './use-job';
+import { ListenButton } from '../../components/listen';
 
 /**
  * Assistant workspace (design v3 agent workspace + doc 05 adaptive loop). Renders only
@@ -326,6 +327,7 @@ function UnderstoodCard({ block, draft, onChange }: { block: MissingFieldBlock; 
         {fromDocument ? 'From the document' : 'From your words'}: {quote}
       </AppText>
       <Meaning fieldPath={block.fieldPath} />
+      <ListenButton text={[block.label.replace(/^Is this right\?\s*/, ''), String(block.candidateValue ?? ''), quote ? 'From what you shared: ' + quote : '', termFor(block.fieldPath)?.definition ?? '', 'Is this right?'].filter(Boolean).join('. ')} />
       <View style={{ gap: space(2), marginTop: space(1) }} accessibilityRole="radiogroup" accessibilityLabel={`Is this right? ${String(block.candidateValue ?? '')}`}>
         <Button label="Yes, that’s right" variant={answered === true ? 'primary' : 'secondary'} onPress={() => onChange({ kind: 'confirm', value: true })} />
         <Pressable
@@ -353,6 +355,7 @@ function QuestionCard({ block, draft, problem, onChange }: { block: MissingField
         {block.reason}
       </AppText>
       <Meaning fieldPath={block.fieldPath} />
+      <ListenButton text={[block.label, block.reason, termFor(block.fieldPath)?.definition ?? ''].filter(Boolean).join(' ')} />
       {block.inputType === 'single_select' ? (
         <>
           <RadioCards
