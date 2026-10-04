@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent orb</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div aria-hidden="true" style="position: relative; width: {{px}}; height: {{px}}; flex-shrink: 0">
+  <svg viewBox="0 0 200 200" width="100%" height="100%" style="position: absolute; inset: 0; overflow: visible">
+    <defs>
+      <radialGradient id="{{coreId}}" cx="50%" cy="50%" r="50%">
+        <stop offset="0" stop-color="{{tint}}" stop-opacity="0.22"></stop>
+        <stop offset="0.55" stop-color="{{tint}}" stop-opacity="0.07"></stop>
+        <stop offset="1" stop-color="{{tint}}" stop-opacity="0"></stop>
+      </radialGradient>
+    </defs>
+    <circle cx="100" cy="100" r="100" fill="url(#{{coreId}})"></circle>
+    <circle cx="100" cy="100" r="98" fill="none" stroke="{{tint}}" stroke-opacity="0.08" stroke-width="1"></circle>
+    <circle cx="100" cy="100" r="82" fill="none" stroke="{{tint}}" stroke-opacity="0.1" stroke-width="1"></circle>
+  </svg>
+  <div ref="{{breathe}}" style="position: absolute; inset: 0">
+    <div style="position: absolute; inset: 0; transform: scale({{ringScale}})">
+      <div ref="{{spinA}}" style="position: absolute; inset: 0">
+        <svg viewBox="0 0 200 200" width="100%" height="100%" style="overflow: visible">
+          <defs>
+            <linearGradient id="{{ringId}}" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="{{glow}}" stop-opacity="1"></stop>
+              <stop offset="0.5" stop-color="{{tint}}" stop-opacity="0.55"></stop>
+              <stop offset="1" stop-color="{{glow}}" stop-opacity="0.95"></stop>
+            </linearGradient>
+          </defs>
+          <g transform="rotate(0 100 100)">
+            <ellipse cx="100" cy="100" rx="68" ry="40" fill="none" stroke="{{tint}}" stroke-opacity="0.07" stroke-width="14"></ellipse>
+            <ellipse cx="100" cy="100" rx="68" ry="40" fill="none" stroke="{{tint}}" stroke-opacity="0.18" stroke-width="5.6"></ellipse>
+            <ellipse cx="100" cy="100" rx="68" ry="40" fill="none" stroke="url(#{{ringId}})" stroke-width="1.6"></ellipse>
+          </g>
+          <g transform="rotate(60 100 100)">
+            <ellipse cx="100" cy="100" rx="68" ry="40" fill="none" stroke="{{tint}}" stroke-opacity="0.07" stroke-width="14"></ellipse>
+            <ellipse cx="100" cy="100" rx="68" ry="40" fill="none" stroke="{{tint}}" stroke-opacity="0.18" stroke-width="5.6"></ellipse>
+            <ellipse cx="100" cy="100" rx="68" ry="40" fill="none" stroke="url(#{{ringId}})" stroke-width="1.6"></ellipse>
+          </g>
+          <g transform="rotate(120 100 100)">
+            <ellipse cx="100" cy="100" rx="68" ry="40" fill="none" stroke="{{tint}}" stroke-opacity="0.07" stroke-width="14"></ellipse>
+            <ellipse cx="100" cy="100" rx="68" ry="40" fill="none" stroke="{{tint}}" stroke-opacity="0.18" stroke-width="5.6"></ellipse>
+            <ellipse cx="100" cy="100" rx="68" ry="40" fill="none" stroke="url(#{{ringId}})" stroke-width="1.6"></ellipse>
+          </g>
+        </svg>
+      </div>
+    </div>
+    <div style="position: absolute; inset: 0; opacity: 0.55; transform: scale({{ringScaleB}})">
+      <div ref="{{spinB}}" style="position: absolute; inset: 0">
+        <svg viewBox="0 0 200 200" width="100%" height="100%" style="overflow: visible">
+          <g transform="rotate(30 100 100)">
+            <ellipse cx="100" cy="100" rx="68" ry="40" fill="none" stroke="{{tint}}" stroke-opacity="0.18" stroke-width="5.6"></ellipse>
+            <ellipse cx="100" cy="100" rx="68" ry="40" fill="none" stroke="url(#{{ringId}})" stroke-width="1.4"></ellipse>
+          </g>
+          <g transform="rotate(90 100 100)">
+            <ellipse cx="100" cy="100" rx="68" ry="40" fill="none" stroke="{{tint}}" stroke-opacity="0.18" stroke-width="5.6"></ellipse>
+            <ellipse cx="100" cy="100" rx="68" ry="40" fill="none" stroke="url(#{{ringId}})" stroke-width="1.4"></ellipse>
+          </g>
+          <g transform="rotate(150 100 100)">
+            <ellipse cx="100" cy="100" rx="68" ry="40" fill="none" stroke="{{tint}}" stroke-opacity="0.18" stroke-width="5.6"></ellipse>
+            <ellipse cx="100" cy="100" rx="68" ry="40" fill="none" stroke="url(#{{ringId}})" stroke-width="1.4"></ellipse>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <sc-if value="{{isSuccess}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #69FFA5">
+      <svg width="{{iconPx}}" height="{{iconPx}}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+    </div>
+  </sc-if>
+  <sc-if value="{{isAlert}}" hint-placeholder-val="{{false}}">
+    <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #FFC46B">
+      <svg width="{{iconPx}}" height="{{iconPx}}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3 M12 9v4 M12 17h.01"></path></svg>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"size":{"editor":"int","default":200,"min":48,"max":320},"tone":{"editor":"enum","options":["green","amber"],"default":"green"},"mode":{"editor":"enum","options":["idle","active","success","alert"],"default":"idle"},"animate":{"editor":"boolean","default":true},"$preview":{"width":200,"height":200}}'>
+class Component extends DCLogic {
+  reduced() {
+    try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+  }
+  // Callback refs are rebuilt only when the motion inputs change, so animations restart exactly then.
+  refs() {
+    const mode = this.props.mode || 'idle';
+    const on = this.props.animate !== false && mode !== 'alert' && !this.reduced();
+    const key = mode + '|' + on;
+    if (this._key === key && this._refs) return this._refs;
+    this._key = key;
+    const active = mode === 'active';
+    const run = (dur, dir) => (el) => {
+      if (!el || !el.animate) return;
+      if (el.__ab) el.__ab.cancel();
+      if (!on) return;
+      el.__ab = el.animate(
+        [{ transform: 'rotate(0deg)' }, { transform: 'rotate(' + 360 * dir + 'deg)' }],
+        { duration: dur, iterations: Infinity, easing: 'linear' }
+      );
+    };
+    this._refs = {
+      spinA: run(active ? 9000 : 24000, 1),
+      spinB: run(active ? 14000 : 38000, -1),
+      breathe: (el) => {
+        if (!el || !el.animate) return;
+        if (el.__ab) el.__ab.cancel();
+        if (!on || mode === 'success') return;
+        el.__ab = el.animate(
+          [{ transform: 'scale(0.97)' }, { transform: 'scale(1.03)' }],
+          { duration: active ? 900 : 2600, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' }
+        );
+      },
+    };
+    return this._refs;
+  }
+  renderVals() {
+    const size = Number(this.props.size) || 200;
+    const amber = this.props.tone === 'amber';
+    const mode = this.props.mode || 'idle';
+    const r = this.refs();
+    return {
+      px: size + 'px',
+      iconPx: Math.round(size * 0.22),
+      tint: amber ? '#FFC46B' : '#31E981',
+      glow: amber ? '#FFE0B0' : '#69FFA5',
+      coreId: amber ? 'abOrbCoreAmber' : 'abOrbCoreGreen',
+      ringId: amber ? 'abOrbRingAmber' : 'abOrbRingGreen',
+      ringScale: mode === 'success' ? 0.82 : 1,
+      ringScaleB: mode === 'success' ? 0.7 : 0.86,
+      isSuccess: mode === 'success',
+      isAlert: mode === 'alert',
+      spinA: r.spinA,
+      spinB: r.spinB,
+      breathe: r.breathe,
+    };
+  }
+}
+</script>
+</body>
+</html>

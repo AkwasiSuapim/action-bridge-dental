@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dental design handoff</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 100%; min-height: 100%; box-sizing: border-box; background: #F5F7F2; color: #101512; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-variant-numeric: tabular-nums">
+  <div style="max-width: 1120px; margin: 0 auto; padding: 56px 24px 80px; display: flex; flex-direction: column; gap: 40px">
+    <header style="display: flex; flex-direction: column; gap: 10px">
+      <span style="font-size: 13px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: #0E6B4D">ActionBridge Dental · design handoff · Oct 3, 2026</span>
+      <h1 style="margin: 0; font-size: 40px; line-height: 46px; font-weight: 700; letter-spacing: -1px">What changed, what's simulated, and what to build</h1>
+      <p style="margin: 0; max-width: 820px; font-size: 17px; line-height: 26px; color: #3F4A44">The original pages (Page 1, Page 2 and Refinement v2) are untouched for comparison. Everything for the dental version lives on the “Dental v3” page: one connected prototype, state artboards, a component inventory and this handoff.</p>
+    </header>
+
+    <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px">
+      <sc-for list="{{notices}}" as="n" hint-placeholder-count="3">
+        <div style="padding: 20px; border-radius: 20px; background: #FFFFFF; border: 1.5px solid {{n.border}}; display: flex; flex-direction: column; gap: 8px">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 700">{{n.title}}</h2>
+          <p style="margin: 0; font-size: 14px; line-height: 21px; color: #3F4A44">{{n.body}}</p>
+        </div>
+      </sc-for>
+    </section>
+
+    <sc-for list="{{tables}}" as="t" hint-placeholder-count="6">
+      <section style="display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 26px; line-height: 32px; font-weight: 700; letter-spacing: -0.4px">{{t.title}}</h2>
+        <sc-if value="{{t.hasIntro}}" hint-placeholder-val="{{true}}">
+          <p style="margin: 0; max-width: 860px; font-size: 15px; line-height: 23px; color: #3F4A44">{{t.intro}}</p>
+        </sc-if>
+        <div style="overflow-x: auto; border-radius: 18px; background: #FFFFFF; border: 1px solid #D8E7DE">
+          <div style="min-width: 720px; display: flex; flex-direction: column">
+            <div style="display: grid; grid-template-columns: {{t.cols}}; gap: 16px; padding: 12px 18px; background: #EAF0EC; font-size: 12px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: #3F4A44">
+              <sc-for list="{{t.head}}" as="h" hint-placeholder-count="3"><span>{{h.t}}</span></sc-for>
+            </div>
+            <sc-for list="{{t.rows}}" as="r" hint-placeholder-count="5">
+              <div style="display: grid; grid-template-columns: {{t.cols}}; gap: 16px; padding: 12px 18px; border-top: 1px solid #EEF2EF; font-size: 14px; line-height: 21px">
+                <sc-for list="{{r.cells}}" as="c" hint-placeholder-count="3"><span style="font-weight: {{c.w}}; color: {{c.color}}; font-family: {{c.font}}; overflow-wrap: anywhere">{{c.t}}</span></sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":8200}}'>
+const MONO = "ui-monospace, 'SF Mono', Menlo, monospace";
+const SANS = 'inherit';
+function table(title, intro, head, cols, rows, monoCols) {
+  return {
+    title: title, intro: intro || '', hasIntro: !!intro, cols: cols,
+    head: head.map((t) => ({ t: t })),
+    rows: rows.map((r) => ({ cells: r.map((t, i) => ({ t: t, w: i === 0 ? 600 : 400, color: i === 0 ? '#101512' : '#3F4A44', font: (monoCols || []).indexOf(i) >= 0 ? MONO : SANS })) })),
+  };
+}
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      notices: [
+        { title: 'Everything is simulated', border: '#F3DDB5', body: 'Sign-in, recording, transcription, document reading, agent stages, saving, reminders, copy and share are simulated in the prototype on one synthetic case (Jordan, labelled Sample data). It makes no network calls and does not show that any backend works. The working screen carries a “Simulated progress” label.' },
+        { title: 'Missing source files', border: '#F3DDB5', body: 'The original HTML export, the seven reference PNGs and 05_INSURANCE_VOICE_UPGRADE.md were not attached to this session. The existing canvas pages (Page 1 and Refinement v2, built from the earlier references) were used as the visual source. Re-check against those files when available.' },
+        { title: 'Welcome image is a placeholder', border: '#F3DDB5', body: 'No image-generation or licensed-asset tool was available, so the Welcome panel is a labelled placeholder with art direction. It is not a finished asset. Replace it with a licensed or generated image and fill in the provenance table below.' },
+      ],
+      tables: [
+        table('Old → new screen map', '', ['Original screen', 'Dental version', 'Artboards'], 'minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr)', [
+          ['(new)', 'Welcome with placeholder image; Sign in, Create account, Explore a sample. Sign-in handoff to the system browser.', 'Welcome · Auth states · Sign-in handoff'],
+          ['1 · Home', 'Dental home: Speak first, Upload / Take photo / Type, Continue your plan, Try a sample, How it works', 'Home · Home, returning'],
+          ['2 · Intake, listening', 'Voice intake: permission, recording with timer, uploading, transcribing, failure', 'Voice · 4 states'],
+          ['3 · Editable transcript', 'Review transcript with extracted fact chips, Record again, add documents', 'Transcript'],
+          ['(new)', 'Document and photo capture: choose, camera permission, blurry recovery, preview with page counts and optional voice note', 'Capture · 4 states'],
+          ['4 · Agent working / v2 workspace', 'Read, identify, check what is missing, calculate, compare timing; pauses for answers; What we have; background, cancel, bounded retry', 'Working · reading, retry, paused, calculating'],
+          ['5 · One missing detail', 'Adaptive questions (network, benefits paid incl. spoken answer and “I don’t know”, missing document) then “Here is what we’ll use”', 'Questions · Facts review'],
+          ['6 · Your Best Next Steps / v2 guided decision', 'Your dental options: two equal timing scenarios, difference with conditions, what could change, self-pay quote state', 'Options · 360 / 390 / 430 · all-in-2026 · tablet'],
+          ['7 · Program details / v2 decision page', 'Plan details: summary, what needs confirmation, timeline, cost breakdown, benefits by year, sources, questions to ask', 'Plan · Sources · Share'],
+          ['8 · Review and approve / v2 action packet', 'Review your plan; what saving does and doesn’t do; storage consent separate from fact confirmation', 'Review'],
+          ['9 · Sending / v2 secure handoff', 'Saving your plan, three short stages', 'Saving'],
+          ['10 · Recoverable failure / v2 not confirmed', 'Recovery for save failure, unreadable document, implausible value, expired session, stale result', 'Recovery · 5 causes'],
+          ['11 · Delivered + Action Ledger / v2 receipt', 'Your plan is saved, next-step card, opt-in reminder, factual plan history with routine entries collapsed', 'Saved · Saved, full history'],
+          ['12 · Activity', 'Dental case activity; tapping resumes the case', 'Activity · My plan, empty'],
+          ['Tablet · Best Next Steps', 'Tablet comparison with scenario cards side by side', 'Options, tablet'],
+          ['(new)', 'Profile: account, documents with delete, privacy, permissions, sign out', 'Profile'],
+        ]),
+        table('Connected prototype path', 'Open “Interactive prototype · start here” and press Play. Each row is reachable by tapping; timings are simulated.', ['Step', 'How to get there', 'Branches and states'], 'minmax(0, 0.7fr) minmax(0, 1.2fr) minmax(0, 1.4fr)', [
+          ['Sign-in handoff', 'Welcome → Sign in → any email and password → Sign in', 'Password “wrong” → invalid; email with “offline” → network error; Cancel → Welcome “Sign-in was cancelled”; Forgot password and Create account → verify'],
+          ['Home', 'Returns automatically after sign-in', 'Explore a sample enters the same flow with a Sample data banner'],
+          ['Voice intake', 'Speak → Continue (permission) → Stop and review', 'Cancel at any point; Type instead'],
+          ['Document intake', 'Transcript → Add a document or photo → Take a picture → Continue', 'First photo is blurry → Retake or Choose a file instead; the transcript is kept'],
+          ['Agent work', 'Read these documents', 'Pauses: “We need two details”. Continue in the background → Home shows Continue your plan'],
+          ['Focused questions', 'Answer now', 'Network choice (Out of network shows a limit notice); benefits paid: type, Say it (spoken answer → Use $500), Attach statement, I don’t know'],
+          ['Fact review', 'After the last answer', 'Edit returns to that question; View source opens excerpts'],
+          ['Comparison', 'Looks right — calculate estimates', 'Switch scenario; What could change; Add a self-pay quote'],
+          ['Evidence', 'Review this plan', 'Expand cost rows, Where these numbers come from, Copy, Share preview'],
+          ['Save', 'Review and save → tick consent → Save this plan', 'First save fails on purpose → Recovery → Try again → saved, no duplicate'],
+          ['Ledger', 'Your plan is saved', 'Set a reminder (permission sheet), Show routine entries, View plan; Activity and My plan resume the case'],
+          ['Missing-info branch', 'Home → Type → Continue (no documents)', '“A quick detail”: Add your treatment estimate and benefits summary; I don’t have it → Finish later'],
+        ]),
+        table('Component-state inventory', '', ['Component', 'States', 'Where'], 'minmax(0, 0.8fr) minmax(0, 1.6fr) minmax(0, 0.8fr)', [
+          ['Agent orb', 'idle, active, success (check), alert (amber); motion off under reduced motion', 'Dental-Orb'],
+          ['Hosted sign-in', 'sign in, loading, invalid, network error, create, verify (code), reset, reset sent, returning, cancelled', 'Auth artboards'],
+          ['Voice capture', 'permission, recording + timer, uploading, transcribing, failed', 'Voice artboards'],
+          ['Transcript', 'from voice, typed, empty (Continue disabled with reason), with documents', 'Transcript'],
+          ['Document capture', 'choose, camera permission, camera denied note, blurry, preview, voice note off / recording / added', 'Capture artboards'],
+          ['Stage list', 'done, in progress, retrying (attempt n of 3), waiting for your answer, up next', 'Working, Saving'],
+          ['Question blocks', 'coverage, network, benefits paid (typed / spoken / attached / unknown / error), date, procedures, conflict, missing document, extracted info', 'Components, Questions'],
+          ['Fact row', 'source label, Edit (user values only), View source (document groups)', 'Facts review'],
+          ['Scenario card', 'selected, unselected, lower-cost tag, trade-off tag; stacked on phone, side by side on tablet', 'Options'],
+          ['Cost breakdown row', 'collapsed, expanded, limited by maximum note, new-year deductible note', 'Plan'],
+          ['Benefit-year bar', 'paid (solid), projected (hatched), left (empty), with text rows', 'Plan, Components'],
+          ['Sheets', 'sources, share preview, self-pay quote, attach statement, notification permission, delete all data, could-not-finish case', 'Plan, Options, Saved, Profile, Activity'],
+          ['Recovery', 'save failed, extraction failed, unknown input, expired session, stale result', 'Recovery artboards'],
+          ['Reminder', 'off, setting, on, notifications denied', 'Saved'],
+          ['Ledger', 'collapsed (routine hidden), expanded, resolved failure', 'Saved artboards'],
+          ['Case status', 'Working, Needs information, Ready to review, Plan saved, Could not finish', 'Activity, My plan, Home'],
+        ]),
+        table('Adaptive UI block contract', 'The agent returns one block per question. Every block shares: id, prompt, whyWeAsk, allowUnknown, unknownLabel, allowVoice, progress {index, total | null}. When total is null the header reads “A quick detail”.', ['Block kind', 'Fields', 'Answer payload'], 'minmax(0, 0.6fr) minmax(0, 1.4fr) minmax(0, 1fr)', [
+          ['choice', 'options [{value, label, hint}] · e.g. coverage: insured | self_pay | unsure; network: in | out | unsure', '{value, method: tap | voice}'],
+          ['currency', 'currency “USD”, min, max (e.g. 0–800), year, allowEvidence {accept: pdf, jpg, png}; no preset amounts', '{amount, method: typed | voice | document, documentId?}'],
+          ['date', 'min, max (dentist window), sourceRef', '{date} or {unknown: true}'],
+          ['multiSelect', 'rows [{id, label, detail, sourceRef}]', '{selectedIds[]}'],
+          ['conflict', 'field, values [{value, sourceRef}], allowManual', '{chosenValue, sourceRef | manual}'],
+          ['document', 'docType: treatment_estimate | benefits_summary | benefits_statement; actions upload | photo | none', '{documentId} or {unavailable: true}'],
+          ['extracted', 'field, value, sourceRef (file, page, excerpt)', '{confirmed: true} or {editedValue}'],
+        ], [0]),
+        table('Data fields', 'Money is never a bare number: every amount carries its label, year and status.', ['Object', 'Fields'], 'minmax(0, 0.5fr) minmax(0, 2fr)', [
+          ['Case', 'id, status (working | needs_info | confirm | ready | saved | failed), transcript {text, source: voice | typed}, documents[], answers{}, assumptions[], scenarios[], selectedScenarioId, savedAt, version (for idempotent saves), reminder {status, at}'],
+          ['Document', 'id, name, kind, pages, status (uploaded | reading | read | unreadable | unsupported), problem (blurry | incomplete | too_long)'],
+          ['Fact', 'field, value, source (provided_by_user | from_document | needs_confirmation | assumed | estimated), sourceRef {documentId, page, excerpt}, confirmedAt'],
+          ['Money', 'amount, currency, year, status (reported | projected | estimated | assumed), label'],
+          ['Scenario', 'id (all_this_year | split_years), items [{procedure, date, benefitYear, charge, contractualAdjustment, allowed, deductibleApplied, coinsuranceRate, planPays, youPay, limitedByMaximum}], totals {youPay, planPays}, perYear {year: {paidBefore, projected, left, maximum}}, conditions[]'],
+          ['Ledger entry', 'id, at, actor (you | actionbridge), type (description_added | document_added | documents_read | information_confirmed | comparison_calculated | save_failed | plan_saved | reminder_set), detail, resolvedBy?'],
+        ], [0]),
+        table('Events', 'Analytics and state events. No document contents, amounts, emails or names in event payloads.', ['Event', 'Payload'], 'minmax(0, 1fr) minmax(0, 1.2fr)', [
+          ['auth.started / auth.cancelled / auth.succeeded / auth.failed', 'reason: invalid | network | expired'],
+          ['permission.requested / permission.result', 'type: microphone | camera | notifications, result: granted | denied'],
+          ['intake.recording_started / stopped / transcribed / failed', 'durationSec'],
+          ['document.added / document.rejected', 'kind, pages, problem'],
+          ['agent.stage / agent.paused / agent.retry / agent.cancelled', 'stage, missing[], attempt'],
+          ['question.answered', 'blockKind, method: tap | typed | voice | document, unknown: bool'],
+          ['facts.confirmed / comparison.calculated', 'scenarioCount'],
+          ['plan.save_attempted / plan.save_failed / plan.saved', 'attempt, idempotencyKey hash'],
+          ['reminder.set / reminder.denied / reminder.off; questions.copied; share.opened', '—'],
+        ], [0]),
+        table('Loading, empty and error states', '', ['Screen', 'Loading', 'Empty', 'Error'], 'minmax(0, 0.6fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)', [
+          ['Sign-in', 'Signing in… (button busy)', 'Missing email/password message', 'Invalid credentials, network, cancelled, expired session'],
+          ['Voice', 'Uploading, transcribing', '—', 'Too quiet to transcribe; nothing kept'],
+          ['Transcript', '—', 'Continue disabled: “Add a few words…”', '—'],
+          ['Capture', '—', 'Choose screen; Read disabled with no documents', 'Blurry, incomplete, unsupported, too long'],
+          ['Working', 'Stage list, What we have', '“Details appear here as we find them.”', 'Retrying attempt n of 3 → extraction recovery'],
+          ['Options / Plan', 'Calculating stages', 'No self-pay quote', 'Stale result recovery'],
+          ['Save', 'Saving your plan', '—', 'Save failed, safe retry, no duplicate'],
+          ['My plan / Activity', '—', '“No plan yet” with Start on Home', 'Could not finish case'],
+        ]),
+        table('Native permissions', 'Our own explanation screen comes first; the system prompt follows only after Continue.', ['Permission', 'When', 'Reason shown', 'Fallback'], 'minmax(0, 0.6fr) minmax(0, 0.8fr) minmax(0, 1.2fr) minmax(0, 1fr)', [
+          ['Microphone', 'First tap on Speak', 'We listen only while you’re recording, and you review the text first.', 'Type instead'],
+          ['Camera', 'First Take photo', 'Only to photograph documents like your estimate.', 'Choose a file or photo; note to enable in Settings'],
+          ['Photos', 'Choose a photo', 'System picker, no library-wide access requested', '—'],
+          ['Notifications', 'Set a reminder (opt-in)', 'One reminder on Mon, Oct 5, 2026, 10:00 AM. Nothing else.', 'No reminder; Settings note; Try again'],
+        ]),
+        table('Fixture and calculation check', 'Sample data · Jordan. Claims apply in date order: deductible first, then coinsurance, then capped by what is left of that year’s $800 maximum. In network, billed equals allowed (assumed), so the adjustment is $0. 2027 coverage is assumed to match 2026. Each figure below was checked by running the prototype’s own calculation.', ['Item', 'All treatment this year', 'Split across benefit years'], 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)', [
+          ['Filling · Nov 10, 2026 · $250', '$50 deductible, plan 80% of $200 = $160, you $90', 'Same: plan $160, you $90'],
+          ['Filling · Nov 11, 2026 · $250', 'Plan would pay $200, only $140 left → you $110', 'Same: plan $140, you $110'],
+          ['Crown · $1,000', 'Nov 12, 2026: maximum used up → plan $0, you $1,000', 'Jan 10, 2027: $50 deductible, 50% of $950 → plan $475, you $525'],
+          ['Totals (estimated)', 'Plan $300, you $1,200', 'Plan $775, you $725'],
+          ['2026 benefit bar', '$500 paid + $300 projected = $800, $0 left', '$500 paid + $300 projected = $800, $0 left'],
+          ['2027 benefit bar', '$0 projected, $800 left', '$475 projected, $325 left'],
+          ['Estimated difference', '$475 (split is lower under these assumptions)', ''],
+          ['Self-pay component (separate fixture)', 'Charge $1,500, adjustment $500, allowed $1,000, deductible $50, 50% → plan $475, you $525', 'Cash quote $1,200 → insurance estimated $675 less'],
+        ]),
+        table('Accessibility and motion', '', ['Area', 'Rule as built'], 'minmax(0, 0.5fr) minmax(0, 2fr)', [
+          ['Targets', 'All controls at least 44 px; primary actions 56 px'],
+          ['Meaning', 'Source labels and statuses are icon + text; bars use solid / hatched / empty plus text rows'],
+          ['Screen readers', 'Labels on icon buttons, radio groups with aria-checked, aria-expanded on disclosures, live regions for stage and save progress, labelled bars'],
+          ['Larger text', 'No fixed-height text containers; buttons use min-height; rows wrap'],
+          ['Motion', 'Screen transitions 220 ms, sheets 240 ms; orb, spinners and transitions stop under reduced motion'],
+          ['Layout', 'Frames at 390 × 844, checked at 360, 430 and 1024 with no horizontal overflow; safe-area padding top and bottom; tabs hidden during capture, questions, review, saving and sign-in'],
+        ]),
+        table('Copy review', '', ['Check', 'Result'], 'minmax(0, 1fr) minmax(0, 1.4fr)', [
+          ['Housing, rent, referral, program, eligibility language', 'Removed from all dental screens'],
+          ['“Best”, match percentages, confidence scores, pie charts, gauges', 'None; the lower option says “Lower estimated cost under these assumptions”'],
+          ['Implementation terms in user copy', 'None; engineering notes appear only on the handoff boards'],
+          ['Money', 'Every amount has a label, a year and an estimate status; annual maximums are never combined'],
+          ['Saving', 'States plainly that it does not book treatment, contact anyone or submit paperwork'],
+          ['Every action', 'Has a destination in the prototype or a documented disabled state (Open phone Settings, Retake photo on the unfinished sample case)'],
+        ]),
+        table('Image provenance', '', ['Asset', 'Status', 'Source / license', 'Alt text'], 'minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1.2fr)', [
+          ['Welcome image: calm, empty dental treatment room', 'Placeholder (labelled in the design)', 'To be supplied: licensed stock or generated; record creator, license and attribution here. No clinic or insurer logos.', 'A calm, empty dental treatment room in soft daylight.'],
+          ['ActionBridge mark and orb', 'Final (vector, in file)', 'Original to this project', 'Decorative; hidden from screen readers'],
+          ['Icons', 'Final (inline outline paths)', 'Lucide-style, ISC license', 'Decorative; controls carry their own labels'],
+        ]),
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
