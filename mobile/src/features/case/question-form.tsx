@@ -3,7 +3,7 @@ import { randomUUID } from 'expo-crypto';
 import { useState, type ReactNode } from 'react';
 import { AccessibilityInfo, View } from 'react-native';
 import { ErrorNotice } from '../../components/states';
-import { AppText, Button, ChoiceChips, MoneyField, Notice, Screen, TextField } from '../../components/ui';
+import { AppText, Button, MoneyField, Notice, RadioCards, Screen, TextField } from '../../components/ui';
 import { answerChanges, type FactValue } from '../../lib/edits';
 import { centsToInput, formatCents, formatDate, isIsoDate, parseDollarsToCents } from '../../lib/format';
 import type { QuestionSpec } from '../../lib/questions';
@@ -160,9 +160,9 @@ export function QuestionForm({
       ) : null}
 
       {question.kind === 'choice' ? (
-        <ChoiceChips
-          label="Choose one"
-          options={question.options.map((option) => ({ id: option.id, label: option.label }))}
+        <RadioCards
+          label={question.label}
+          options={question.options.map((option) => ({ id: option.id, label: option.label, ...(option.hint ? { hint: option.hint } : {}) }))}
           value={choice}
           onChange={(id) => {
             setChoice(id);

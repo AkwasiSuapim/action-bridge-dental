@@ -108,10 +108,6 @@ function SavedBody() {
         </Card>
       ) : null}
 
-      <AppText variant="caption" muted>
-        Saving didn’t book treatment, contact anyone or submit a claim.
-      </AppText>
-
       <View style={{ gap: space(2) }}>
         <AppText variant="heading">Plan history</AppText>
         {ledgerError ? <ErrorNotice error={ledgerError} onRetry={loadLedger} /> : null}

@@ -22,6 +22,34 @@ const client = (fetchImpl: typeof fetch, token: string | null = 'token-abc') =>
   createApiClient({ baseUrl: 'https://api.example/dev', getAccessToken: async () => token, fetchImpl, sleep: async () => {}, random: () => 0 });
 
 describe('API client', () => {
+  it('calls the planned agent-job routes and validates job views', async () => {
+    const view = {
+      jobId: 'job-1',
+      caseId: 'case-1',
+      caseRevision: 2,
+      operation: 'interpret',
+      status: 'running',
+      attempt: 1,
+      maxAttempts: 3,
+      events: [],
+      questions: null,
+      resultBlocks: null,
+      error: null,
+      createdAt: '2026-10-03T16:00:00.000Z',
+      updatedAt: '2026-10-03T16:00:01.000Z',
+    };
+    const { impl, calls } = fakeFetch({ status: 202, body: { jobId: 'job-1' } }, { status: 200, body: view }, { status: 200, body: { ...view, status: 'cancelled' } });
+    const api = client(impl);
+    await expect(api.createJob('case-1', { expectedRevision: 2, operation: 'interpret', input: { text: 'Two fillings and a crown' } })).resolves.toEqual({ jobId: 'job-1' });
+    await expect(api.getJob('job-1')).resolves.toMatchObject({ status: 'running' });
+    await expect(api.cancelJob('job-1')).resolves.toMatchObject({ status: 'cancelled' });
+    expect(calls.map((c) => `${c.init?.method} ${c.url.replace('https://api.example/dev', '')}`)).toEqual([
+      'POST /v1/cases/case-1/jobs',
+      'GET /v1/jobs/job-1',
+      'POST /v1/jobs/job-1/cancel',
+    ]);
+  });
+
   it('reports an ended session once per call, for a missing token and for HTTP 401', async () => {
     const onUnauthenticated = vi.fn();
     const make = (impl: typeof fetch, token: string | null) =>

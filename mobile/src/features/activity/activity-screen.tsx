@@ -20,7 +20,7 @@ export function ActivityScreen() {
       {!loaded ? <ActivityIndicator color={colors.primary} accessibilityLabel="Loading activity" /> : null}
       {loaded && items.length === 0 ? (
         <Card style={{ gap: space(3) }}>
-          <AppText muted>Nothing yet. Estimates you start on this phone appear here.</AppText>
+          <AppText muted>Estimates you start will appear here.</AppText>
           <Button label="Start on Home" variant="secondary" onPress={() => router.navigate('/')} />
         </Card>
       ) : null}
@@ -34,11 +34,6 @@ export function ActivityScreen() {
           return <CaseCard key={item.caseId} summary={state.summary} />;
         })}
       </View>
-      {items.length > 0 ? (
-        <AppText variant="caption" muted>
-          Shows estimates started on this phone. Demo records are kept for a limited time.
-        </AppText>
-      ) : null}
     </Screen>
   );
 }

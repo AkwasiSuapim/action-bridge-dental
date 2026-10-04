@@ -2,7 +2,7 @@ import type { CoverageComparison, DentalCase, EstimateResult, ScenarioComparison
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, View, useWindowDimensions } from 'react-native';
 import { AgentOrb } from '../../components/orb';
 import { ErrorNotice, ErrorState, LoadingState } from '../../components/states';
 import { AppText, Badge, Button, Card, Notice, Row, Screen } from '../../components/ui';
@@ -84,7 +84,7 @@ function OptionsBody({ record, results }: { record: DentalCase; results: Results
       <Screen footer={<Button label="Answer the missing details" onPress={() => router.push(`/case/${record.caseId}/questions`)} />}>
         {sample ? <Badge label="Sample data" tone="neutral" /> : null}
         <AppText variant="title">A few details are missing</AppText>
-        <AppText muted>We need these before we can estimate. “I don’t know” is a fine answer — we’ll show what’s still open.</AppText>
+        <AppText muted>We need these before we can estimate.</AppText>
         <Card>
           {estimate.missing.map((fact) => (
             <AppText key={fact.fieldPath}>• {questionFor(fact, record).label}</AppText>
@@ -108,6 +108,8 @@ function OptionsBody({ record, results }: { record: DentalCase; results: Results
     );
   }
 
+  const { width } = useWindowDimensions();
+  const sideBySide = width >= 700;
   const model = buildOptions(record, scenarios);
   const selectedCard = model.cards.find((card) => card.scenarioId === selected);
   return (
@@ -133,9 +135,12 @@ function OptionsBody({ record, results }: { record: DentalCase; results: Results
         <AppText muted>{model.summary}</AppText>
       </View>
 
-      <View accessibilityRole="radiogroup" accessibilityLabel="Timing options" style={{ gap: space(3) }}>
+      {/* Stacked on phones, side by side on tablets (design v3 "Options, tablet"). */}
+      <View accessibilityRole="radiogroup" accessibilityLabel="Timing options" style={{ gap: space(3), flexDirection: sideBySide ? 'row' : 'column', alignItems: sideBySide ? 'stretch' : undefined }}>
         {model.cards.map((card) => (
-          <ScenarioCard key={card.scenarioId} card={card} selected={card.scenarioId === selected} onSelect={() => setSelected(card.scenarioId)} />
+          <View key={card.scenarioId} style={sideBySide ? { flex: 1 } : undefined}>
+            <ScenarioCard card={card} selected={card.scenarioId === selected} onSelect={() => setSelected(card.scenarioId)} fill={sideBySide} />
+          </View>
         ))}
       </View>
 

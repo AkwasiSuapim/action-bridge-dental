@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, View } from 'react-native';
+import { Animated, Easing, Platform, View } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useTheme } from '../theme/theme';
 
@@ -10,6 +10,8 @@ import { useTheme } from '../theme/theme';
  */
 export type OrbMode = 'idle' | 'active' | 'success' | 'alert';
 
+/** Native-driver animation on phones; browsers have no native animated module. */
+const NATIVE_DRIVER = Platform.OS !== 'web';
 const RING_ANGLES_A = [0, 60, 120];
 const RING_ANGLES_B = [30, 90, 150];
 
@@ -33,16 +35,16 @@ export function AgentOrb({ size = 170, mode = 'idle' }: { size?: number; mode?: 
       return;
     }
     const loops = [
-      Animated.loop(Animated.timing(spinA, { toValue: 1, duration: active ? 9000 : 24000, easing: Easing.linear, useNativeDriver: true })),
-      Animated.loop(Animated.timing(spinB, { toValue: 1, duration: active ? 14000 : 38000, easing: Easing.linear, useNativeDriver: true })),
+      Animated.loop(Animated.timing(spinA, { toValue: 1, duration: active ? 9000 : 24000, easing: Easing.linear, useNativeDriver: NATIVE_DRIVER })),
+      Animated.loop(Animated.timing(spinB, { toValue: 1, duration: active ? 14000 : 38000, easing: Easing.linear, useNativeDriver: NATIVE_DRIVER })),
     ];
     if (mode !== 'success') {
       const half = active ? 900 : 2600;
       loops.push(
         Animated.loop(
           Animated.sequence([
-            Animated.timing(breathe, { toValue: 1, duration: half, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-            Animated.timing(breathe, { toValue: 0, duration: half, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            Animated.timing(breathe, { toValue: 1, duration: half, easing: Easing.inOut(Easing.ease), useNativeDriver: NATIVE_DRIVER }),
+            Animated.timing(breathe, { toValue: 0, duration: half, easing: Easing.inOut(Easing.ease), useNativeDriver: NATIVE_DRIVER }),
           ]),
         ),
       );

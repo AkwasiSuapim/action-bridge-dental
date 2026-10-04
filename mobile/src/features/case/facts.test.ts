@@ -20,10 +20,20 @@ describe('buildFactGroups', () => {
       'Filling two',
       'Crown',
       'Your coverage',
-      'This benefit year · Jan 1, 2026 – Dec 31, 2026',
-      'Next benefit year · Jan 1, 2027 – Dec 31, 2027',
+      'This benefit year · 2026',
+      'Next benefit year · 2027',
     ]);
     expect(find('policy.rate.major')?.value).toBe('Plan pays 50% after deductible');
+    expect(groups.find((g) => g.key === 'planYears.py-2027')?.summary).toMatchObject({
+      value: 'Same as 2026',
+      detail: '$800.00 maximum · $50.00 deductible · nothing paid yet',
+      source: 'assumed',
+    });
+    expect(groups.find((g) => g.title === 'Crown')?.summary).toEqual({
+      value: '$1,000.00 · Nov 12, 2026',
+      detail: 'In network · allowed $1,000.00 · dentist allows Nov 12, 2026 – Jan 15, 2027',
+      needsAnswer: false,
+    });
   });
 
   it('shows dentist windows read-only and fixed dates as fixed', () => {

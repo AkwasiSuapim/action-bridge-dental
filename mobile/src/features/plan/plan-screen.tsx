@@ -120,7 +120,7 @@ function PlanBody({ record, plan }: { record: DentalCase; plan: PlanDetails }) {
                 <AppText variant="caption" muted>
                   {item.ask}
                 </AppText>
-                <FactBadge source={item.source} />
+                {isSampleCase(record) && item.source === 'sample' ? null : <FactBadge source={item.source} />}
               </View>
             </View>
           ))}
@@ -232,7 +232,7 @@ function PlanBody({ record, plan }: { record: DentalCase; plan: PlanDetails }) {
             </View>
           </View>
           <AppText variant="caption" muted>
-            Only these questions are shared — no amounts or documents. Nothing is sent unless you choose to share it.
+            Shares only these questions.
           </AppText>
         </Card>
       </Section>

@@ -1,4 +1,4 @@
-import type { DentalCase, MissingFact, PatchCaseRequest } from '@actionbridge/contracts';
+import type { DentalCase, MissingFact, MissingFieldBlock, PatchCaseRequest } from '@actionbridge/contracts';
 
 /**
  * Adaptive response loop, typed path (doc 05 §4): the engine decides which facts are missing;
@@ -7,7 +7,7 @@ import type { DentalCase, MissingFact, PatchCaseRequest } from '@actionbridge/co
  */
 export type QuestionSpec =
   | { kind: 'currency'; fieldPath: string; label: string; reason: string }
-  | { kind: 'choice'; fieldPath: string; label: string; reason: string; options: { id: string; label: string; value: unknown }[] }
+  | { kind: 'choice'; fieldPath: string; label: string; reason: string; options: { id: string; label: string; value: unknown; hint?: string }[] }
   | { kind: 'date'; fieldPath: string; label: string; reason: string }
   | { kind: 'edit_case'; fieldPath: string; label: string; reason: string };
 
@@ -32,7 +32,7 @@ export function questionFor(fact: MissingFact, record: DentalCase): QuestionSpec
       options: [
         { id: 'insured', label: 'Yes, I have a plan', value: 'insured' },
         { id: 'self_pay', label: 'No, I’ll pay myself', value: 'self_pay' },
-        { id: 'unknown', label: 'Not sure', value: 'unknown' },
+        { id: 'unknown', label: 'Not sure', value: 'unknown', hint: 'Your employer or insurer can tell you.' },
       ],
     };
   }
@@ -79,9 +79,9 @@ export function questionFor(fact: MissingFact, record: DentalCase): QuestionSpec
           label: `Is your dentist in your plan’s network for ${name}?`,
           reason: 'Network status decides whether the dentist accepts your plan’s allowed amount.',
           options: [
-            { id: 'in', label: 'In network', value: 'in' },
-            { id: 'out', label: 'Out of network', value: 'out' },
-            { id: 'unknown', label: 'Not sure', value: 'unknown' },
+            { id: 'in', label: 'In network', value: 'in', hint: 'Your dentist is listed in your plan.' },
+            { id: 'out', label: 'Out of network', value: 'out', hint: 'Your dentist is not in your plan.' },
+            { id: 'unknown', label: 'Not sure', value: 'unknown', hint: 'Your insurer’s dentist finder can tell you.' },
           ],
         };
       case 'proposedDate':
@@ -125,4 +125,24 @@ export function changesForAnswer(record: DentalCase, fieldPath: string, value: u
     return { policy: { ...record.policy, [id]: { ...map, [field]: value } } };
   }
   throw new Error(`Unsupported field ${fieldPath}`);
+}
+
+/**
+ * Adapter for agent-proposed questions (`missing_field` UI blocks from a job, D-13) so they render
+ * with the same question card as engine-reported facts. The block's field path, choices and
+ * limits come from validated contracts; unsupported input types fall back to a plain notice.
+ */
+export function questionFromBlock(block: MissingFieldBlock): QuestionSpec {
+  const base = { fieldPath: block.fieldPath, label: block.label, reason: block.reason };
+  switch (block.inputType) {
+    case 'currency':
+      return { kind: 'currency', ...base };
+    case 'single_select':
+      return { kind: 'choice', ...base, options: block.options.map((option) => ({ id: option.id, label: option.label, value: option.id })) };
+    case 'date':
+      return { kind: 'date', ...base };
+    default:
+      // fact_review and attachment need the document pipeline, which is not built yet.
+      return { kind: 'edit_case', ...base };
+  }
 }

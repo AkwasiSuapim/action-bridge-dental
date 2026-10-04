@@ -64,11 +64,6 @@ export function RulesFields({
           </View>
         );
       })}
-      {categories.length > 0 ? (
-        <AppText variant="caption" muted>
-          Enter what your benefits summary says. We don’t check these with your insurer.
-        </AppText>
-      ) : null}
     </View>
   );
 }

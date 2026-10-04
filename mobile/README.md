@@ -16,6 +16,11 @@ The dental app UI (design v3, `actionbridge-dental-v3/`), built on the foundatio
 
 Not built yet, because their backend does not exist: voice, document upload and camera, agent progress, reminders, and data deletion. Home shows those inputs as "Coming soon".
 
+Ready for the next backend features:
+- `src/lib/capabilities.ts` switches voice, upload and photo on Home once their APIs are deployed.
+- `useApi()` already has typed agent-job calls (`createJob`, `getJob`, `answerJob`, `retryJob`, `cancelJob`) validated against `@actionbridge/contracts`.
+- `questionFromBlock()` in `src/lib/questions.ts` renders agent `missing_field` questions with the same question card as engine questions.
+
 ## Run on a phone (Expo Go)
 
 ```bash
