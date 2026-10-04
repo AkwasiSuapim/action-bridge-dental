@@ -67,11 +67,20 @@ npm.cmd test
 
 Browser tests cover the sample and manual journeys, case switching/reload, edited coverage, individual quotes and scope validation, authentication/password-change simulations, all intake methods, explicit voice confirmation, stale-result protection, lower cash quotes, duplicate saves, save retry, background completion, extra question types, reset, and layouts at 360, 390, 768, 1024, 1280 and 1440 pixels. Axe checks cover the main journey, manual forms and coverage drawers. Browser artifacts are under `test-results/` and `playwright-report/` and are ignored by Git.
 
-For static hosting, serve `dist/` and rewrite application routes to `index.html` so direct links and reloads work. `npm.cmd run preview` serves the production build locally.
+`npm.cmd run preview` serves the production build locally.
+
+## Deploy
+
+The site is static and needs no environment variables or secrets. Vercel must build from the **repository root**, because the web app uses the shared packages and their `dist/` folders are not committed. One command does it: `npm ci && npm run build:web`, output `web/dist`. `vercel.json` rewrites unknown paths to `index.html` so direct links and reloads work.
+
+On vercel.com: Add New → Project → import the GitHub repo and keep the root directory as the repository root. Build settings come from `vercel.json`. Pushes to the production branch (`main`) deploy the live site; other branches get preview URLs.
+
+Node 22.13 or later is required (`engines` in the root `package.json`). When the web app is connected to the live API later, its public settings (API URL, Cognito region and client ID) will be `VITE_*` variables set in Vercel's project settings; they are public values, not secrets.
 
 ## Asset attribution
 
-- Dental room: Ozkan Guner, Unsplash, photo `1643916800611-1302e8d27c38`, reused from the provided web mockup. [Photo source](https://images.unsplash.com/photo-1643916800611-1302e8d27c38). Served locally from `public/assets/dental-room.jpg`; attribution appears on login.
+- Login photo (tooth and mirror): shared with the mobile app (`mobile/assets/images/welcome.jpg`), served from `public/assets/welcome.jpg`. Source and license still to be recorded before release.
+- Dental room (previous login photo, kept for now): Ozkan Guner, Unsplash, photo `1643916800611-1302e8d27c38`. [Photo source](https://images.unsplash.com/photo-1643916800611-1302e8d27c38). `public/assets/dental-room.jpg`.
 - Plus Jakarta Sans: distributed by `@fontsource/plus-jakarta-sans`, SIL Open Font License. Served locally.
 - Icons: Lucide, ISC license.
 - Brand and orbital illustration: code-native SVG adapted from the provided web/mobile references.
