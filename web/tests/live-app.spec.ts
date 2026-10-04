@@ -84,11 +84,25 @@ test('sample case: server amounts, choosing an option, saving once with retry, s
       exact: true,
     }),
   ).toBeVisible();
-  const cards = page.locator('.scenario-card');
+  const cards = page.locator('.choice-card');
   await expect(cards).toHaveCount(2);
   await expect(cards.first()).toContainText('$1,200');
   await expect(cards.nth(1)).toContainText('$725');
   expect(api.requests.some((r) => r.path.endsWith('/scenarios'))).toBe(true);
+  // Plain words first, from the calculator's numbers.
+  await expect(page.locator('.meaning-card')).toContainText(
+    'If you do everything as planned, you pay about $1,200 and your plan pays $300.',
+  );
+  await expect(page.locator('.meaning-card')).toContainText('$475 less');
+  await expect(cards.nth(1)).toContainText('Save $475');
+  await expect(page.locator('.benefits-left')).toContainText('$300');
+  const download = page.waitForEvent('download');
+  await page
+    .getByRole('button', { name: 'Remind me before they reset' })
+    .click();
+  expect((await download).suggestedFilename()).toBe(
+    'dental-benefits-reminder.ics',
+  );
 
   await cards.nth(1).getByRole('radio').check();
   await page.getByRole('button', { name: 'Review this plan' }).click();
@@ -190,7 +204,7 @@ test('composer: words and a page, analysed once, confirmations quote their sourc
   ).toBeVisible();
   await expect(page.locator('.estimate-summary')).toContainText('$1,200');
   await page.getByRole('button', { name: 'See your options' }).click();
-  await expect(page.locator('.scenario-card')).toHaveCount(2);
+  await expect(page.locator('.choice-card')).toHaveCount(2);
 
   await page.getByRole('button', { name: 'Edit details' }).click();
   await expect(
@@ -231,7 +245,7 @@ test('editing a fact saves it to the server as provided by you, and stale result
   await expect(page.getByText('Provided by you').first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Confirm and compare' }).click();
-  await expect(page.locator('.scenario-card').first()).toBeVisible();
+  await expect(page.locator('.choice-card').first()).toBeVisible();
   // Results shown after the edit are for the new revision only.
   const latest = api.requests
     .filter((r) => r.path.endsWith('/scenarios'))
@@ -248,7 +262,7 @@ test('self-pay quotes need every scope confirmation and come back from the serve
   await signIn(page);
   await startSample(page);
   await page.getByRole('button', { name: 'Confirm and compare' }).click();
-  await page.getByRole('button', { name: 'Self-pay' }).click();
+  await page.getByRole('button', { name: 'Paying without insurance' }).click();
   await expect(
     page.getByRole('heading', { name: 'Add a self-pay quote' }),
   ).toBeVisible();
@@ -303,7 +317,7 @@ for (const width of [360, 390, 768, 1024, 1440]) {
     await startSample(page);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await page.getByRole('button', { name: 'Confirm and compare' }).click();
-    await expect(page.locator('.scenario-card').first()).toBeVisible();
+    await expect(page.locator('.choice-card').first()).toBeVisible();
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     expect(await noOverflow()).toBe(true);
   });

@@ -30,7 +30,7 @@ In our reference case, doing everything now costs **$1,200**. Doing the crown a 
 2. **See what the AI understood** — one card at a time: *"Is this right? Crown · $1,000"* with the **exact words** it came from. Every quote is verified against your document. Nothing is used until you choose **Yes**.
 3. **Answer only what's missing** — a few questions at a time, each with a one-line definition ("Annual maximum: the most your insurer pays in one benefit year"). *I don't know* becomes a question for your dentist or insurer, never a guess.
 4. **Get the numbers** — a deterministic calculator (integer cents, fixed rules, 280+ tests) estimates each procedure, each benefit year, the timing options your dentist permits, and a self-pay comparison.
-5. **Act on it** — see where every number came from, save a plan, and take a ready-made question to your dentist.
+5. **Understand and act** — a plain-language summary ("you pay about $1,200 now, or about $725 if the crown waits until January") that you can **listen to**, where every number came from, a saved plan, a question for your dentist, and a **reminder before unused benefits reset** (phone notification or calendar alert).
 
 ## Architecture
 
@@ -45,13 +45,14 @@ flowchart LR
   M & W -->|presigned upload| S3[(Amazon S3<br/>private uploads)]
   API --> L1[Lambda: cases<br/>& saved plans]
   API --> L2[Lambda: calculations]
-  API --> L3[Lambda: jobs & uploads]
+  API --> L3[Lambda: jobs, uploads<br/>& read-aloud]
   L1 & L2 & L3 --> DDB[(DynamoDB)]
   L3 --> SQS[[Amazon SQS]]
   SQS --> WK[Lambda: agent worker]
   WK --> BR[Amazon Bedrock<br/>Nova 2 Lite]
   WK --> TX[Amazon Textract]
   WK --> TR[Amazon Transcribe]
+  L3 --> PL[Amazon Polly]
   WK --> S3
   WK --> DDB
   L2 -.-> ENG{{Benefits engine<br/>pure, deterministic}}
@@ -65,6 +66,7 @@ flowchart LR
 | **Amazon Bedrock** (Nova 2 Lite, Converse API with tool use) | Reads the user's words and document text and **proposes** facts through typed tools (`record_case_facts`, `check_missing_facts`). It never calculates amounts. |
 | **Amazon Textract** | Turns uploaded PDFs and photos into text: instant API for images and single pages, asynchronous API for multi-page PDFs (first 5 pages). |
 | **Amazon Transcribe** | Converts voice notes (M4A from the phone, WebM/Ogg from browsers) into editable text. |
+| **Amazon Polly** | Reads key screens aloud (neural voice) — the plain-language summary, each "Is this right?" card and each question — for people who prefer listening. |
 | **AWS Lambda** (Node.js 22, arm64) | Five functions: health, cases and saved plans, calculations, jobs and uploads, and the agent worker. |
 | **Amazon API Gateway** (HTTP API) | The public API: Cognito JWT authorizer on every route, CORS limited to our web origins, throttling. |
 | **Amazon Cognito** | Sign-in for both apps. Admin-created accounts only, strong password policy, short-lived tokens. |

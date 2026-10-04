@@ -1,8 +1,6 @@
 import { CalendarDays } from 'lucide-react';
 import type { Scenario, DentalCaseInput } from '@actionbridge/contracts';
 import { useCase } from '../../state/case-store';
-import { isSampleCase } from '../../domain/provenance';
-import { treatmentTitle } from '../../domain/model';
 import { Badge, Button, Card, Disclosure, Row } from '../../components/ui';
 import {
   dateLabel,
@@ -11,127 +9,63 @@ import {
   scenarioTitle,
 } from '../../domain/model';
 
+/** One choice, in plain words: what happens, what you pay, and why it differs. */
 export function ScenarioCard({
   scenario,
   selected,
   onSelect,
-  onSources,
 }: {
   scenario: Scenario;
   selected: boolean;
   onSelect: () => void;
-  onSources: () => void;
 }) {
   const { record } = useCase();
   const input = record!;
-  const sample = isSampleCase(input);
-  const answered = input.sourceFacts.some(
-    (f) => f.userConfirmed && f.origin !== 'synthetic',
+  const moved = scenario.schedule.filter((s) =>
+    scenario.movedProcedureIds.includes(s.procedureId),
   );
   return (
-    <article className={`scenario-card ${selected ? 'selected' : ''}`}>
-      <label className="scenario-select">
-        <div className="scenario-header">
-          <input
-            type="radio"
-            name="schedule"
-            checked={selected}
-            onChange={onSelect}
-          />
-          <div>
-            <h3>{scenarioTitle(scenario)}</h3>
-            <p className="small muted">
-              {scenario.kind === 'baseline'
-                ? 'Complete care in the current benefit year'
-                : 'Compare dates permitted by your dentist'}
-            </p>
-          </div>
-          {selected && <Badge tone="green">Selected</Badge>}
-        </div>
-        <div>
-          <span className="scenario-money">
-            {money(scenario.estimate.totals.patientPaysCents)}
-          </span>
-          <p className="muted small">Estimated patient cost</p>
-        </div>
-        <div className="scenario-facts">
-          <Row
-            label="Insurer contribution"
-            value={
-              <>
-                {money(scenario.estimate.totals.insurerPaysCents)}
-                <small>
-                  {scenario.kind === 'baseline'
-                    ? 'Original treatment dates'
-                    : 'Across both benefit years'}
-                </small>
-              </>
-            }
-          />
-          {scenario.schedule.map((s) => (
-            <Row
-              key={s.procedureId}
-              label={procedureLabel(s.procedureId, input)}
-              value={dateLabel(s.date)}
-            />
-          ))}
-          <Row label="Procedure scope" value={treatmentTitle(input)} />
-        </div>
-        <div className="assumptions">
-          <strong className="small">Assumptions</strong>
-          <div>
-            <span>
-              {input.procedures.every((p) => p.network === 'in')
-                ? 'In network'
-                : input.procedures.every((p) => p.network === 'out')
-                  ? 'Out of network'
-                  : 'Mixed provider networks'}
-              ;{' '}
-              {input.procedures.every(
-                (p) => p.providerChargeCents === p.allowedCents,
-              )
-                ? 'billed equals allowed'
-                : 'allowed amounts differ from billed fees'}
-            </span>
-            <Badge>
-              {answered
-                ? 'Includes your answers'
-                : sample
-                  ? 'Sample'
-                  : 'Provided by you'}
+    <label className={`choice-card ${selected ? 'selected' : ''}`}>
+      <div className="choice-card-head">
+        <input
+          type="radio"
+          name="schedule"
+          checked={selected}
+          onChange={onSelect}
+        />
+        <h3>{scenarioTitle(scenario, input)}</h3>
+        {scenario.kind === 'alternative' &&
+          scenario.differenceFromBaselineCents > 0 && (
+            <Badge tone="green">
+              Save {money(scenario.differenceFromBaselineCents)}
             </Badge>
-          </div>
-          {scenario.kind === 'alternative' && (
-            <>
-              <div>
-                <span>
-                  {Object.values(input.planYears).some(
-                    (y) =>
-                      y.sourceStatus === 'explicit_unchanged_plan_assumption',
-                  )
-                    ? "Next year's coverage and fees unchanged"
-                    : 'Future plan terms entered; confirm before acting'}
-                </span>
-                <Badge tone="assumed">Unverified</Badge>
-              </div>
-              <div>
-                <span>Dates are within dentist-supplied windows</span>
-                <Badge>{sample ? 'Sample' : 'From your dentist'}</Badge>
-              </div>
-            </>
           )}
-          <div>
-            <span>No other claims use these balances</span>
-            <Badge tone="assumed">Assumed</Badge>
-          </div>
-        </div>
-      </label>
-      <div className="scenario-card-footer">
-        <Button variant="secondary" onClick={onSources}>
-          View sources
-        </Button>
       </div>
-    </article>
+      <div className="choice-card-money">
+        <span className="small muted">You pay about</span>
+        <strong>{money(scenario.estimate.totals.patientPaysCents)}</strong>
+        <span className="small muted">
+          Your plan pays {money(scenario.estimate.totals.insurerPaysCents)}
+        </span>
+      </div>
+      <p className="small">
+        {scenario.kind === 'baseline'
+          ? 'Every treatment on the dates your dentist planned.'
+          : `${moved
+              .map(
+                (s) =>
+                  `${procedureLabel(s.procedureId, input)} on ${dateLabel(s.date)}`,
+              )
+              .join(
+                ' and ',
+              )}, inside the window your dentist allows. A new benefit year starts, so your plan can pay more.`}
+      </p>
+      {scenario.conditional && (
+        <span className="small muted">
+          Assumes next year’s plan stays the same.
+        </span>
+      )}
+    </label>
   );
 }
 export function BenefitYears({

@@ -29,6 +29,7 @@ import { useApi, useAuth } from '../../state/auth';
 import { useCase } from '../../state/case-store';
 import { ApiNotice } from '../assistant/assistant-page';
 import { ledgerTitle, PlanHistory, QuestionCard } from '../saved/saved-pages';
+import { BenefitsLeft } from '../options/options-page';
 
 type Summary = { record: DentalCase; saved: SavedStrategy | null };
 
@@ -239,6 +240,7 @@ export function MyPlanPage() {
           </Button>
         </div>
       </Card>
+      <BenefitsLeft scenario={saved.scenario} record={record} />
       <QuestionCard />
       <PlanHistory />
       <Button variant="ghost" onClick={() => navigate('/activity')}>

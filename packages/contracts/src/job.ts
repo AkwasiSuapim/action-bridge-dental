@@ -148,3 +148,18 @@ export type AgentJobView = z.infer<typeof AgentJobViewSchema>;
 export type JobAnswersRequest = z.infer<typeof JobAnswersRequestSchema>;
 export type CreateUploadRequest = z.infer<typeof CreateUploadRequestSchema>;
 export type CreateUploadResponse = z.infer<typeof CreateUploadResponseSchema>;
+
+/** `POST /v1/speech`: reads short app text aloud with Amazon Polly (accessibility). */
+export const SpeechRequestSchema = z.strictObject({
+  text: z.string().trim().min(1).max(1500),
+});
+
+export const SpeechResponseSchema = z.strictObject({
+  /** MP3 audio, base64-encoded. */
+  audioBase64: z.string().min(1).max(4_000_000),
+  contentType: z.literal('audio/mpeg'),
+  voice: z.string().min(1).max(40),
+});
+
+export type SpeechRequest = z.infer<typeof SpeechRequestSchema>;
+export type SpeechResponse = z.infer<typeof SpeechResponseSchema>;

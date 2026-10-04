@@ -14,17 +14,24 @@ export const dateLabel = (date: string) =>
     year: 'numeric',
     timeZone: 'UTC',
   }).format(new Date(`${date}T12:00:00Z`));
-export const scenarioTitle = (scenario: Scenario) => {
-  const split =
-    new Set(scenario.estimate.lines.map((l) => l.planYearId)).size > 1;
-  const sample = scenario.schedule.some((s) => s.procedureId === 'crown-1');
-  return scenario.kind === 'baseline'
-    ? sample && !split
-      ? 'All treatment this year'
-      : 'Original treatment schedule'
-    : split
-      ? 'Split across benefit years'
-      : 'Alternative treatment schedule';
+/** Plain names for the choices: "Everything as planned" or "Crown in January 2027". */
+export const scenarioTitle = (
+  scenario: Scenario,
+  input?: DentalCaseInput | null,
+) => {
+  if (scenario.kind === 'baseline') return 'Everything as planned';
+  const moved = scenario.schedule.filter((s) =>
+    scenario.movedProcedureIds.includes(s.procedureId),
+  );
+  const first = moved[0];
+  if (!first) return 'A different permitted schedule';
+  const month = new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${first.date}T12:00:00Z`));
+  const names = moved.map((s) => procedureLabel(s.procedureId, input));
+  return `${names.join(' and ')} in ${month}`;
 };
 export const procedureLabel = (id: string, input?: DentalCaseInput | null) =>
   input?.procedures.find((p) => p.id === id)?.label ??

@@ -12,6 +12,7 @@ import {
   retryDelayMs,
   SaveStrategyResponseSchema,
   ScenarioComparisonResultSchema,
+  SpeechResponseSchema,
   StrategyListSchema,
   type CreateCaseRequest,
   type CreateJobRequest,
@@ -259,6 +260,11 @@ export function createApiClient({
       ),
     retryJob: (jobId: string) =>
       once('POST', `${jobPath(jobId)}/retry`, CreateJobResponseSchema, {}),
+    /** Amazon Polly reads short app text aloud (accessibility). */
+    speech: (text: string) =>
+      once('POST', '/v1/speech', SpeechResponseSchema, {
+        text: text.slice(0, 1500),
+      }),
     cancelJob: (jobId: string) =>
       once('POST', `${jobPath(jobId)}/cancel`, AgentJobViewSchema, {}),
   };

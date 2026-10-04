@@ -33,6 +33,7 @@ import { useApi } from '../../state/auth';
 import { useCase, useResults } from '../../state/case-store';
 import { ApiNotice } from '../assistant/assistant-page';
 import { Conditions, TreatmentTimeline } from '../options/financial-components';
+import { BenefitsLeft } from '../options/options-page';
 
 /**
  * Review and save. The server recomputes the chosen option for this exact revision; the browser
@@ -409,6 +410,7 @@ export function SavedPage() {
           View saved details
         </Button>
       </Card>
+      <BenefitsLeft scenario={saved.scenario} record={record} />
       <QuestionCard />
       <PlanHistory />
       <FooterActions>

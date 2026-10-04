@@ -1,4 +1,6 @@
+import { plainSummary } from '@actionbridge/contracts';
 import { BookOpen, ClipboardList } from 'lucide-react';
+import { MeaningCard } from '../options/options-page';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Evidence } from '../../components/evidence';
@@ -22,7 +24,7 @@ import {
 } from '../options/financial-components';
 export function DetailsPage() {
   const { record, saved: savedPlan, select } = useCase();
-  const { selected } = useResults();
+  const { selected, data, comparison } = useResults();
   const [params] = useSearchParams();
   const saved = params.get('saved') === '1';
   const navigate = useNavigate();
@@ -65,6 +67,24 @@ export function DetailsPage() {
           Your case changed after saving. This is the saved snapshot; recompare
           to update it.
         </Notice>
+      )}
+      {!saved && data && comparison && (
+        <MeaningCard
+          title="Your choice in plain words"
+          summary={plainSummary({
+            comparison: comparison.baseline,
+            alternative: comparison.alternatives[0] ?? null,
+            outcome: comparison.outcome,
+            procedures: record.procedures,
+            selfPay:
+              data.coverage.selfPay.status === 'available'
+                ? {
+                    totalCents: data.coverage.selfPay.totalCents,
+                    minusInsuredCents: data.coverage.selfPayMinusInsuredCents,
+                  }
+                : null,
+          })}
+        />
       )}
       <Card className="plan-summary">
         <div>

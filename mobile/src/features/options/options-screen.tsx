@@ -1,4 +1,4 @@
-import type { CoverageComparison, DentalCase, EstimateResult, ScenarioComparisonResult } from '@actionbridge/contracts';
+import { plainSummary, type CoverageComparison, type DentalCase, type EstimateResult, type ScenarioComparisonResult } from '@actionbridge/contracts';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View, useWindowDimensions } from 'react-native';
@@ -14,6 +14,8 @@ import { isSampleCase } from '../case/facts';
 import { useRevisionResult } from '../case/use-revision-result';
 import { buildOptions, selfPayView } from './options-model';
 import { ScenarioCard } from './scenario-card';
+import { BenefitsLeft } from './benefits-left';
+import { MeaningCard } from '../../components/meaning-card';
 
 type Results = { estimate: EstimateResult; scenarios: ScenarioComparisonResult; coverage: CoverageComparison };
 
@@ -113,10 +115,18 @@ function OptionsBody({ record, results }: { record: DentalCase; results: Results
         <Badge label="Estimated" tone="neutral" />
         {sample ? <Badge label="Sample data" tone="neutral" /> : null}
       </View>
-      <View style={{ gap: space(2) }}>
-        <AppText variant="title">Your dental options</AppText>
-        <AppText muted>{model.summary}</AppText>
-      </View>
+      <AppText variant="title">Your dental options</AppText>
+      <MeaningCard
+        summary={plainSummary({
+          comparison: scenarios.baseline,
+          alternative: scenarios.alternatives[0] ?? null,
+          outcome: scenarios.outcome,
+          procedures: record.procedures,
+          selfPay: coverage.selfPay.status === 'available' ? { totalCents: coverage.selfPay.totalCents, minusInsuredCents: coverage.selfPayMinusInsuredCents } : null,
+        })}
+      />
+      <BenefitsLeft scenario={scenarios.baseline} record={record} />
+      <AppText variant="heading">Your choices</AppText>
 
       {/* Stacked on phones, side by side on tablets (design v3 "Options, tablet"). */}
       <View accessibilityRole="radiogroup" accessibilityLabel="Timing options" style={{ gap: space(3), flexDirection: sideBySide ? 'row' : 'column', alignItems: sideBySide ? 'stretch' : undefined }}>
@@ -127,12 +137,6 @@ function OptionsBody({ record, results }: { record: DentalCase; results: Results
         ))}
       </View>
 
-      {model.difference ? (
-        <Card tone="highlight">
-          <AppText variant="heading">Estimated difference: {formatCents(model.difference.cents)}</AppText>
-          <AppText variant="caption">{model.difference.conditions}</AppText>
-        </Card>
-      ) : null}
       {notes.length > 0 ? <Notice tone="info" title={notes[0] ?? ''} {...(notes.length > 1 ? { body: notes.slice(1).join('\n') } : {})} /> : null}
 
       <Disclosure title="What could change this estimate">
@@ -163,7 +167,10 @@ function SelfPaySection({ record, coverage }: { record: DentalCase; coverage: Co
   const view = selfPayView(record, coverage);
   const open = () => router.push(`/case/${record.caseId}/self-pay`);
   return (
-    <Section title="Self-pay comparison">
+    <Section title="Paying without insurance">
+      <AppText variant="caption" muted>
+        You pay the dentist’s cash price yourself and don’t use your plan. Some dentists charge less for cash, so it’s worth comparing.
+      </AppText>
       <Card>
         {view.status === 'unavailable' ? (
           <>

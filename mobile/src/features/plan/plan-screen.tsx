@@ -1,4 +1,5 @@
-import type { DentalCase } from '@actionbridge/contracts';
+import { plainSummary, type DentalCase, type PlainSummary } from '@actionbridge/contracts';
+import { MeaningCard } from '../../components/meaning-card';
 import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Check, ChevronDown, ChevronRight, ChevronUp, Copy, FileSearch, Share2 } from 'lucide-react-native';
@@ -55,10 +56,11 @@ export function PlanScreen() {
       </Screen>
     );
   }
-  return <PlanBody record={record} plan={buildPlanDetails(record, current, scenario)} />;
+  const summary = plainSummary({ comparison: current.baseline, alternative: current.alternatives[0] ?? null, outcome: current.outcome, procedures: record.procedures, selfPay: null });
+  return <PlanBody record={record} plan={buildPlanDetails(record, current, scenario)} summary={summary} />;
 }
 
-function PlanBody({ record, plan }: { record: DentalCase; plan: PlanDetails }) {
+function PlanBody({ record, plan, summary }: { record: DentalCase; plan: PlanDetails; summary: PlainSummary }) {
   const { colors } = useTheme();
   const [copied, setCopied] = useState(false);
 
@@ -81,6 +83,8 @@ function PlanBody({ record, plan }: { record: DentalCase; plan: PlanDetails }) {
         <Badge label="Your selected option · estimated" tone="neutral" />
         {isSampleCase(record) ? <Badge label="Sample data" tone="neutral" /> : null}
       </View>
+
+      <MeaningCard title="Your choices in plain words" summary={summary} />
 
       <Card>
         <AppText variant="title">{plan.title}</AppText>
