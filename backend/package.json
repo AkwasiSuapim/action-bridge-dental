@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "bundle": "node scripts/bundle.mjs",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "eval:agent": "node scripts/eval-agent.mjs"
   },
   "dependencies": {
     "@actionbridge/benefits-engine": "0.1.0",

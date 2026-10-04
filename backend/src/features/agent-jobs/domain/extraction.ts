@@ -43,6 +43,17 @@ export const ExtractionSchema = z.strictObject({
     )
     .max(3)
     .optional(),
+  planRestrictions: z
+    .array(
+      z.strictObject({
+        kind: z.enum(['waiting_period', 'exclusion', 'frequency_limit']),
+        description: z.string().min(3).max(200).describe('e.g. "12-month waiting period for crowns"'),
+        quote: Quote,
+      }),
+    )
+    .max(5)
+    .optional()
+    .describe('Any waiting period, exclusion or frequency limit the description mentions'),
   procedures: z
     .array(
       z.strictObject({
@@ -70,6 +81,7 @@ export type FactGroup =
   | { kind: 'coverageMode'; fieldPath: 'coverageMode'; summary: string; quote: string; value: 'insured' | 'self_pay' }
   | { kind: 'benefitYear'; fieldPath: string; summary: string; quote: string; planYearId: string; startDate: string | null; endDate: string | null; values: Partial<Record<PlanYearMoney, number>> }
   | { kind: 'coverageRules'; fieldPath: 'policy'; summary: string; quote: string; rules: { category: string; bps: number; deductibleApplies: boolean | null }[] }
+  | { kind: 'restrictions'; fieldPath: 'policy'; summary: string; quote: string; restrictions: { kind: 'waiting_period' | 'exclusion' | 'frequency_limit'; description: string }[] }
   | { kind: 'procedure'; fieldPath: string; summary: string; quote: string; procedure: Procedure };
 
 type PlanYearMoney = 'annualMaximumCents' | 'insurerAlreadyPaidCents' | 'annualDeductibleCents' | 'deductibleAlreadyMetCents';
@@ -80,10 +92,30 @@ export interface Dropped {
   reason: 'quote_not_in_description' | 'amount_not_in_quote' | 'benefit_year_dates_not_stated';
 }
 
-/** Whitespace- and case-insensitive containment, tolerant of curly quotes. */
+/**
+ * Whitespace- and case-insensitive containment, tolerant of curly quotes. A quote may join several
+ * exact fragments with "…" (or "..."); every fragment must appear word for word.
+ */
 export function quoteAppears(quote: string, text: string): boolean {
-  const norm = (s: string) => s.replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim().toLowerCase();
-  return norm(text).includes(norm(quote));
+  const fragments = fragmentsOf(quote);
+  return fragments.length > 0 && fragments.every((f) => f.length >= 3 && norm(text).includes(norm(f)));
+}
+
+/**
+ * The fragments of a quote that appear word for word in the description, joined with " … ", or
+ * null if none do. Values are then checked against this verified text only.
+ */
+export function verifiedQuote(quote: string, text: string): string | null {
+  const kept = fragmentsOf(quote).filter((f) => f.length >= 3 && norm(text).includes(norm(f)));
+  return kept.length > 0 ? kept.join(' … ') : null;
+}
+
+function norm(s: string): string {
+  return s.replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function fragmentsOf(quote: string): string[] {
+  return quote.split(/\s*(?:…|\.\.\.)\s*/).map((f) => f.trim()).filter((f) => f.length > 0);
 }
 
 /**
@@ -177,14 +209,30 @@ export function groupsFromExtraction(
     });
   }
 
+  const restrictions = (extraction.planRestrictions ?? []).filter((r) => {
+    const ok = quoteAppears(r.quote, text);
+    if (!ok) dropped.push({ group: 'restrictions', field: r.kind, reason: 'quote_not_in_description' });
+    return ok;
+  });
+  if (restrictions.length > 0) {
+    groups.push({
+      kind: 'restrictions',
+      fieldPath: 'policy',
+      quote: restrictions.map((r) => r.quote).join(' … ').slice(0, 300),
+      restrictions: restrictions.map(({ kind, description }) => ({ kind, description })),
+      summary: `Your plan has limits: ${restrictions.map((r) => r.description).join('; ')}`.slice(0, 200),
+    });
+  }
+
   const usedIds = new Set(current.procedures.map((p) => p.id));
   let next = current.procedures.length + 1;
   for (const p of extraction.procedures ?? []) {
-    if (!quoteAppears(p.quote, text)) {
+    const verified = verifiedQuote(p.quote, text);
+    if (verified === null) {
       dropped.push({ group: 'procedure', field: p.label, reason: 'quote_not_in_description' });
       continue;
     }
-    const amounts = amountsIn(p.quote);
+    const amounts = amountsIn(verified);
     const keep = (field: string, cents: number | undefined): number | null => {
       if (cents === undefined) return null;
       if (amounts.has(cents)) return cents;
@@ -223,7 +271,7 @@ export function groupsFromExtraction(
       dentistWindow ? `dentist allows ${p.dentistEarliestDate} to ${p.dentistLatestDate}` : null,
       selfPay !== null ? `cash quote ${money(selfPay)}` : null,
     ].filter(Boolean);
-    groups.push({ kind: 'procedure', fieldPath: `procedures.${id}`, quote: p.quote, procedure, summary: parts.join(' · ').slice(0, 200) });
+    groups.push({ kind: 'procedure', fieldPath: `procedures.${id}`, quote: verified, procedure, summary: parts.join(' · ').slice(0, 200) });
   }
 
   return { groups, dropped };
@@ -274,19 +322,26 @@ export function applyGroups(
         }
         break;
       }
+      case 'restrictions': {
+        const policy = input.policy ?? emptyPolicy();
+        if (input.policy === null) {
+          facts.push(makeFact('policy.deductibleBeforeCoinsurance', true, null, 'assumption'));
+        }
+        const field = { waiting_period: 'waitingPeriods', exclusion: 'exclusions', frequency_limit: 'frequencyRestrictions' } as const;
+        const next: Policy = { ...policy, waitingPeriods: [...policy.waitingPeriods], exclusions: [...policy.exclusions], frequencyRestrictions: [...policy.frequencyRestrictions] };
+        group.restrictions.forEach((r, i) => {
+          const list = next[field[r.kind]];
+          list.push({ id: `agent-${r.kind.replace('_', '-')}-${list.length + i + 1}`, description: r.description, categoryIds: [] });
+          facts.push(makeFact(`policy.${field[r.kind]}`, r.description, group.quote, 'agent_proposed'));
+        });
+        // A stated limit means coverage is not "all services covered": the engine then reports it as
+        // unsupported, and any earlier "all services covered" assumption no longer applies.
+        input = { ...input, policy: { ...next, allServicesCovered: false } };
+        for (let i = facts.length - 1; i >= 0; i--) if (facts[i]?.fieldPath === 'policy.allServicesCovered') facts.splice(i, 1);
+        break;
+      }
       case 'coverageRules': {
-        const policy: Policy = input.policy ?? {
-          id: 'member-plan',
-          deductibleBeforeCoinsurance: true,
-          deductibleAppliesByCategory: {},
-          insurerRateBpsByCategory: {},
-          annualMaximumAppliesByCategory: {},
-          rounding: 'half_up_to_cent',
-          allServicesCovered: true,
-          waitingPeriods: [],
-          exclusions: [],
-          frequencyRestrictions: [],
-        };
+        const policy: Policy = input.policy ?? emptyPolicy();
         if (input.policy === null) {
           facts.push(makeFact('policy.deductibleBeforeCoinsurance', true, null, 'assumption'));
           facts.push(makeFact('policy.allServicesCovered', true, null, 'assumption'));
@@ -310,4 +365,20 @@ export function applyGroups(
     }
   }
   return { input, facts };
+}
+
+/** The supported plan model, with nothing plan-specific filled in (same shape as the coverage-rules screen). */
+function emptyPolicy(): Policy {
+  return {
+    id: 'member-plan',
+    deductibleBeforeCoinsurance: true,
+    deductibleAppliesByCategory: {},
+    insurerRateBpsByCategory: {},
+    annualMaximumAppliesByCategory: {},
+    rounding: 'half_up_to_cent',
+    allServicesCovered: true,
+    waitingPeriods: [],
+    exclusions: [],
+    frequencyRestrictions: [],
+  };
 }
