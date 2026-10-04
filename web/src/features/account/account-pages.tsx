@@ -16,6 +16,7 @@ import {
 import { dateLabel, money, scenarioTitle } from '../../domain/model';
 import { useDemo } from '../../state/demo-store';
 import { useJob } from '../../state/job-store';
+import { useEndSession } from '../../state/session';
 import { QuestionCard, ReminderCard } from '../saved/saved-pages';
 
 export function MyPlanPage() {
@@ -155,7 +156,8 @@ export function ActivityPage() {
   );
 }
 export function ProfilePage() {
-  const { state, rename, signOut, reset } = useDemo();
+  const { state, rename, reset } = useDemo();
+  const endSession = useEndSession();
   const { cancel } = useJob();
   const navigate = useNavigate();
   const [name, setName] = useState(state.session!.name);
@@ -233,15 +235,7 @@ export function ProfilePage() {
         </p>
       </Card>
       <div className="actions">
-        <Button
-          variant="secondary"
-          icon={LogOut}
-          onClick={() => {
-            cancel();
-            signOut();
-            navigate('/login', { replace: true });
-          }}
-        >
+        <Button variant="secondary" icon={LogOut} onClick={() => endSession()}>
           Sign out
         </Button>
         <Button variant="danger" onClick={() => setResetOpen(true)}>

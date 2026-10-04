@@ -16,5 +16,10 @@ export default defineConfig({
     command: 'npm run dev',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: true,
+    // Placeholder settings so sign-in is enabled; tests mock every Cognito call.
+    env: {
+      VITE_COGNITO_REGION: 'us-test-1',
+      VITE_COGNITO_CLIENT_ID: 'testclient',
+    },
   },
 });

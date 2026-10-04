@@ -5,9 +5,12 @@ import '@fontsource/plus-jakarta-sans/400.css';
 import '@fontsource/plus-jakarta-sans/500.css';
 import '@fontsource/plus-jakarta-sans/600.css';
 import '@fontsource/plus-jakarta-sans/700.css';
+import '@fontsource/geist/400.css';
+import '@fontsource/geist/500.css';
+import '@fontsource/geist/600.css';
 import './styles.css';
 import { Shell } from './components/shell';
-import { LoginPage } from './features/auth/login-page';
+import { SignInPage } from './features/auth/sign-in-page';
 import { HomePage } from './features/home/home-page';
 import {
   PhotoPage,
@@ -27,38 +30,49 @@ import {
   MyPlanPage,
   ProfilePage,
 } from './features/account/account-pages';
+import { AuthProvider } from './state/auth';
 import { DemoProvider } from './state/demo-store';
 import { JobProvider } from './state/job-store';
+import { SessionSync, SignedIn } from './state/session';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <DemoProvider>
-        <JobProvider>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route element={<Shell />}>
-              <Route index element={<HomePage />} />
-              <Route path="intake/type" element={<TypePage />} />
-              <Route path="intake/speak" element={<SpeakPage />} />
-              <Route path="intake/upload" element={<UploadPage />} />
-              <Route path="intake/photo" element={<PhotoPage />} />
-              <Route path="facts" element={<FactsPage />} />
-              <Route path="questions" element={<QuestionsPage />} />
-              <Route path="working" element={<WorkingPage />} />
-              <Route path="options" element={<OptionsPage />} />
-              <Route path="self-pay" element={<SelfPayPage />} />
-              <Route path="details" element={<DetailsPage />} />
-              <Route path="review" element={<ReviewPage />} />
-              <Route path="saved" element={<SavedPage />} />
-              <Route path="my-plan" element={<MyPlanPage />} />
-              <Route path="activity" element={<ActivityPage />} />
-              <Route path="profile" element={<ProfilePage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
-        </JobProvider>
-      </DemoProvider>
+      <AuthProvider>
+        <DemoProvider>
+          <JobProvider>
+            <SessionSync />
+            <Routes>
+              <Route path="/sign-in" element={<SignInPage />} />
+              <Route
+                path="/login"
+                element={<Navigate to="/sign-in" replace />}
+              />
+              <Route element={<SignedIn />}>
+                <Route element={<Shell />}>
+                  <Route index element={<HomePage />} />
+                  <Route path="intake/type" element={<TypePage />} />
+                  <Route path="intake/speak" element={<SpeakPage />} />
+                  <Route path="intake/upload" element={<UploadPage />} />
+                  <Route path="intake/photo" element={<PhotoPage />} />
+                  <Route path="facts" element={<FactsPage />} />
+                  <Route path="questions" element={<QuestionsPage />} />
+                  <Route path="working" element={<WorkingPage />} />
+                  <Route path="options" element={<OptionsPage />} />
+                  <Route path="self-pay" element={<SelfPayPage />} />
+                  <Route path="details" element={<DetailsPage />} />
+                  <Route path="review" element={<ReviewPage />} />
+                  <Route path="saved" element={<SavedPage />} />
+                  <Route path="my-plan" element={<MyPlanPage />} />
+                  <Route path="activity" element={<ActivityPage />} />
+                  <Route path="profile" element={<ProfilePage />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Route>
+              </Route>
+            </Routes>
+          </JobProvider>
+        </DemoProvider>
+      </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>,
 );
