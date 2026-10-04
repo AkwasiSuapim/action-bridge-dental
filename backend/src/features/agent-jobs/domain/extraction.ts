@@ -37,7 +37,7 @@ export const ExtractionSchema = z.strictObject({
       z.strictObject({
         category: Category,
         insurerPaysPercent: z.number().min(0).max(100).describe('Percentage the plan pays for this category'),
-        deductibleApplies: z.boolean().optional(),
+        deductibleApplies: z.boolean().optional().describe('true for "after the deductible", false for "deductible does not apply"'),
         quote: Quote,
       }),
     )
@@ -77,6 +77,44 @@ export const ExtractionSchema = z.strictObject({
 
 export type Extraction = z.infer<typeof ExtractionSchema>;
 
+/**
+ * Combines a later `record_case_facts` call with earlier ones, so a follow-up call that only adds
+ * or corrects a detail never erases what was already found. Later values win field by field; quotes
+ * are joined with " … ", so every kept value still appears in its group's quote.
+ */
+export function mergeExtractions(earlier: Extraction, later: Extraction, text: string): Extraction {
+  // Only fragments that really appear in the text are kept, so one bad quote cannot sink the other.
+  const joinQuotes = (a: string, b: string) =>
+    norm(a).includes(norm(b)) ? a : norm(b).includes(norm(a)) ? b : (verifiedQuote(`${a} … ${b}`, text) ?? b);
+  const merge = <T extends { quote: string }>(a: T | undefined, b: T | undefined): T | undefined => {
+    if (!a || !b) return b ?? a;
+    const defined = Object.fromEntries(Object.entries(b).filter(([, value]) => value !== undefined));
+    return { ...a, ...defined, quote: joinQuotes(a.quote, b.quote) };
+  };
+  const mergeBy = <T extends { quote: string }>(a: T[] | undefined, b: T[] | undefined, key: (item: T) => string): T[] | undefined => {
+    if (!a || !b) return b ?? a;
+    const out = [...a];
+    for (const item of b) {
+      const index = out.findIndex((existing) => key(existing) === key(item));
+      if (index === -1) out.push(item);
+      else out[index] = merge(out[index], item) as T;
+    }
+    return out;
+  };
+  const merged: Extraction = {
+    coverageMode: later.coverageMode ?? earlier.coverageMode,
+    // A different benefit year replaces the earlier one rather than mixing two years.
+    benefitYear:
+      later.benefitYear?.startDate && earlier.benefitYear?.startDate && later.benefitYear.startDate !== earlier.benefitYear.startDate
+        ? later.benefitYear
+        : merge(earlier.benefitYear, later.benefitYear),
+    coverageRules: mergeBy(earlier.coverageRules, later.coverageRules, (r) => r.category),
+    planRestrictions: mergeBy(earlier.planRestrictions, later.planRestrictions, (r) => `${r.kind}:${norm(r.description)}`),
+    procedures: mergeBy(earlier.procedures, later.procedures, (p) => norm(p.label)),
+  };
+  return Object.fromEntries(Object.entries(merged).filter(([, value]) => value !== undefined)) as Extraction;
+}
+
 export type FactGroup = FactGroupBody & {
   /** Where the verified quote came from: the user's own words or an uploaded document. */
   source?: 'description' | 'document';
@@ -87,7 +125,7 @@ export type FactGroup = FactGroupBody & {
 type FactGroupBody =
   | { kind: 'coverageMode'; fieldPath: 'coverageMode'; summary: string; quote: string; value: 'insured' | 'self_pay' }
   | { kind: 'benefitYear'; fieldPath: string; summary: string; quote: string; planYearId: string; startDate: string | null; endDate: string | null; values: Partial<Record<PlanYearMoney, number>> }
-  | { kind: 'coverageRules'; fieldPath: 'policy'; summary: string; quote: string; rules: { category: string; bps: number; deductibleApplies: boolean | null }[] }
+  | { kind: 'coverageRules'; fieldPath: 'policy'; summary: string; quote: string; rules: { category: string; bps: number; deductibleApplies: boolean | null; maximumApplies?: boolean | null }[] }
   | { kind: 'restrictions'; fieldPath: 'policy'; summary: string; quote: string; restrictions: { kind: 'waiting_period' | 'exclusion' | 'frequency_limit'; description: string }[] }
   | { kind: 'procedure'; fieldPath: string; summary: string; quote: string; procedure: Procedure };
 
@@ -206,13 +244,30 @@ export function groupsFromExtraction(
     if (!ok) dropped.push({ group: 'coverageRules', field: rule.category, reason: quoteAppears(rule.quote, text) ? 'amount_not_in_quote' : 'quote_not_in_description' });
     return ok;
   });
+  // "The annual maximum applies to basic and major services" is read from the text itself, never
+  // left to the model, which tends to mistake it for a plan limit.
+  const maximumSentence = text.match(/[^.\n]*\b(?:annual|yearly) maximum (?:applies|counts) (?:to|toward)\b([^.\n]+)/i);
+  const maximumApplies = (category: string): true | null =>
+    maximumSentence?.[1] && new RegExp(`\\b${category}\\b`, 'i').test(maximumSentence[1]) ? true : null;
   if (rules.length > 0) {
+    const maximumCategories = rules.filter((r) => maximumApplies(r.category)).map((r) => r.category);
     groups.push({
       kind: 'coverageRules',
       fieldPath: 'policy',
-      quote: rules.map((r) => r.quote).join(' … ').slice(0, 300),
-      rules: rules.map((r) => ({ category: r.category, bps: Math.round(r.insurerPaysPercent * 100), deductibleApplies: r.deductibleApplies ?? null })),
-      summary: `Your plan pays ${rules.map((r) => `${r.insurerPaysPercent}% for ${r.category}`).join(', ')}`,
+      quote: [...rules.map((r) => r.quote), ...(maximumCategories.length > 0 && maximumSentence ? [`${maximumSentence[0].trim()}.`] : [])].join(' … ').slice(0, 300),
+      rules: rules.map((r) => ({
+        category: r.category,
+        bps: Math.round(r.insurerPaysPercent * 100),
+        deductibleApplies: r.deductibleApplies ?? null,
+        maximumApplies: maximumApplies(r.category),
+      })),
+      summary: [
+        `Your plan pays ${rules.map((r) => `${r.insurerPaysPercent}% for ${r.category}${r.deductibleApplies === true ? ' after the deductible' : ''}`).join(', ')}`,
+        maximumCategories.length > 0 ? `the yearly maximum applies to ${maximumCategories.join(' and ')}` : null,
+      ]
+        .filter(Boolean)
+        .join('; ')
+        .slice(0, 200),
     });
   }
 
@@ -221,6 +276,8 @@ export function groupsFromExtraction(
     if (/^\s*(no|none|not|without)\b/i.test(r.description) || /\bno (waiting|exclusion|frequency|limit)/i.test(r.description)) return false;
     // Treatment timing from the dentist ("can safely be done any time from … to …") is not a plan limit.
     if (/\b(safely|can wait|any time|timing|dentist says)\b/i.test(`${r.description} ${r.quote}`)) return false;
+    // The annual maximum and the deductible are part of the calculation, never a plan limit.
+    if (/\b(annual|yearly) maximum\b|\bdeductible\b/i.test(`${r.description} ${r.quote}`)) return false;
     const ok = quoteAppears(r.quote, text);
     if (!ok) dropped.push({ group: 'restrictions', field: r.kind, reason: 'quote_not_in_description' });
     return ok;
@@ -260,7 +317,9 @@ export function groupsFromExtraction(
     const networkStated = p.network === 'in' ? /\bin[- ]network\b/i.test(text) : p.network === 'out' ? /\bout[- ]of[- ]network\b/i.test(text) : false;
     if (p.network && !networkStated) dropped.push({ group: 'procedure', field: `${p.label}.network`, reason: 'quote_not_in_description' });
     const network = networkStated && p.network ? p.network : null;
-    const proposedDate = statedDate('proposedDate', p.proposedDate);
+    // The model sometimes leaves out a date its own verified quote states ("planned 2026-11-12").
+    const plannedInQuote = [...verified.matchAll(/\bplanned (?:for |on )?(\d{4}-\d{2}-\d{2})\b/gi)].map((m) => m[1] as string);
+    const proposedDate = statedDate('proposedDate', p.proposedDate ?? (plannedInQuote.length === 1 ? plannedInQuote[0] : undefined));
     const earliest = statedDate('dentistEarliestDate', p.dentistEarliestDate);
     const latest = statedDate('dentistLatestDate', p.dentistLatestDate);
     while (usedIds.has(`proc-${next}`)) next++;
@@ -268,7 +327,11 @@ export function groupsFromExtraction(
     usedIds.add(id);
     const charge = keep('providerChargeCents', p.providerChargeCents);
     const selfPay = keep('selfPayQuoteCents', p.selfPayQuoteCents);
-    const dentistWindow = p.timingStatedBy === 'dentist' && earliest !== null && latest !== null;
+    // A window counts as the dentist's when the model says so, or when the verified quote itself has
+    // the dentist stating both dates ("your dentist says it can safely be done any time from … to …").
+    // Timing the model attributes to the user never unlocks the optimizer (D-14).
+    const dentistInQuote = earliest !== null && latest !== null && /\bdentist\b/i.test(verified) && verified.includes(earliest) && verified.includes(latest);
+    const dentistWindow = earliest !== null && latest !== null && (p.timingStatedBy === 'dentist' || (p.timingStatedBy !== 'user' && dentistInQuote));
     const procedure: Procedure = {
       id,
       label: p.label,
@@ -372,13 +435,22 @@ export function applyGroups(
           facts.push(record('policy.deductibleBeforeCoinsurance', true, null, 'assumption'));
           facts.push(record('policy.allServicesCovered', true, null, 'assumption'));
         }
-        const next = { ...policy, insurerRateBpsByCategory: { ...policy.insurerRateBpsByCategory }, deductibleAppliesByCategory: { ...policy.deductibleAppliesByCategory } };
+        const next = {
+          ...policy,
+          insurerRateBpsByCategory: { ...policy.insurerRateBpsByCategory },
+          deductibleAppliesByCategory: { ...policy.deductibleAppliesByCategory },
+          annualMaximumAppliesByCategory: { ...policy.annualMaximumAppliesByCategory },
+        };
         for (const rule of group.rules) {
           next.insurerRateBpsByCategory[rule.category] = rule.bps;
           facts.push(record(`policy.insurerRateBpsByCategory.${rule.category}`, rule.bps, group.quote, 'agent_proposed'));
           if (rule.deductibleApplies !== null) {
             next.deductibleAppliesByCategory[rule.category] = rule.deductibleApplies;
             facts.push(record(`policy.deductibleAppliesByCategory.${rule.category}`, rule.deductibleApplies, group.quote, 'agent_proposed'));
+          }
+          if (rule.maximumApplies != null) {
+            next.annualMaximumAppliesByCategory[rule.category] = rule.maximumApplies;
+            facts.push(record(`policy.annualMaximumAppliesByCategory.${rule.category}`, rule.maximumApplies, group.quote, 'agent_proposed'));
           }
         }
         input = { ...input, policy: next };

@@ -187,7 +187,7 @@ bash infra/scripts/smoke-aws.sh   # live checks: API, agent, documents
 
 | Check | Result |
 |---|---|
-| Unit and integration tests (engine, contracts, backend, mobile logic) | **297 passing** |
+| Unit and integration tests (engine, contracts, backend, mobile logic) | **300 passing** |
 | Web end-to-end tests (Playwright + axe, 360–1440 px), including a fully hands-free voice run | **12 passing** |
 | Live checks against AWS (API, agent, documents, multi-page PDF) | **all passing** |
 | Agent evaluation on Bedrock (complete, missing, contradictory, unsupported, prompt injection) | **5 / 5** — [results](docs/evals/agent-eval-results.md) |

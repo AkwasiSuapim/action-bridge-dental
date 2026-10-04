@@ -1,7 +1,7 @@
 import type { DentalCaseInput, JobStageEvent, MissingFact, SourceFact } from '@actionbridge/contracts';
 import { compareSchedules, estimateCase } from '@actionbridge/benefits-engine';
 import { z } from 'zod';
-import { applyGroups, ExtractionSchema, groupsFromExtraction, type Dropped, type FactGroup } from '../domain/extraction.js';
+import { applyGroups, ExtractionSchema, groupsFromExtraction, mergeExtractions, type Dropped, type Extraction, type FactGroup } from '../domain/extraction.js';
 import type { AgentModel, ContentBlock, ModelMessage, ToolSpec } from '../ports.js';
 
 export const MAX_TOOL_CALLS = 6;
@@ -16,10 +16,13 @@ Rules:
 - Money is integer cents ($250 = 25000). Percentages are numbers (80% = 80).
 - Timing is flexible only if the description says the dentist allowed it; set timingStatedBy to "dentist" only then.
 - When the dentist says a procedure can be done between two dates (for example "can safely be done any time from 2026-11-12 to 2027-01-15" or "can wait until 2027-01-15"), record those dates on that same procedure as dentistEarliestDate and dentistLatestDate with timingStatedBy "dentist", and join that sentence into the procedure's quote with " … ". Treatment timing is never a plan restriction.
+- When one sentence states the office's network status for all treatment (for example "Bright Smile Dental is in network with Acme PPO"), set network on every procedure from that office.
+- For each coverage rule: "after the deductible" means deductibleApplies true; "deductible does not apply" means false.
+- Record what has already been paid or met, including zero (for example "Deductible met so far: $0.00").
 - planRestrictions are only plan limits that actually apply: a waiting period, an exclusion, or a frequency limit such as "one crown per tooth every 5 years". Never record a sentence that says no limit applies, and never record treatment timing or dates as a restriction.
 - Never judge whether treatment is necessary or safe to delay. Never compute costs yourself: the calculator does that.
 
-Steps: call record_case_facts once with everything you found, then check_missing_facts. If nothing is missing you may call calculate_estimate. Finish with one or two plain sentences saying what you found and what is still needed. Do not state any dollar amounts in that final message.`;
+Steps: call record_case_facts once with everything you found, then check_missing_facts. If check_missing_facts shows something the text does state, call record_case_facts again with just those facts; earlier facts are kept. If nothing is missing you may call calculate_estimate. Finish with one or two plain sentences saying what you found and what is still needed. Do not state any dollar amounts in that final message.`;
 
 const NO_INPUT = { type: 'object', properties: {}, additionalProperties: false };
 
@@ -73,6 +76,8 @@ export async function runInterpretAgent(args: {
   const { model, input, text, today, report } = args;
   let groups: FactGroup[] = [];
   let dropped: Dropped[] = [];
+  // Facts from every record_case_facts call so far: a follow-up call adds to them, never erases them.
+  let recorded: Extraction | null = null;
   let toolCalls = 0;
   let summary: string | null = null;
 
@@ -116,7 +121,8 @@ export async function runInterpretAgent(args: {
             results.push(toolError(use.toolUseId, `Invalid facts: ${parsed.error.issues.slice(0, 5).map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`));
             break;
           }
-          ({ groups, dropped } = groupsFromExtraction(parsed.data, text, input, today));
+          recorded = recorded ? mergeExtractions(recorded, parsed.data, text) : parsed.data;
+          ({ groups, dropped } = groupsFromExtraction(recorded, text, input, today));
           await report('reading_input', 'completed', groups.length === 0 ? 'No details found that the description states' : `Found ${groups.length} ${groups.length === 1 ? 'group' : 'groups'} of details`);
           results.push(toolOk(use.toolUseId, { accepted: groups.map((g) => g.summary), dropped: dropped.map((d) => `${d.field}: ${d.reason}`) }));
           break;

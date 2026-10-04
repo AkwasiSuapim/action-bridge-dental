@@ -210,6 +210,68 @@ describe('T5 adaptive agent loop, end to end with a scripted model', () => {
     expect(user.groups[0]).toMatchObject({ procedure: { timingSource: 'user_reported' } });
   });
 
+  it('a follow-up record_case_facts call adds to earlier facts instead of erasing them (live run, 2026-10-04)', async () => {
+    const { runInterpretAgent } = await import('../src/features/agent-jobs/application/interpret-agent.js');
+    // The model first recorded everything, then re-sent the procedures only to add network status.
+    const networkOnly: Extraction = {
+      procedures: EXTRACTION.procedures!.map(({ label, category }) => ({ label, category, network: 'in' as const, quote: 'The office is in network.' })),
+    };
+    const model = new ScriptedModel([
+      toolTurn('record_case_facts', EXTRACTION),
+      toolTurn('check_missing_facts', {}),
+      toolTurn('record_case_facts', networkOnly),
+      textTurn('Done.'),
+    ]);
+    const empty = { caseRevision: 1, currency: 'USD' as const, coverageMode: 'unknown' as const, policy: null, planYears: {}, procedures: [] };
+    const result = await runInterpretAgent({ model, input: empty, text: DESCRIPTION, today: '2026-10-04', report: async () => {} });
+    expect(result.groups.map((g) => g.kind)).toEqual(['coverageMode', 'benefitYear', 'coverageRules', 'procedure', 'procedure', 'procedure']);
+    expect(result.groups.at(-1)).toMatchObject({ procedure: { label: 'Crown', providerChargeCents: 100000, allowedCents: 100000, network: 'in', proposedDate: '2026-11-12' } });
+    expect(result.groups.at(-1)!.quote).toBe('a crown at $1,000 … The office is in network.');
+    expect(result.missingAfter.some((m) => m.fieldPath.endsWith('providerChargeCents'))).toBe(false);
+  });
+
+  it('reads "the annual maximum applies" from the text and never treats it as a plan limit (live run, 2026-10-04)', async () => {
+    const { applyGroups } = await import('../src/features/agent-jobs/domain/extraction.js');
+    const text = 'Annual maximum: $800.00. Basic services such as fillings: plan pays 80% after the deductible. The annual maximum applies to basic and major services.';
+    const empty = { caseRevision: 1, currency: 'USD' as const, coverageMode: 'insured' as const, policy: null, planYears: {}, procedures: [] };
+    const { groups } = groupsFromExtraction(
+      {
+        coverageRules: [{ category: 'basic', insurerPaysPercent: 80, deductibleApplies: true, quote: 'plan pays 80% after the deductible' }],
+        // What the model proposed in the live run: both would have blocked every estimate.
+        planRestrictions: [
+          { kind: 'frequency_limit', description: 'annual maximum', quote: 'Annual maximum: $800.00.' },
+          { kind: 'frequency_limit', description: 'The annual maximum applies to basic and major services', quote: 'The annual maximum applies to basic and major services.' },
+        ],
+      },
+      text,
+      empty,
+      '2026-10-04',
+    );
+    expect(groups.map((g) => g.kind)).toEqual(['coverageRules']);
+    expect(groups[0]).toMatchObject({
+      summary: 'Your plan pays 80% for basic after the deductible; the yearly maximum applies to basic',
+      quote: 'plan pays 80% after the deductible … The annual maximum applies to basic and major services.',
+    });
+    const { input } = applyGroups(empty, groups, (fieldPath, value) => ({
+      id: 'f', fieldPath, value, sourceId: null, location: null, origin: 'agent_proposed',
+      extractionStatus: 'extracted', userConfirmed: true, insurerVerification: { status: 'not_verified' }, conflict: false, recordedAt: '2026-10-04T00:00:00.000Z',
+    }));
+    expect(input.policy).toMatchObject({ deductibleAppliesByCategory: { basic: true }, annualMaximumAppliesByCategory: { basic: true } });
+  });
+
+  it('a dentist window and planned date stated in the verified quote are kept even if the model leaves out the flags (live run, 2026-10-04)', () => {
+    const text = `Crown, tooth 30 (D2740): fee $1,000.00, allowed $1,000.00, write-off $0.00, cash price $900.00, planned 2026-11-12
+Crown, tooth 30 (D2740) timing: your dentist says it can safely be done any time from 2026-11-12 to 2027-01-15.`;
+    const quote = text.replace('\n', ' … ');
+    const empty = { caseRevision: 1, currency: 'USD' as const, coverageMode: 'unknown' as const, policy: null, planYears: {}, procedures: [] };
+    const base = { label: 'Crown, tooth 30', category: 'major' as const, providerChargeCents: 100000, dentistEarliestDate: '2026-11-12', dentistLatestDate: '2027-01-15', quote };
+    const omitted = groupsFromExtraction({ procedures: [base] }, text, empty, '2026-10-04');
+    expect(omitted.groups[0]).toMatchObject({ procedure: { proposedDate: '2026-11-12', timingSource: 'dentist_supplied' } });
+    // Timing the model attributes to the user still never unlocks the optimizer.
+    const user = groupsFromExtraction({ procedures: [{ ...base, timingStatedBy: 'user' }] }, text, empty, '2026-10-04');
+    expect(user.groups[0]).toMatchObject({ procedure: { timingSource: 'user_reported' } });
+  });
+
   it('when nothing in the description can be quoted, the engine asks its own questions instead', async () => {
     const model = new ScriptedModel([toolTurn('record_case_facts', { procedures: [{ label: 'Crown', category: 'major', quote: 'not in the text at all' }] }), textTurn('Done.')]);
     const h = createAgentHarness(model);
