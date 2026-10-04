@@ -49,8 +49,7 @@ export function addAttachment(
   if (file.sizeBytes > MAX_UPLOAD_BYTES)
     return {
       ok: false,
-      problem:
-        'That file is larger than 5 MB. Try a one-page PDF, or a smaller photo.',
+      problem: 'That file is larger than 5 MB. Try a smaller PDF or photo.',
     };
   if (file.sizeBytes === 0)
     return { ok: false, problem: 'That file is empty.' };

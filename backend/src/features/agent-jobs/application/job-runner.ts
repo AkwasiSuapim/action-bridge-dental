@@ -221,8 +221,12 @@ export async function runJob(deps: JobRunnerDeps, message: { ownerId: string; jo
       lines = await reader.readLines(deps.uploads.bucket, upload.key);
     } catch (error) {
       await deps.uploads.remove(upload.key).catch(() => undefined);
-      if (error instanceof Error && /UnsupportedDocument|BadDocument|DocumentTooLarge|InvalidParameter/.test(error.name)) {
-        const message = 'I can read one page at a time. Upload a single page, or take a photo of it.';
+      if (error instanceof Error && /UnsupportedDocument|BadDocument|DocumentTooLarge|InvalidParameter|TextractTimeout/.test(error.name)) {
+        logEvent('warn', 'document_unreadable', { jobId: job.jobId, errorName: error.name });
+        const message =
+          error.name === 'TextractTimeout'
+            ? 'That document is taking too long to read. Take a photo of the page with the costs, or upload a shorter PDF.'
+            : 'I couldn’t read that file. It may be password-protected or in an unusual format. Take a photo of the page with the costs, or upload a different PDF.';
         await finish('failed', null, null, { code: 'BAD_REQUEST', message: label ? `${label}: ${message}` : message, retryable: false, requestId: job.jobId });
         return null;
       }

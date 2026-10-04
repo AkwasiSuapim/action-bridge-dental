@@ -390,8 +390,8 @@ export function ComposerPage() {
         </ul>
         <p className="small muted">
           Anything you leave out, I’ll ask about. Photos are for documents like
-          estimates, not your teeth — one page each, up to {MAX_ATTACHMENTS}.
-          You can also drop files onto this page.
+          estimates, not your teeth — up to {MAX_ATTACHMENTS} files; for long
+          PDFs I read the first 5 pages. You can also drop files onto this page.
         </p>
       </Disclosure>
       <div className="actions">

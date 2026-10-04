@@ -172,7 +172,7 @@ export function createApiClient({
 
     // Agent jobs (system design §6, phases 5–6): interpret, explain, analyze_document, transcribe_audio.
     // Planned routes, not deployed yet; until they are, these fail with NOT_FOUND like any unknown route.
-    /** Short-lived upload slot for a voice note or one-page document; then upload with `uploadToSlot`. */
+    /** Short-lived upload slot for a voice note or a document (PDFs: first 5 pages are read); then upload with `uploadToSlot`. */
     createUpload: (caseId: string, request: CreateUploadRequest) => once('POST', `${casePath(caseId)}/uploads`, CreateUploadResponseSchema, request),
     createJob: (caseId: string, request: CreateJobRequest) => once('POST', `${casePath(caseId)}/jobs`, CreateJobResponseSchema, request),
     /** Poll with backoff until a terminal status; safe to retry. */

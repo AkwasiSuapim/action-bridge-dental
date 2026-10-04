@@ -31,7 +31,7 @@ export function addAttachment(
   file: Omit<Attachment, 'state' | 'uploadId' | 'problem'>,
 ): { ok: true; list: Attachment[] } | { ok: false; problem: string } {
   if (list.length >= MAX_ATTACHMENTS) return { ok: false, problem: `You can add up to ${MAX_ATTACHMENTS} pages. Remove one to add another.` };
-  if (file.sizeBytes > MAX_UPLOAD_BYTES) return { ok: false, problem: 'That file is larger than 5 MB. Try a one-page PDF, or take a photo instead.' };
+  if (file.sizeBytes > MAX_UPLOAD_BYTES) return { ok: false, problem: 'That file is larger than 5 MB. Try a smaller PDF, or take a photo instead.' };
   return { ok: true, list: [...list, { ...file, state: 'uploading', uploadId: null, problem: null }] };
 }
 
