@@ -77,7 +77,14 @@ export const ExtractionSchema = z.strictObject({
 
 export type Extraction = z.infer<typeof ExtractionSchema>;
 
-export type FactGroup =
+export type FactGroup = FactGroupBody & {
+  /** Where the verified quote came from: the user's own words or an uploaded document. */
+  source?: 'description' | 'document';
+  /** Provenance ID recorded on confirmed facts, e.g. `user-description` or `upload-<id>`. */
+  sourceId?: string;
+};
+
+type FactGroupBody =
   | { kind: 'coverageMode'; fieldPath: 'coverageMode'; summary: string; quote: string; value: 'insured' | 'self_pay' }
   | { kind: 'benefitYear'; fieldPath: string; summary: string; quote: string; planYearId: string; startDate: string | null; endDate: string | null; values: Partial<Record<PlanYearMoney, number>> }
   | { kind: 'coverageRules'; fieldPath: 'policy'; summary: string; quote: string; rules: { category: string; bps: number; deductibleApplies: boolean | null }[] }
@@ -306,15 +313,17 @@ function twelveMonthsFrom(start: string): string {
 export function applyGroups(
   current: DentalCaseInput,
   groups: FactGroup[],
-  makeFact: (fieldPath: string, value: string | number | boolean | null, quote: string | null, origin: SourceFact['origin']) => SourceFact,
+  makeFact: (fieldPath: string, value: string | number | boolean | null, quote: string | null, origin: SourceFact['origin'], sourceId?: string) => SourceFact,
 ): { input: DentalCaseInput; facts: SourceFact[] } {
   let input = structuredClone(current);
   const facts: SourceFact[] = [];
   for (const group of groups) {
+    const record = (fieldPath: string, value: string | number | boolean | null, quote: string | null, origin: SourceFact['origin']) =>
+      makeFact(fieldPath, value, quote, origin, group.sourceId);
     switch (group.kind) {
       case 'coverageMode':
         input = { ...input, coverageMode: group.value };
-        facts.push(makeFact('coverageMode', group.value, group.quote, 'agent_proposed'));
+        facts.push(record('coverageMode', group.value, group.quote, 'agent_proposed'));
         break;
       case 'benefitYear': {
         const existing = input.planYears[group.planYearId];
@@ -331,21 +340,21 @@ export function applyGroups(
           sourceStatus: 'user_confirmed',
         };
         for (const [field, value] of Object.entries(group.values)) {
-          facts.push(makeFact(`planYears.${group.planYearId}.${field}`, value, group.quote, 'agent_proposed'));
+          facts.push(record(`planYears.${group.planYearId}.${field}`, value, group.quote, 'agent_proposed'));
         }
         break;
       }
       case 'restrictions': {
         const policy = input.policy ?? emptyPolicy();
         if (input.policy === null) {
-          facts.push(makeFact('policy.deductibleBeforeCoinsurance', true, null, 'assumption'));
+          facts.push(record('policy.deductibleBeforeCoinsurance', true, null, 'assumption'));
         }
         const field = { waiting_period: 'waitingPeriods', exclusion: 'exclusions', frequency_limit: 'frequencyRestrictions' } as const;
         const next: Policy = { ...policy, waitingPeriods: [...policy.waitingPeriods], exclusions: [...policy.exclusions], frequencyRestrictions: [...policy.frequencyRestrictions] };
         group.restrictions.forEach((r, i) => {
           const list = next[field[r.kind]];
           list.push({ id: `agent-${r.kind.replace('_', '-')}-${list.length + i + 1}`, description: r.description, categoryIds: [] });
-          facts.push(makeFact(`policy.${field[r.kind]}`, r.description, group.quote, 'agent_proposed'));
+          facts.push(record(`policy.${field[r.kind]}`, r.description, group.quote, 'agent_proposed'));
         });
         // A stated limit means coverage is not "all services covered": the engine then reports it as
         // unsupported, and any earlier "all services covered" assumption no longer applies.
@@ -356,16 +365,16 @@ export function applyGroups(
       case 'coverageRules': {
         const policy: Policy = input.policy ?? emptyPolicy();
         if (input.policy === null) {
-          facts.push(makeFact('policy.deductibleBeforeCoinsurance', true, null, 'assumption'));
-          facts.push(makeFact('policy.allServicesCovered', true, null, 'assumption'));
+          facts.push(record('policy.deductibleBeforeCoinsurance', true, null, 'assumption'));
+          facts.push(record('policy.allServicesCovered', true, null, 'assumption'));
         }
         const next = { ...policy, insurerRateBpsByCategory: { ...policy.insurerRateBpsByCategory }, deductibleAppliesByCategory: { ...policy.deductibleAppliesByCategory } };
         for (const rule of group.rules) {
           next.insurerRateBpsByCategory[rule.category] = rule.bps;
-          facts.push(makeFact(`policy.insurerRateBpsByCategory.${rule.category}`, rule.bps, group.quote, 'agent_proposed'));
+          facts.push(record(`policy.insurerRateBpsByCategory.${rule.category}`, rule.bps, group.quote, 'agent_proposed'));
           if (rule.deductibleApplies !== null) {
             next.deductibleAppliesByCategory[rule.category] = rule.deductibleApplies;
-            facts.push(makeFact(`policy.deductibleAppliesByCategory.${rule.category}`, rule.deductibleApplies, group.quote, 'agent_proposed'));
+            facts.push(record(`policy.deductibleAppliesByCategory.${rule.category}`, rule.deductibleApplies, group.quote, 'agent_proposed'));
           }
         }
         input = { ...input, policy: next };
@@ -373,7 +382,7 @@ export function applyGroups(
       }
       case 'procedure':
         input = { ...input, procedures: [...input.procedures, group.procedure] };
-        facts.push(makeFact(group.fieldPath, group.procedure.label, group.quote, 'agent_proposed'));
+        facts.push(record(group.fieldPath, group.procedure.label, group.quote, 'agent_proposed'));
         break;
     }
   }

@@ -352,7 +352,7 @@ function Finished({ job, caseId }: { job: AgentJobView; caseId: string }) {
       }
     >
       <View style={{ alignItems: 'center', gap: space(2), paddingTop: space(2) }}>
-        <AgentOrb size={90} mode={hasEstimate ? 'success' : 'alert'} />
+        <AgentOrb size={96} mode={hasEstimate ? 'success' : 'alert'} />
         <AppText variant="title" style={{ textAlign: 'center' }}>
           {hasEstimate ? 'Your estimate is ready' : 'Almost there'}
         </AppText>
@@ -465,12 +465,12 @@ function Failed({ job, caseId, onRetried }: { job: AgentJobView; caseId: string;
       footer={
         <>
           {job.error?.retryable ? <Button label="Try again" onPress={retry} loading={busy} /> : null}
-          <Button label="Enter details step by step" variant={job.error?.retryable ? 'ghost' : 'primary'} onPress={() => router.replace({ pathname: '/case/[caseId]/questions', params: { caseId } })} />
+          <Button label="Answer questions instead" variant={job.error?.retryable ? 'ghost' : 'primary'} onPress={() => router.replace({ pathname: '/case/[caseId]/questions', params: { caseId } })} />
         </>
       }
     >
       <View style={{ alignItems: 'center', paddingTop: space(4) }}>
-        <AgentOrb size={90} mode="alert" />
+        <AgentOrb size={96} mode="alert" />
       </View>
       <Notice tone="warning" title={job.error?.message ?? 'The assistant could not finish.'} body={`Your case is unchanged.${job.error?.requestId ? ` Reference: ${job.error.requestId}` : ''}`} />
       {failure ? <ErrorNotice error={failure} /> : null}

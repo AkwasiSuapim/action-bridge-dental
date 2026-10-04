@@ -34,7 +34,7 @@ export default function SignedInLayout() {
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="case/new" options={{ title: 'New estimate' }} />
-          <Stack.Screen name="case/describe" options={{ title: 'Describe your situation' }} />
+          <Stack.Screen name="case/describe" options={{ title: 'New estimate' }} />
           <Stack.Screen name="case/[caseId]/assistant" options={{ title: 'Assistant', headerBackVisible: false, gestureEnabled: false }} />
           <Stack.Screen name="case/[caseId]/questions" options={{ title: 'A few details' }} />
           <Stack.Screen name="case/[caseId]/rules" options={{ title: 'Plan coverage' }} />
