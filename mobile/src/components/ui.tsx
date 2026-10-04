@@ -219,6 +219,8 @@ export function TextField({
   helper,
   invalid = false,
   trailing,
+  leading,
+  hideLabel = false,
   inputRef,
   returnKeyType,
   onSubmitEditing,
@@ -239,6 +241,10 @@ export function TextField({
   invalid?: boolean;
   /** A control inside the right edge of the input, such as a show-password toggle. */
   trailing?: ReactNode;
+  /** A decorative icon inside the left edge of the input. */
+  leading?: ReactNode;
+  /** Keep the label for screen readers only; the placeholder carries it visually. */
+  hideLabel?: boolean;
   inputRef?: Ref<TextInput>;
   returnKeyType?: TextInputProps['returnKeyType'];
   onSubmitEditing?: () => void;
@@ -250,7 +256,7 @@ export function TextField({
   const { colors } = useTheme();
   return (
     <View style={{ gap: space(1) }}>
-      <AppText variant="label">{label}</AppText>
+      {hideLabel ? null : <AppText variant="label">{label}</AppText>}
       <View style={{ justifyContent: 'center' }}>
         <TextInput
           ref={inputRef}
@@ -273,8 +279,14 @@ export function TextField({
             styles.input,
             { color: colors.text, backgroundColor: colors.surface, borderColor: error || invalid ? colors.danger : colors.border },
             trailing ? { paddingRight: layout.minHitArea + space(2) } : null,
+            leading ? { paddingLeft: space(11) } : null,
           ]}
         />
+        {leading ? (
+          <View aria-hidden style={styles.leading}>
+            {leading}
+          </View>
+        ) : null}
         {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
       </View>
       {error ? (
@@ -493,6 +505,7 @@ const styles = StyleSheet.create({
   notice: { flexDirection: 'row', gap: space(3), borderRadius: layout.radiusSmall, padding: space(3.5) },
   input: { minHeight: layout.minHitArea + 4, borderWidth: 1, borderRadius: layout.radiusSmall, paddingHorizontal: space(3), fontFamily: fonts.regular, fontSize: 16 },
   trailing: { position: 'absolute', right: space(1) },
+  leading: { position: 'absolute', left: space(4), pointerEvents: 'none' },
   iconButton: { width: layout.minHitArea, height: layout.minHitArea, alignItems: 'center', justifyContent: 'center', borderRadius: layout.radiusSmall },
   radioCard: { minHeight: layout.minHitArea + 12, borderRadius: layout.radius, padding: space(4), flexDirection: 'row', alignItems: 'center', gap: space(3) },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },

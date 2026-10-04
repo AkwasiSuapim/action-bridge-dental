@@ -1,20 +1,20 @@
-import type { DentalCase, ScenarioComparisonResult } from '@actionbridge/contracts';
+import type { DentalCase } from '@actionbridge/contracts';
 import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Check, ChevronDown, ChevronRight, ChevronUp, Copy, FileSearch, Share2 } from 'lucide-react-native';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Pressable, Share, View } from 'react-native';
 import { FactBadge } from '../../components/fact-badge';
 import { AgentOrb } from '../../components/orb';
 import { ErrorNotice, ErrorState, LoadingState } from '../../components/states';
 import { AppText, Badge, Button, Card, Notice, Row, Screen } from '../../components/ui';
 import { formatCents } from '../../lib/format';
-import { asApiError, type ApiError } from '../../services/api';
 import { useApi } from '../../services/api-context';
 import { useTheme } from '../../theme/theme';
 import { fonts, layout, space } from '../../theme/tokens';
 import { useCase } from '../case/case-store';
 import { isSampleCase } from '../case/facts';
+import { useRevisionResult } from '../case/use-revision-result';
 import { BenefitBar } from './benefit-bar';
 import { buildPlanDetails, findScenario, type BreakdownItem, type PlanDetails } from './plan-model';
 
@@ -23,25 +23,7 @@ export function PlanScreen() {
   const { caseId, scenario: scenarioId } = useLocalSearchParams<{ caseId: string; scenario: string }>();
   const { record, loading, error, reload } = useCase(caseId);
   const api = useApi();
-  const [result, setResult] = useState<{ revision: number; scenarios: ScenarioComparisonResult } | null>(null);
-  const [failure, setFailure] = useState<ApiError | null>(null);
-
-  const revision = record?.caseRevision;
-  const load = useCallback(async () => {
-    if (!caseId || revision === undefined) return;
-    setFailure(null);
-    try {
-      setResult({ revision, scenarios: await api.scenarios(caseId, revision) });
-    } catch (caught) {
-      const apiError = asApiError(caught);
-      if (apiError.code === 'REVISION_CONFLICT') await reload();
-      else setFailure(apiError);
-    }
-  }, [api, caseId, revision, reload]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { current, failure, retry: load } = useRevisionResult(caseId, record?.caseRevision, reload, api.scenarios);
 
   if (loading) return <LoadingState label="Loading your plan" />;
   if (!record) return error ? <ErrorState error={error} onRetry={reload} /> : <LoadingState label="Loading your plan" />;
@@ -52,7 +34,6 @@ export function PlanScreen() {
       </Screen>
     );
   }
-  const current = result && result.revision === record.caseRevision ? result.scenarios : null;
   if (!current) {
     return (
       <Screen>

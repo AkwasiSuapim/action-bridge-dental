@@ -6,7 +6,7 @@ The dental app UI (design v3, `actionbridge-dental-v3/`), built on the foundatio
 
 | Flow | Route (`src/app/`) | Feature folder |
 |---|---|---|
-| Welcome, Sign in | `welcome`, `sign-in` | `features/auth` (hero image slot: `welcome-image.ts`) |
+| Welcome + sign-in (one screen) | `welcome` | `features/auth` (hero photo: `welcome-image.ts`) |
 | Home, My plan, Activity, Profile (tabs) | `(app)/(tabs)/…` | `features/home`, `features/activity`, `features/profile` |
 | New estimate (typed) → questions → coverage rules | `(app)/case/new`, `case/[caseId]/questions`, `…/rules` | `features/intake`, `features/case` |
 | Check your details → update a detail | `case/[caseId]/facts`, `…/edit` | `features/case` |
