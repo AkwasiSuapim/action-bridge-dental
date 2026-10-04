@@ -88,7 +88,9 @@ export async function runJob(deps: JobRunnerDeps, message: { ownerId: string; jo
   } catch (error) {
     if (error instanceof LeaseLost) return 'skipped';
     const retryable = error instanceof ModelError ? error.retryable : true;
-    logEvent('error', 'job_failed', { jobId: job.jobId, errorName: error instanceof Error ? error.name : 'UnknownError', retryable });
+    // ModelError messages are our own fixed text plus the AWS error name (e.g. AccessDeniedException); never user content.
+    const errorName = error instanceof ModelError ? error.message.replace('Model call failed: ', 'Bedrock:') : error instanceof Error ? error.name : 'UnknownError';
+    logEvent('error', 'job_failed', { jobId: job.jobId, errorName, retryable });
     await finish('failed', null, null, {
       code: error instanceof ModelError && !retryable ? 'INTERNAL' : 'UPSTREAM_UNAVAILABLE',
       message: 'The assistant could not finish. Your case is unchanged — try again or enter the details yourself.',
