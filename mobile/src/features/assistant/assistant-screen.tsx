@@ -15,6 +15,7 @@ import { fonts, layout, space } from '../../theme/tokens';
 import { buildAnswers, initialDrafts, questionsOf, type Draft, type Drafts } from './answers';
 import { useJob } from './use-job';
 import { ListenButton } from '../../components/listen';
+import { useAutoRead } from '../../lib/voice';
 
 /**
  * Assistant workspace (design v3 agent workspace + doc 05 adaptive loop). Renders only
@@ -133,6 +134,15 @@ function Step({ job, caseId }: { job: AgentJobView; caseId: string }) {
   const notices = (job.questions?.blocks ?? []).filter((b): b is Extract<UiBlock, { type: 'notice' }> => b.type === 'notice');
   const current = questions[index];
   const reviewing = index >= questions.length;
+  // Voice guidance reads the key words of each item as it appears; answers are tapped.
+  useAutoRead(
+    api,
+    current
+      ? current.inputType === 'fact_review'
+        ? `${index === 0 ? `I found ${questions.length} things to check. ` : ''}${current.label.replace(/^Is this right\?\s*/, '')}: ${String(current.candidateValue ?? '')}. Is this right?`
+        : `${current.label} ${current.options.length ? `Options: ${current.options.map((o) => o.label).join(', or ')}.` : ''}`
+      : `Check before I use these. Tap continue to use them, or tap an item to change it.`,
+  );
 
   const set = (questionId: string, draft: Draft) => {
     setDrafts((existing) => ({ ...existing, [questionId]: draft }));

@@ -14,7 +14,7 @@ import { logEvent } from '../../../shared/logger.js';
 import { toEngineInput } from '../../cases/application/case-service.js';
 import type { CaseRepository } from '../../cases/ports/case-repository.js';
 import { verifiedQuote, type FactGroup } from '../domain/extraction.js';
-import { nextStepItems, planStep } from '../domain/adaptive.js';
+import { NEXT_YEAR_PATH, nextStepItems, nextYearQuestion, planStep } from '../domain/adaptive.js';
 import { ModelError, uploadKey, type AgentModel, type DocumentReader, type JobRecord, type JobRepository, type Transcriber, type UploadStore } from '../ports.js';
 import { explainComparison } from './explain.js';
 import { runInterpretAgent } from './interpret-agent.js';
@@ -282,8 +282,23 @@ export async function runJob(deps: JobRunnerDeps, message: { ownerId: string; jo
       return;
     }
 
-    await report('calculating_costs', 'completed', 'Estimate calculated');
     const comparison = compareSchedules(input);
+    // The dentist allows treatment after the last known benefit year: ask once whether the plan
+    // renews the same way, so the cheaper timing can be compared instead of silently skipped.
+    if (
+      comparison.status === 'estimated' &&
+      comparison.limitations.some((l) => l.code === 'NEXT_PLAN_YEAR_NOT_SUPPLIED') &&
+      !(job.skippedFieldPaths ?? []).includes(NEXT_YEAR_PATH)
+    ) {
+      const question = nextYearQuestion(input, job.caseRevision);
+      if (question) {
+        await report('checking_missing_facts', 'completed', 'One question could lower your cost');
+        const header = notice('info', 'One question could lower your cost', 'Your dentist allows some treatment after your benefit year resets. Choose “I don’t know” if you aren’t sure — I won’t ask again.');
+        await finish('needs_information', envelope(job.caseRevision, [...lead, header, question].slice(0, 10)), null, null);
+        return;
+      }
+    }
+    await report('calculating_costs', 'completed', 'Estimate calculated');
     const coverage = compareCoverage(input);
     const blocks: UiBlock[] = [{ id: 'summary', type: 'cost_summary', scenarioId: 'baseline' }];
     const options: { kind: 'insured' | 'self_pay' | 'alternative_timing'; scenarioId: string | null; available: boolean }[] = [
@@ -388,10 +403,10 @@ export function confirmationBlocks(groups: FactGroup[], caseRevision: number, so
 
 function foundNotice(result: { groups: FactGroup[]; dropped: unknown[]; missingAfter: { message: string }[]; summary: string | null }): UiBlock {
   const parts = [
-    result.summary ?? `We found ${result.groups.length} ${result.groups.length === 1 ? 'group' : 'groups'} of details in your description.`,
+    result.summary ?? `We found ${result.groups.length} ${result.groups.length === 1 ? 'group' : 'groups'} of details in what you shared.`,
     'Nothing is used until you confirm it.',
     result.missingAfter.length > 0 ? `After you confirm, ${result.missingAfter.length} more ${result.missingAfter.length === 1 ? 'value is' : 'values are'} still needed.` : null,
-    result.dropped.length > 0 ? `${result.dropped.length} ${result.dropped.length === 1 ? 'detail was' : 'details were'} left out because your description did not state ${result.dropped.length === 1 ? 'it' : 'them'} clearly.` : null,
+    result.dropped.length > 0 ? `${result.dropped.length} ${result.dropped.length === 1 ? 'detail was' : 'details were'} left out because what you shared did not state ${result.dropped.length === 1 ? 'it' : 'them'} clearly.` : null,
   ].filter(Boolean);
   return notice('info', 'What I found', parts.join(' '));
 }

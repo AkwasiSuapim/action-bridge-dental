@@ -22,6 +22,7 @@ import { LandingPage } from '../features/landing/landing-page';
 import { useAuth } from '../state/auth';
 import { CaseProvider, useCase } from '../state/case-store';
 import { Badge, Brand, Button } from './ui';
+import { VoiceToggle } from './listen';
 
 const pages: [string, string][] = [
   ['/my-plan', 'My plan'],
@@ -183,6 +184,7 @@ function ShellBody() {
             />
           )}
           <h1>{titleFor(location.pathname)}</h1>
+          <VoiceToggle />
           {record && isSampleCase(record) && <Badge>Sample data</Badge>}
           <button
             className="header-account"

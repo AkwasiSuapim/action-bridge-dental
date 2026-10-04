@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { DentalCaseInputSchema, type DentalCaseInput, type MissingFieldBlock } from '@actionbridge/contracts';
-import { estimateCase } from '@actionbridge/benefits-engine';
+import { compareSchedules, estimateCase } from '@actionbridge/benefits-engine';
 import { describe, expect, it } from 'vitest';
 import { applyAnswer, missingFor, nextStepItems, planStep, skipMarker } from '../src/features/agent-jobs/domain/adaptive.js';
 import { createAgentHarness, ScriptedModel } from './agent-harness.js';
@@ -164,5 +164,50 @@ describe('answers that would contradict the case', () => {
       answers: [{ questionId: question.questionId, value: 5000, unknown: false, responseMode: 'type', attachmentId: null }],
     });
     expect(accepted.status).toBe(202);
+  });
+});
+
+describe('next benefit year (cross-year timing from the user’s own details)', () => {
+  async function caseWithoutNextYear() {
+    const h = createAgentHarness(new ScriptedModel([]));
+    const base = fixture();
+    const { 'py-2027': _next, ...planYears } = base.planYears;
+    const created = await h.call('POST /v1/cases', {}, { currency: 'USD', coverageMode: 'insured', policy: base.policy, planYears, procedures: base.procedures });
+    const caseId = created.body.caseId;
+    const job = await h.call('POST /v1/cases/{caseId}/jobs', { caseId }, { expectedRevision: 1, operation: 'interpret', input: {} });
+    await h.drain();
+    const asked = (await h.call('GET /v1/jobs/{jobId}', { jobId: job.body.jobId })).body;
+    return { h, caseId, asked };
+  }
+
+  it('asks once whether the plan renews the same way, and "Yes" unlocks the $725 option', async () => {
+    const { h, caseId, asked } = await caseWithoutNextYear();
+    const question = asked.questions.blocks.find((b: MissingFieldBlock) => b.fieldPath === 'planYears.next.sameTerms');
+    expect(question.label).toBe('Will your plan renew on January 1, 2027 with the same yearly maximum ($800) and deductible ($50)?');
+
+    const next = await h.call('POST /v1/jobs/{jobId}/answers', { jobId: asked.jobId }, {
+      expectedRevision: 1,
+      answers: [{ questionId: question.questionId, value: 'same', unknown: false, responseMode: 'tap', attachmentId: null }],
+    });
+    expect(next.status).toBe(202);
+    await h.drain();
+    const record = (await h.call('GET /v1/cases/{caseId}', { caseId })).body;
+    expect(record.planYears['py-2027']).toMatchObject({ startDate: '2027-01-01', endDate: '2027-12-31', annualMaximumCents: 80000, sourceStatus: 'explicit_unchanged_plan_assumption' });
+    const scenarios = compareSchedules(DentalCaseInputSchema.parse({ caseRevision: record.caseRevision, currency: record.currency, coverageMode: record.coverageMode, policy: record.policy, planYears: record.planYears, procedures: record.procedures }));
+    if (scenarios.status !== 'estimated') throw new Error(scenarios.status);
+    expect(scenarios.alternatives[0]?.estimate.totals.patientPaysCents).toBe(72500);
+  });
+
+  it('"No, it changes" is not asked again and the estimate still completes', async () => {
+    const { h, asked } = await caseWithoutNextYear();
+    const question = asked.questions.blocks.find((b: MissingFieldBlock) => b.fieldPath === 'planYears.next.sameTerms');
+    const next = await h.call('POST /v1/jobs/{jobId}/answers', { jobId: asked.jobId }, {
+      expectedRevision: 1,
+      answers: [{ questionId: question.questionId, value: 'different', unknown: false, responseMode: 'tap', attachmentId: null }],
+    });
+    await h.drain();
+    const done = (await h.call('GET /v1/jobs/{jobId}', { jobId: next.body.jobId })).body;
+    expect(done.status).toBe('completed');
+    expect(done.resultBlocks.blocks[0]).toMatchObject({ type: 'cost_summary' });
   });
 });

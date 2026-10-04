@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GLOSSARY, jobSteps, termFor, type JobStageEvent } from '../src/index.js';
+import { GLOSSARY, jobSteps, speakable, spokenAnswer, spokenChoice, termFor, type JobStageEvent } from '../src/index.js';
 
 describe('plain-language terms', () => {
   it('explains the fields people ask about, from field paths and grouped questions', () => {
@@ -52,5 +52,32 @@ describe('job progress steps', () => {
     ]);
     expect(steps[0]?.hint).toBe('Long PDFs can take 20–30 seconds.');
     expect(steps[1]?.hint).toBe('Usually 5–10 seconds.');
+  });
+});
+
+describe('voice guidance', () => {
+  it('speaks dates, money and separators naturally', () => {
+    expect(speakable('2026-01-01 to 2026-12-31 · annual maximum $800.00 · insurer already paid $500.00')).toBe(
+      'January 1, 2026 to December 31, 2026, annual maximum $800, insurer already paid $500',
+    );
+    expect(speakable('Crown, tooth 30 (D2740) · charge $1,000.00 · planned 2026-11-12')).toBe('Crown, tooth 30, charge $1,000, planned November 12, 2026');
+    expect(speakable('From your document: “Crown fee $1,000.00”')).toBe('From your document: Crown fee $1,000');
+  });
+
+  it('understands short spoken answers, and says when it is unsure', () => {
+    expect(['Yes', 'yeah that is right', 'Correct.', 'yep'].map(spokenAnswer)).toEqual(['yes', 'yes', 'yes', 'yes']);
+    expect(['No', 'not right', "that's wrong", 'nope'].map(spokenAnswer)).toEqual(['no', 'no', 'no', 'no']);
+    expect(["I don't know", 'not sure'].map(spokenAnswer)).toEqual(['unknown', 'unknown']);
+    expect(spokenAnswer('banana')).toBeNull();
+  });
+
+  it('matches a spoken reply to one of the offered options', () => {
+    const options = [
+      { id: 'in', label: 'In network' },
+      { id: 'out', label: 'Out of network' },
+    ];
+    expect(spokenChoice('out of network', options)).toBe('out');
+    expect(spokenChoice('it is in network', options)).toBe('in');
+    expect(spokenChoice('maybe', options)).toBeNull();
   });
 });

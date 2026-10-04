@@ -5,6 +5,7 @@ import { useTheme } from '../../theme/theme';
 import { useFocusStatusBar } from '../../theme/status-bar';
 import { fonts, space } from '../../theme/tokens';
 import { useAuth } from '../auth/auth-context';
+import { VoiceToggle } from '../../components/listen';
 
 /**
  * Profile (design v3 "Profile"), limited to what is real today: the signed-in account, the privacy
@@ -40,6 +41,14 @@ export function ProfileScreen() {
             <AppText style={{ fontFamily: fonts.semibold }}>{auth.email ?? 'Unknown account'}</AppText>
           </View>
         </View>
+      </Card>
+
+      <Card>
+        <AppText variant="heading">Voice guidance</AppText>
+        <AppText variant="caption">
+          When it’s on, key screens read themselves aloud as you open them — what I found, the questions and your results. You still tap your answers.
+        </AppText>
+        <VoiceToggle />
       </Card>
 
       <Card>

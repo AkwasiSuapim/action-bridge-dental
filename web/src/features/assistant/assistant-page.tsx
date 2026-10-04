@@ -1,5 +1,8 @@
 import {
   jobSteps,
+  plainSummary,
+  spokenAnswer,
+  spokenChoice,
   termFor,
   type AgentJobView,
   type MissingFieldBlock,
@@ -9,11 +12,13 @@ import {
   Check,
   CheckCircle2,
   ClipboardCopy,
+  Mic,
+  Volume2,
   LoaderCircle,
   MinusCircle,
   XCircle,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Badge,
@@ -38,7 +43,16 @@ import { asApiError, type ApiError } from '../../services/api';
 import { useApi } from '../../state/auth';
 import { useCase, useResults } from '../../state/case-store';
 import { useJob } from '../../state/use-job';
-import { ListenButton } from '../../components/listen';
+import { ListenButton, VoiceToggle } from '../../components/listen';
+import {
+  canListen,
+  listenOnce,
+  speak,
+  stopListening,
+  stopSpeaking,
+  useAutoRead,
+  useVoiceGuidance,
+} from '../../voice/voice';
 
 /**
  * Assistant workspace. Renders only server-validated UI blocks: real stage events while working,
@@ -255,9 +269,11 @@ function Step({ job }: { job: AgentJobView }) {
     }
     setIndex((i) => i + 1);
   };
+  const draftsRef = useRef(drafts);
+  draftsRef.current = drafts;
   const submit = async () => {
     if (busy) return;
-    const built = buildAnswers(questions, drafts, job.caseRevision);
+    const built = buildAnswers(questions, draftsRef.current, job.caseRevision);
     if (!built.ok) {
       setProblems(
         Object.fromEntries(
@@ -283,9 +299,120 @@ function Step({ job }: { job: AgentJobView }) {
       setBusy(false);
     }
   };
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+
+  // Voice guidance: read the key words of each item, then listen for the answer and move on.
+  const voiceOn = useVoiceGuidance();
+  const [voice, setVoice] = useState<'speaking' | 'listening' | 'tap' | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!voiceOn) return setVoice(null);
+    let cancelled = false;
+    const q = questions[index];
+    const say = async (text: string) => {
+      setVoice('speaking');
+      await speak(api, text);
+      return !cancelled;
+    };
+    const hear = async () => {
+      if (!canListen()) return null;
+      setVoice('listening');
+      const heard = await listenOnce(6000);
+      return cancelled ? null : heard;
+    };
+    /** Asks, listens, and asks once more if the reply was unclear. */
+    const ask = async <T,>(
+      prompt: string,
+      understand: (heard: string) => T | null,
+      retry: string,
+    ): Promise<T | null> => {
+      if (!(await say(prompt))) return null;
+      for (let attempt = 0; attempt < 2 && !cancelled; attempt++) {
+        if (attempt > 0 && !(await say(retry))) return null;
+        const heard = await hear();
+        const meaning = heard ? understand(heard) : null;
+        if (meaning !== null) return meaning;
+      }
+      if (!cancelled) setVoice('tap');
+      return null;
+    };
+    void (async () => {
+      if (!q) {
+        const go = await ask(
+          `Check before I use these. ${questions.length} items. Say continue to use them, or tap an item to change it.`,
+          (heard) => (spokenAnswer(heard) === 'yes' ? true : null),
+          'Say continue, or tap an item to change it.',
+        );
+        if (go && !cancelled) void submitRef.current();
+        return;
+      }
+      const first =
+        index === 0
+          ? `I found ${questions.filter((x) => x.inputType === 'fact_review').length || questions.length} things to check. `
+          : '';
+      if (q.inputType === 'fact_review') {
+        const answer = await ask(
+          `${first}${q.label.replace(/^Is this right\?\s*/, '')}: ${String(q.candidateValue ?? '')}. Is this right?`,
+          spokenAnswer,
+          'Sorry, I didn’t catch that. Say yes, or not right.',
+        );
+        if (answer && !cancelled) {
+          set(
+            q.questionId,
+            answer === 'unknown'
+              ? { kind: 'unknown' }
+              : { kind: 'confirm', value: answer === 'yes' },
+          );
+          setIndex((i) => i + 1);
+        }
+      } else if (q.inputType === 'single_select') {
+        const choices = q.options.map((o) => o.label).join(', or ');
+        const answer = await ask(
+          `${first}${q.label} Say ${choices}${q.allowUnknown ? ', or I don’t know' : ''}.`,
+          (heard) =>
+            spokenAnswer(heard) === 'unknown'
+              ? ({ kind: 'unknown' } as Draft)
+              : (() => {
+                  const id = spokenChoice(heard, q.options);
+                  return id
+                    ? ({ kind: 'choice', optionId: id } as Draft)
+                    : null;
+                })(),
+          `Sorry, I didn’t catch that. Say ${choices}.`,
+        );
+        if (answer && !cancelled) {
+          set(q.questionId, answer);
+          setIndex((i) => i + 1);
+        }
+      } else {
+        const answer = await ask(
+          `${first}${q.label} Type your answer, or say I don’t know.`,
+          (heard) => (spokenAnswer(heard) === 'unknown' ? true : null),
+          'Type your answer, or say I don’t know.',
+        );
+        if (answer && !cancelled) {
+          set(q.questionId, { kind: 'unknown' });
+          setIndex((i) => i + 1);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      stopSpeaking();
+      stopListening();
+    };
+    // Re-run per item; drafts are read through refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, voiceOn]);
 
   return (
     <div className="page narrow assistant-page">
+      <div className="voice-row">
+        <VoiceToggle />
+        {voice && <VoiceStatus state={voice} />}
+      </div>
       {index === 0 &&
         notices.map((n) => (
           <AssistantMessage key={n.id} title={n.title} body={n.body} />
@@ -396,6 +523,25 @@ function Step({ job }: { job: AgentJobView }) {
         </>
       )}
     </div>
+  );
+}
+
+/** What the voice is doing, so people always know when to speak. */
+function VoiceStatus({ state }: { state: 'speaking' | 'listening' | 'tap' }) {
+  return (
+    <p className={`voice-status ${state}`} role="status" aria-live="polite">
+      {state === 'speaking' && (
+        <>
+          <Volume2 size={16} aria-hidden="true" /> Reading…
+        </>
+      )}
+      {state === 'listening' && (
+        <>
+          <Mic size={16} aria-hidden="true" /> Listening — say your answer
+        </>
+      )}
+      {state === 'tap' && <>I didn’t catch that — tap your answer</>}
+    </p>
   );
 }
 
@@ -638,8 +784,29 @@ function Finished({ job }: { job: AgentJobView }) {
 
 /** Numbers come from the calculator for this exact revision. */
 function EstimateSummary({ revision }: { revision: number }) {
+  const api = useApi();
   const { record } = useCase();
-  const { status, data, error, retry } = useResults();
+  const { status, data, error, retry, comparison } = useResults();
+  // Voice guidance reads the plain-language result as soon as it is ready.
+  const speech =
+    record && data && comparison
+      ? `Your estimate is ready. ${
+          plainSummary({
+            comparison: comparison.baseline,
+            alternative: comparison.alternatives[0] ?? null,
+            outcome: comparison.outcome,
+            procedures: record.procedures,
+            selfPay:
+              data.coverage.selfPay.status === 'available'
+                ? {
+                    totalCents: data.coverage.selfPay.totalCents,
+                    minusInsuredCents: data.coverage.selfPayMinusInsuredCents,
+                  }
+                : null,
+          }).speech
+        }`
+      : null;
+  useAutoRead(api, speech);
   if (!record || record.caseRevision !== revision)
     return <p className="muted">Loading the calculator’s numbers…</p>;
   if (status === 'error' && error)
