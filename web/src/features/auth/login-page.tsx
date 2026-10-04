@@ -1,46 +1,35 @@
-import { KeyRound } from 'lucide-react';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Badge, Brand, Button, Field, Notice } from '../../components/ui';
-import { useDemo } from '../../state/demo-store';
+import { useState, type FormEvent } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { Brand, Button, Field, Notice } from '../../components/ui';
+import { appConfig } from '../../config';
+import { CognitoError } from '../../services/cognito';
+import { useAuth } from '../../state/auth';
 
+/**
+ * Real sign-in with the team's Cognito user pool. Accounts are created by an admin (no public
+ * sign-up); a first sign-in asks for a new password, as on the phone.
+ */
 export function LoginPage() {
-  const { state, signIn } = useDemo();
+  const { status, ended, signIn, completeNewPassword } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const [view, setView] = useState<
-    'signin' | 'create' | 'forgot' | 'sent' | 'new-password'
-  >('signin');
-  const [name, setName] = useState('');
+  const [view, setView] = useState<'signin' | 'new-password'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(timer.current), []);
-  if (state.session) return <Navigate to="/" replace />;
-  const switchView = (next: typeof view) => {
-    setView(next);
-    setErrors({});
-    setPassword('');
-    setConfirmation('');
-  };
-  function submit(e: FormEvent) {
+  if (status === 'signed_in') return <Navigate to="/" replace />;
+
+  async function submit(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
     const next: Record<string, string> = {};
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
-      next.email = 'Enter a valid email address.';
-    if (view !== 'forgot' && !password) next.password = 'Enter your password.';
-    if (view === 'create') {
-      if (!name.trim()) next.name = 'Enter your name.';
-      if (password.length < 8) next.password = 'Use at least 8 characters.';
-      if (confirmation !== password)
-        next.confirmation = 'Passwords must match.';
-    }
-    if (view === 'new-password') {
+    if (view === 'signin') {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+        next.email = 'Enter a valid email address.';
+      if (!password) next.password = 'Enter your password.';
+    } else {
       if (
         password.length < 12 ||
         !/[A-Z]/.test(password) ||
@@ -54,31 +43,34 @@ export function LoginPage() {
     }
     setErrors(next);
     if (Object.keys(next).length) return;
-    if (view === 'forgot') {
-      setView('sent');
-      return;
-    }
-    if (
-      view === 'signin' &&
-      (email.trim().toLowerCase() !== 'jordan@example.com' ||
-        password !== 'DentalDemo123!')
-    ) {
-      setErrors({
-        form: 'Demo credentials did not match. Use Fill demo credentials to try the sample.',
-      });
-      return;
-    }
     setBusy(true);
-    timer.current = setTimeout(() => {
-      signIn({
-        name: view === 'create' ? name.trim() : 'Jordan',
-        email: email.trim().toLowerCase(),
-      });
+    try {
+      if (view === 'signin') {
+        const result = await signIn(email, password);
+        if (result.kind === 'new_password_required') {
+          setView('new-password');
+          setPassword('');
+          setConfirmation('');
+          return;
+        }
+      } else {
+        await completeNewPassword(password);
+      }
       setPassword('');
       setConfirmation('');
       navigate('/', { replace: true });
-    }, 550);
+    } catch (caught) {
+      setErrors({
+        form:
+          caught instanceof CognitoError
+            ? caught.message
+            : 'Sign-in failed. Try again.',
+      });
+    } finally {
+      setBusy(false);
+    }
   }
+
   return (
     <div className="login dark">
       <section className="login-art" aria-label="About ActionBridge Dental">
@@ -99,185 +91,111 @@ export function LoginPage() {
         </div>
       </section>
       <section className="login-panel">
-        <div className="login-badge">
-          <Badge>Demo mode · Sample data</Badge>
-        </div>
         <div className="login-form-wrap">
-          <form className="stack login-form" noValidate onSubmit={submit}>
-            {location.state?.expired && (
-              <Notice>
-                Your demo session expired. Sign in again to start a new session.
+          <form
+            className="stack login-form"
+            noValidate
+            onSubmit={(e) => void submit(e)}
+          >
+            {!appConfig.ok && (
+              <Notice tone="danger">
+                This site is not configured: {appConfig.problems.join(' ')}
               </Notice>
+            )}
+            {ended === 'expired' && view === 'signin' && (
+              <Notice>Your session ended. Sign in again to continue.</Notice>
             )}
             <div>
               <h1>
                 {view === 'new-password'
                   ? 'Choose a new password'
-                  : view === 'signin'
-                    ? 'Welcome to ActionBridge Dental'
-                    : view === 'create'
-                      ? 'Create a demo account'
-                      : view === 'forgot'
-                        ? 'Reset your password'
-                        : 'Demo reset confirmation. No email was sent.'}
+                  : 'Welcome to ActionBridge Dental'}
               </h1>
               <p className="muted">
                 {view === 'new-password'
-                  ? 'Finish the first-sign-in step for a demo account. This is a simulation; no password is stored or changed.'
-                  : view === 'signin'
-                    ? 'Understand your dental costs. Plan your next step.'
-                    : view === 'create'
-                      ? 'Stays in this browser. No real account is created.'
-                      : view === 'forgot'
-                        ? 'Enter your email. In this demo, nothing is sent.'
-                        : `A real reset link would go to ${email}. Use the demo credentials to sign in.`}
+                  ? 'This is your first sign-in. Choose a password only you know.'
+                  : 'Understand your dental costs. Plan your next step.'}
               </p>
             </div>
-            {view === 'signin' && (
-              <Button
-                variant="secondary"
-                icon={KeyRound}
-                className="demo-fill"
-                onClick={() => {
-                  setEmail('jordan@example.com');
-                  setPassword('DentalDemo123!');
-                  setErrors({});
-                }}
-              >
-                Fill demo credentials
-              </Button>
-            )}
             {errors.form && <Notice tone="danger">{errors.form}</Notice>}
-            {view === 'create' && (
-              <Field label="Name" error={errors.name}>
+            <Field label="Email" error={errors.email}>
+              <input
+                type="email"
+                readOnly={view === 'new-password'}
+                autoComplete="username"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </Field>
+            <Field
+              label={view === 'new-password' ? 'New password' : 'Password'}
+              error={errors.password}
+            >
+              <div className="password-control">
                 <input
-                  autoComplete="name"
-                  value={name}
-                  maxLength={60}
-                  onChange={(e) => setName(e.target.value)}
-                  aria-invalid={!!errors.name}
+                  type={show ? 'text' : 'password'}
+                  autoComplete={
+                    view === 'new-password'
+                      ? 'new-password'
+                      : 'current-password'
+                  }
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShow(!show)}
+                  aria-pressed={show}
+                >
+                  {show ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </Field>
+            {view === 'new-password' && (
+              <Field label="Confirm password" error={errors.confirmation}>
+                <input
+                  type={show ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  value={confirmation}
+                  onChange={(e) => setConfirmation(e.target.value)}
                 />
               </Field>
             )}
-            {view !== 'sent' && (
-              <Field label="Email" error={errors.email}>
-                <input
-                  type="email"
-                  readOnly={view === 'new-password'}
-                  autoComplete={view === 'signin' ? 'username' : 'email'}
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  aria-invalid={!!errors.email}
-                />
-              </Field>
-            )}
-            {(view === 'signin' ||
-              view === 'create' ||
-              view === 'new-password') && (
-              <>
-                <div>
-                  <div className="password-label">
-                    <span>Password</span>
-                    {view === 'signin' && (
-                      <button
-                        type="button"
-                        className="text-button"
-                        onClick={() => switchView('forgot')}
-                      >
-                        Forgot password?
-                      </button>
-                    )}
-                  </div>
-                  <Field
-                    label={
-                      view === 'new-password'
-                        ? 'New password'
-                        : view === 'create'
-                          ? 'Choose a password'
-                          : 'Your password'
-                    }
-                    error={errors.password}
-                  >
-                    <div className="password-control">
-                      <input
-                        type={show ? 'text' : 'password'}
-                        autoComplete={
-                          view === 'create' || view === 'new-password'
-                            ? 'new-password'
-                            : 'current-password'
-                        }
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        aria-invalid={!!errors.password}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShow(!show)}
-                        aria-pressed={show}
-                      >
-                        {show ? 'Hide' : 'Show'}
-                      </button>
-                    </div>
-                  </Field>
-                </div>
-                {(view === 'create' || view === 'new-password') && (
-                  <Field label="Confirm password" error={errors.confirmation}>
-                    <input
-                      type={show ? 'text' : 'password'}
-                      autoComplete="new-password"
-                      value={confirmation}
-                      onChange={(e) => setConfirmation(e.target.value)}
-                      aria-invalid={!!errors.confirmation}
-                    />
-                  </Field>
-                )}
-              </>
-            )}
-            {view !== 'sent' && (
-              <Button type="submit" busy={busy} className="full">
-                {busy
-                  ? 'Signing in…'
-                  : view === 'new-password'
-                    ? 'Set password and continue'
-                    : view === 'signin'
-                      ? 'Sign in'
-                      : view === 'create'
-                        ? 'Create demo account'
-                        : 'Send reset link'}
-              </Button>
-            )}
-            {view === 'signin' && (
+            <Button
+              type="submit"
+              busy={busy}
+              className="full"
+              disabled={!appConfig.ok}
+            >
+              {busy
+                ? 'Signing in…'
+                : view === 'new-password'
+                  ? 'Set password and continue'
+                  : 'Sign in'}
+            </Button>
+            {view === 'new-password' && (
               <Button
                 variant="ghost"
                 onClick={() => {
-                  switchView('new-password');
-                  setEmail('jordan@example.com');
+                  setView('signin');
+                  setErrors({});
+                  setPassword('');
+                  setConfirmation('');
                 }}
               >
-                Preview first-sign-in password change
-              </Button>
-            )}
-            {view === 'signin' ? (
-              <p className="auth-switch muted">
-                New here?{' '}
-                <button
-                  className="text-button"
-                  type="button"
-                  onClick={() => switchView('create')}
-                >
-                  Create account
-                </button>
-              </p>
-            ) : (
-              <Button variant="ghost" onClick={() => switchView('signin')}>
                 Back to sign in
               </Button>
             )}
+            <p className="small muted">
+              Accounts are created by your team admin. Forgot your password? Ask
+              your admin to reset it.
+            </p>
           </form>
         </div>
         <p className="login-fine-print">
-          Simulated sign-in. Passwords are never stored.
+          Use made-up details in this demo — no names, member IDs or health
+          history.
           <br />
           Estimates only — your dentist and insurer decide final costs.
         </p>

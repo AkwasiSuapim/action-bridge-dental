@@ -1,6 +1,7 @@
 import { CalendarDays } from 'lucide-react';
 import type { Scenario, DentalCaseInput } from '@actionbridge/contracts';
-import { useDemo } from '../../state/demo-store';
+import { useCase } from '../../state/case-store';
+import { isSampleCase } from '../../domain/provenance';
 import { treatmentTitle } from '../../domain/model';
 import { Badge, Button, Card, Disclosure, Row } from '../../components/ui';
 import {
@@ -21,8 +22,12 @@ export function ScenarioCard({
   onSelect: () => void;
   onSources: () => void;
 }) {
-  const { state } = useDemo();
-  const input = state.input!;
+  const { record } = useCase();
+  const input = record!;
+  const sample = isSampleCase(input);
+  const answered = input.sourceFacts.some(
+    (f) => f.userConfirmed && f.origin !== 'synthetic',
+  );
   return (
     <article className={`scenario-card ${selected ? 'selected' : ''}`}>
       <label className="scenario-select">
@@ -89,9 +94,11 @@ export function ScenarioCard({
                 : 'allowed amounts differ from billed fees'}
             </span>
             <Badge>
-              {Object.keys(state.provenance).length
+              {answered
                 ? 'Includes your answers'
-                : 'Sample'}
+                : sample
+                  ? 'Sample'
+                  : 'Provided by you'}
             </Badge>
           </div>
           {scenario.kind === 'alternative' && (
@@ -109,7 +116,7 @@ export function ScenarioCard({
               </div>
               <div>
                 <span>Dates are within dentist-supplied windows</span>
-                <Badge>Sample</Badge>
+                <Badge>{sample ? 'Sample' : 'From your dentist'}</Badge>
               </div>
             </>
           )}
@@ -134,8 +141,8 @@ export function BenefitYears({
   scenario: Scenario;
   input?: DentalCaseInput;
 }) {
-  const { state } = useDemo();
-  const input = supplied ?? state.input;
+  const { record } = useCase();
+  const input = supplied ?? record;
   return (
     <Card className="benefit-card">
       <h3>Benefit-year usage</h3>
@@ -224,8 +231,8 @@ export function ProcedureTable({
   onSources: () => void;
   input?: DentalCaseInput;
 }) {
-  const { state } = useDemo();
-  const input = supplied ?? state.input;
+  const { record } = useCase();
+  const input = supplied ?? record;
   return (
     <Card className="procedure-table-card">
       <div className="section-title">
@@ -287,8 +294,8 @@ export function TreatmentTimeline({
   scenario: Scenario;
   input?: DentalCaseInput;
 }) {
-  const { state } = useDemo();
-  const input = supplied ?? state.input;
+  const { record } = useCase();
+  const input = supplied ?? record;
   return (
     <Card>
       <div className="section-title">
@@ -332,8 +339,8 @@ export function ProcedureDetails({
   onSources: () => void;
   input?: DentalCaseInput;
 }) {
-  const { state } = useDemo();
-  const input = supplied ?? state.input;
+  const { record } = useCase();
+  const input = supplied ?? record;
   return (
     <Card>
       <h3>Costs by procedure</h3>
@@ -410,7 +417,7 @@ export function Conditions() {
           determines timing.
         </li>
         <li>
-          These are estimates using fictional information. Final coverage and
+          These are estimates from the details you confirmed. Final coverage and
           costs may differ.
         </li>
       </ul>

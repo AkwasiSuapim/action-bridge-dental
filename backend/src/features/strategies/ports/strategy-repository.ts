@@ -25,4 +25,6 @@ export interface StrategySave {
 export interface StrategyRepository {
   findByIdempotencyKey(ownerId: string, caseId: string, idempotencyKey: string): Promise<IdempotencyRecord | null>;
   save(input: StrategySave): Promise<SaveOutcome>;
+  /** Saved strategies for one of the owner's cases, any order. */
+  listForCase(ownerId: string, caseId: string): Promise<SavedStrategy[]>;
 }

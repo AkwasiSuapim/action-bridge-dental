@@ -29,7 +29,12 @@ export const IdempotencyKeySchema = z
   .max(100)
   .regex(/^[A-Za-z0-9_-]+$/, 'Use letters, digits, hyphens or underscores');
 
-export const LedgerActionSchema = z.enum(['case_created', 'case_updated', 'strategy_saved']);
+/** `GET /v1/cases/{caseId}/strategies` → saved plans for the case, newest first (read back after reload). */
+export const StrategyListSchema = z.strictObject({
+  strategies: z.array(SavedStrategySchema).max(20),
+});
+
+export const LedgerActionSchema =z.enum(['case_created', 'case_updated', 'strategy_saved']);
 
 /** Server-generated record of something that actually happened. Never a simulated action. */
 export const LedgerEventSchema = z.strictObject({
@@ -52,6 +57,7 @@ export const LedgerPageSchema = z.strictObject({
 
 export type SavedStrategy = z.infer<typeof SavedStrategySchema>;
 export type SaveStrategyResponse = z.infer<typeof SaveStrategyResponseSchema>;
+export type StrategyList = z.infer<typeof StrategyListSchema>;
 export type LedgerAction = z.infer<typeof LedgerActionSchema>;
 export type LedgerEvent = z.infer<typeof LedgerEventSchema>;
 export type LedgerPage = z.infer<typeof LedgerPageSchema>;

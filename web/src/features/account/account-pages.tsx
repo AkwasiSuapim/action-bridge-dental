@@ -1,15 +1,19 @@
+import type {
+  DentalCase,
+  LedgerEvent,
+  SavedStrategy,
+} from '@actionbridge/contracts';
 import { ClipboardList, History, LogOut, UserRound } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Badge,
   Button,
   Card,
-  Dialog,
-  Disclosure,
   EmptyState,
   Field,
   Notice,
+  Orb,
   PageHeading,
   Row,
 } from '../../components/ui';
@@ -18,71 +22,123 @@ import {
   money,
   scenarioTitle,
   treatmentTitle,
-  type CaseSnapshot,
 } from '../../domain/model';
-import { useDemo, recentCases } from '../../state/demo-store';
-import { nextQuestion } from '../../domain/case-fields';
-import { useJob } from '../../state/job-store';
-import { QuestionCard, ReminderCard, PlanHistory } from '../saved/saved-pages';
+import { isSampleCase } from '../../domain/provenance';
+import { asApiError, type ApiError } from '../../services/api';
+import { useApi, useAuth } from '../../state/auth';
+import { useCase } from '../../state/case-store';
+import { ApiNotice } from '../assistant/assistant-page';
+import { ledgerTitle, PlanHistory, QuestionCard } from '../saved/saved-pages';
 
-function casePath(c: CaseSnapshot) {
-  return c.saved && c.saved.input.caseRevision === c.input?.caseRevision
-    ? '/details?saved=1'
-    : c.comparedRevision === c.input?.caseRevision
-      ? '/options'
-      : nextQuestion(c.input!) || c.documentNeeded || c.deductibleConflict
-        ? '/questions'
-        : '/facts';
+type Summary = { record: DentalCase; saved: SavedStrategy | null };
+
+/** Loads the user's recent cases (IDs kept in this browser) from the API, newest first. */
+function useSummaries(ids: string[], limit: number) {
+  const api = useApi();
+  const [summaries, setSummaries] = useState<Summary[] | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const key = ids.slice(0, limit).join(',');
+  useEffect(() => {
+    let live = true;
+    setError(null);
+    const wanted = key ? key.split(',') : [];
+    void Promise.all(
+      wanted.map(async (id): Promise<Summary | null> => {
+        try {
+          const [record, strategies] = await Promise.all([
+            api.getCase(id),
+            api.listStrategies(id).catch(() => ({ strategies: [] })),
+          ]);
+          return { record, saved: strategies.strategies[0] ?? null };
+        } catch (caught) {
+          const failure = asApiError(caught);
+          if (failure.code !== 'NOT_FOUND' && live) setError(failure);
+          return null;
+        }
+      }),
+    ).then((found) => {
+      if (live)
+        setSummaries(
+          found
+            .filter((s): s is Summary => s !== null)
+            .sort((a, b) =>
+              b.record.updatedAt.localeCompare(a.record.updatedAt),
+            ),
+        );
+    });
+    return () => {
+      live = false;
+    };
+  }, [api, key]);
+  return { summaries, error };
 }
-function CaseList({ limit }: { limit?: number }) {
-  const { state, openCase } = useDemo();
-  const { cancel } = useJob();
+
+function CaseList({ limit = 10 }: { limit?: number }) {
+  const { recent, open } = useCase();
   const navigate = useNavigate();
-  const cases = recentCases(state).slice(0, limit);
+  const { summaries, error } = useSummaries(recent, limit);
+  if (error) return <ApiNotice error={error} />;
+  if (!summaries)
+    return (
+      <p className="muted small" role="status">
+        Loading your cases…
+      </p>
+    );
+  if (summaries.length === 0) return <p className="muted">No cases yet.</p>;
   return (
     <div className="stack">
-      {cases.map((c) => {
-        const changed =
-          !!c.saved && c.saved.input.caseRevision !== c.input?.caseRevision;
-        const missing =
-          !!nextQuestion(c.input!) || c.documentNeeded || c.deductibleConflict;
+      {summaries.map(({ record, saved }) => {
+        const changed = !!saved && saved.caseRevision !== record.caseRevision;
         const status = changed
           ? 'Details changed'
-          : c.saved
+          : saved
             ? 'Saved plan'
-            : missing
-              ? 'Needs information'
-              : c.comparedRevision === c.input?.caseRevision
-                ? 'Comparison ready'
+            : record.procedures.length === 0
+              ? 'Not started'
+              : record.status === 'draft'
+                ? 'Needs information'
                 : 'Ready to compare';
         return (
-          <Card className="case-history-card" key={c.caseId}>
+          <Card className="case-history-card" key={record.caseId}>
             <div className="section-title">
-              <h3>{treatmentTitle(c.input)}</h3>
+              <h3>
+                {record.procedures.length
+                  ? treatmentTitle(record)
+                  : 'New estimate'}
+              </h3>
               <Badge
                 tone={
-                  changed || missing ? 'warning' : c.saved ? 'green' : undefined
+                  changed || status === 'Needs information'
+                    ? 'warning'
+                    : saved
+                      ? 'green'
+                      : undefined
                 }
               >
                 {status}
               </Badge>
             </div>
             <p className="small muted">
-              {c.origin === 'sample' ? 'Sample case' : 'Manual demo case'} ·
-              Updated {new Date(c.updatedAt).toLocaleString('en-US')}
+              {isSampleCase(record) ? 'Sample case' : 'Your case'} · Updated{' '}
+              {new Date(record.updatedAt).toLocaleString('en-US')}
             </p>
-            {c.saved && (
+            {saved && (
               <Row
                 label="Saved patient estimate"
-                value={money(c.saved.scenario.estimate.totals.patientPaysCents)}
+                value={money(saved.scenario.estimate.totals.patientPaysCents)}
               />
             )}
             <Button
               variant="secondary"
               onClick={() => {
-                cancel();
-                openCase(c.caseId!);
-                navigate(casePath(c));
+                open(record.caseId);
+                navigate(
+                  saved && !changed
+                    ? '/saved'
+                    : record.procedures.length
+                      ? '/facts'
+                      : '/',
+                );
               }}
             >
               Resume case
@@ -95,10 +151,16 @@ function CaseList({ limit }: { limit?: number }) {
 }
 
 export function MyPlanPage() {
-  const { state } = useDemo();
+  const { record, saved, loading, recent } = useCase();
   const navigate = useNavigate();
-  if (!state.saved && (state.input || state.cases.length))
+  if (loading && !record)
     return (
+      <div className="page narrow centered" role="status">
+        <Orb size={120} active />
+      </div>
+    );
+  if (!saved || !record)
+    return recent.length ? (
       <div className="page medium">
         <PageHeading
           title="My plan"
@@ -109,37 +171,33 @@ export function MyPlanPage() {
           See all cases in Activity
         </Button>
       </div>
-    );
-  if (!state.saved)
-    return (
+    ) : (
       <div className="page medium">
         <EmptyState
           icon={ClipboardList}
           title="No saved plan yet"
           description="When you save a plan, it appears here with its costs, dates and assumptions."
           action={
-            <Button onClick={() => navigate(state.input ? '/facts' : '/')}>
-              {state.input ? 'Continue your case' : 'Start an estimate'}
-            </Button>
+            <Button onClick={() => navigate('/')}>Start an estimate</Button>
           }
         />
       </div>
     );
-  const scenario = state.saved.scenario;
-  const changed = state.saved.input.caseRevision !== state.input?.caseRevision;
+  const scenario = saved.scenario;
+  const changed = saved.caseRevision !== record.caseRevision;
   return (
     <div className="page medium">
       <PageHeading
         eyebrow="Your saved plan"
         title={scenarioTitle(scenario)}
-        description={`${treatmentTitle(state.saved.input)}. Your selected estimate and next steps, in one place.`}
+        description={`${treatmentTitle(record)}. Your selected estimate and next steps, in one place.`}
       />
       <Card>
         <div className="section-title">
-          <Badge tone="green">Saved locally</Badge>
+          <Badge tone="green">Saved to your account</Badge>
           <span className="small muted">
             Saved{' '}
-            {new Date(state.saved.savedAt).toLocaleDateString('en-US', {
+            {new Date(saved.savedAt).toLocaleDateString('en-US', {
               month: 'short',
               day: 'numeric',
               year: 'numeric',
@@ -160,15 +218,15 @@ export function MyPlanPage() {
           <Row
             key={s.procedureId}
             label={
-              state.saved!.input.procedures.find((p) => p.id === s.procedureId)
-                ?.label ?? 'Treatment'
+              record.procedures.find((p) => p.id === s.procedureId)?.label ??
+              'Treatment'
             }
             value={dateLabel(s.date)}
           />
         ))}
         {changed && (
           <Notice tone="warning">
-            Your case details changed after this snapshot was saved. Recompare
+            Your case details changed after this plan was saved. Compare again
             before relying on these costs.
           </Notice>
         )}
@@ -177,24 +235,11 @@ export function MyPlanPage() {
             Open details
           </Button>
           <Button variant="secondary" onClick={() => navigate('/facts')}>
-            Edit or recompare
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() =>
-              navigate(
-                state.comparedRevision === state.input?.caseRevision
-                  ? '/options'
-                  : '/facts',
-              )
-            }
-          >
-            Resume case
+            Edit or compare again
           </Button>
         </div>
       </Card>
       <QuestionCard />
-      <ReminderCard />
       <PlanHistory />
       <Button variant="ghost" onClick={() => navigate('/activity')}>
         See all cases in Activity
@@ -202,85 +247,104 @@ export function MyPlanPage() {
     </div>
   );
 }
+
+/** Recorded actions across the user's recent cases, from the server ledger. */
 export function ActivityPage() {
-  const { state } = useDemo();
+  const api = useApi();
+  const { recent } = useCase();
   const navigate = useNavigate();
+  const [events, setEvents] = useState<LedgerEvent[] | null>(null);
+  const key = recent.slice(0, 5).join(',');
+  useEffect(() => {
+    let live = true;
+    const ids = key ? key.split(',') : [];
+    void Promise.all(
+      ids.map((id) =>
+        api
+          .ledger(id)
+          .then((p) => p.events)
+          .catch(() => [] as LedgerEvent[]),
+      ),
+    ).then((pages) => {
+      if (live)
+        setEvents(
+          pages
+            .flat()
+            .sort((a, b) => b.at.localeCompare(a.at))
+            .slice(0, 50),
+        );
+    });
+    return () => {
+      live = false;
+    };
+  }, [api, key]);
   return (
     <div className="page medium">
       <PageHeading
         title="Your activity"
-        description="Events from your actions in this demo, newest first. Stored only in this browser."
+        description="Your cases and what happened to them, newest first."
       />
-      {(state.input || state.cases.length > 0) && (
+      {recent.length === 0 ? (
+        <EmptyState
+          icon={History}
+          title="Your next steps will appear here"
+          description="Start a case from Home. Your confirmed details and saved plans will create an activity trail."
+          action={<Button onClick={() => navigate('/')}>Start on Home</Button>}
+        />
+      ) : (
         <>
           <h3>Your cases</h3>
           <CaseList />
           <h3>Recent actions</h3>
-        </>
-      )}
-      {state.events.length === 0 ? (
-        <EmptyState
-          icon={History}
-          title="Your next steps will appear here"
-          description="Start a case from Home. Your confirmed details, comparisons and saved plan will create an activity trail."
-          action={<Button onClick={() => navigate('/')}>Start on Home</Button>}
-        />
-      ) : (
-        <ol className="activity-list">
-          {state.events.map((event) => (
-            <li key={event.id}>
-              <Card>
-                <Disclosure
-                  title={
+          {!events ? (
+            <p className="muted small" role="status">
+              Loading activity…
+            </p>
+          ) : (
+            <ol className="activity-list">
+              {events.map((event) => (
+                <li key={event.eventId}>
+                  <Card>
                     <div className="activity-heading">
                       <span className="activity-dot" />
-                      <strong>{event.title}</strong>
-                      <time className="small muted" dateTime={event.timestamp}>
-                        {new Date(event.timestamp).toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })}
+                      <strong>{ledgerTitle(event)}</strong>
+                      <time className="small muted" dateTime={event.at}>
+                        {new Date(event.at).toLocaleString('en-US')}
                       </time>
                     </div>
-                  }
-                >
-                  <p className="muted">{event.detail}</p>
-                  <p className="small muted">
-                    {new Date(event.timestamp).toLocaleString('en-US')}
-                  </p>
-                </Disclosure>
-              </Card>
-            </li>
-          ))}
-        </ol>
+                  </Card>
+                </li>
+              ))}
+            </ol>
+          )}
+        </>
       )}
     </div>
   );
 }
+
 export function ProfilePage() {
-  const { state, rename, signOut, reset } = useDemo();
-  const { cancel } = useJob();
+  const { session, rename, signOut } = useAuth();
   const navigate = useNavigate();
-  const [name, setName] = useState(state.session!.name);
+  const [name, setName] = useState(session?.name ?? '');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [resetOpen, setResetOpen] = useState(false);
+  if (!session) return null;
   return (
     <div className="page narrow">
       <PageHeading
         title="Your profile"
-        description="Your demo identity and browser data settings."
+        description="Your account and how your data is handled."
       />
       <Card className="stack">
         <div className="profile-identity">
           <span className="avatar large">
-            {state.session!.name.charAt(0).toUpperCase()}
+            {session.name.charAt(0).toUpperCase()}
           </span>
           <div>
-            <h3>{state.session!.name}</h3>
-            <p className="muted small">{state.session!.email}</p>
+            <h3>{session.name}</h3>
+            <p className="muted small">{session.email}</p>
           </div>
-          <Badge>Demo account</Badge>
         </div>
         <form
           className="stack"
@@ -291,11 +355,15 @@ export function ProfilePage() {
               return;
             }
             rename(name.trim());
-            setMessage('Display name saved.');
+            setMessage('Display name saved in this browser.');
             setError('');
           }}
         >
-          <Field label="Display name" error={error}>
+          <Field
+            label="Display name"
+            error={error}
+            hint="Shown only in this browser."
+          >
             <input
               value={name}
               maxLength={60}
@@ -317,22 +385,18 @@ export function ProfilePage() {
             </p>
           )}
         </form>
-        <Row label="Email" value={state.session!.email} />
-        <p className="small muted">The demo email can't be changed.</p>
+        <Row label="Email" value={session.email} />
       </Card>
       <Card>
-        <h3>About demo data</h3>
+        <h3>About your data</h3>
         <p className="muted">
-          Sign-in is simulated. Passwords are never stored. The app does not
-          create a real account.
-        </p>
-        <p className="muted">
-          Your fictional case, saved estimate, activity and demo reminder stay
-          in this browser. Files and descriptions stay in memory and disappear
-          after a reload. No files or audio are sent to a server.
+          Your cases, answers and saved plans are stored in your account.
+          Uploaded documents and voice notes are read once and then deleted.
+          Nothing is shared with your dentist or insurer.
         </p>
         <p className="small muted">
-          If browser storage is blocked, the demo continues in memory.
+          This browser remembers only which cases you opened. Signing out ends
+          your session here.
         </p>
       </Card>
       <div className="actions">
@@ -340,41 +404,13 @@ export function ProfilePage() {
           variant="secondary"
           icon={LogOut}
           onClick={() => {
-            cancel();
-            signOut();
+            void signOut();
             navigate('/login', { replace: true });
           }}
         >
           Sign out
         </Button>
-        <Button variant="danger" onClick={() => setResetOpen(true)}>
-          Reset demo
-        </Button>
       </div>
-      {resetOpen && (
-        <Dialog title="Reset the demo?" onClose={() => setResetOpen(false)}>
-          <p>
-            Your sample case, plan, reminder and activity will be cleared. Any
-            running analysis will stop.
-          </p>
-          <div className="actions">
-            <Button variant="secondary" onClick={() => setResetOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              onClick={() => {
-                cancel();
-                reset();
-                setResetOpen(false);
-                navigate('/');
-              }}
-            >
-              Reset demo
-            </Button>
-          </div>
-        </Dialog>
-      )}
     </div>
   );
 }

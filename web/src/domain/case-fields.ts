@@ -4,8 +4,7 @@ import type {
   Policy,
   Procedure,
 } from '@actionbridge/contracts';
-import { compareSchedules } from '@actionbridge/benefits-engine';
-import { amountLabel, currentYear, dateLabel } from './model';
+import { amountLabel, dateLabel } from './model';
 
 export const categories = ['basic', 'major'] as const;
 export function emptyPolicy(): Policy {
@@ -80,88 +79,6 @@ export const networkOptions = [
   { value: 'out', label: 'Out of network' },
   { value: 'unknown', label: 'Not sure' },
 ];
-export function nextQuestion(input: DentalCaseInput): CaseQuestion | null {
-  if (input.coverageMode === 'unknown')
-    return {
-      path: 'coverageMode',
-      title: 'Do you have dental insurance for this treatment?',
-      reason:
-        'Coverage decides whether we apply your plan rules or review cash prices.',
-      kind: 'choice',
-      options: coverageOptions,
-    };
-  if (input.coverageMode === 'self_pay') return null;
-  if (!currentYear(input))
-    return {
-      path: 'benefitStart',
-      title: 'When does your plan’s benefit year start?',
-      reason:
-        'Your maximum and deductible reset on this date. Check your benefits summary.',
-      kind: 'date',
-    };
-  const result = compareSchedules(input);
-  if (result.status === 'estimated') return null;
-  if (result.status !== 'needs_information')
-    return {
-      path: 'rules',
-      title: 'Let’s check your coverage rules',
-      reason:
-        result.status === 'invalid'
-          ? 'Some details contradict one another. Review your coverage and procedure amounts.'
-          : 'These plan rules need review before an estimate is available.',
-      kind: 'rules',
-    };
-  const fact = result.missing[0];
-  if (!fact) return null;
-  const path = fact.fieldPath;
-  const p = input.procedures.find((p) =>
-    path.startsWith(`procedures.${p.id}.`),
-  );
-  if (path === 'coverageMode')
-    return {
-      path,
-      title: 'Do you have dental insurance for this treatment?',
-      reason: fact.message,
-      kind: 'choice',
-      options: coverageOptions,
-    };
-  if (path.endsWith('.network'))
-    return {
-      path,
-      title: `Is your dentist in network for ${p?.label ?? 'this treatment'}?`,
-      reason: 'Network terms affect allowed amounts and balance billing.',
-      kind: 'choice',
-      options: networkOptions,
-    };
-  if (path.endsWith('.proposedDate'))
-    return {
-      path,
-      title: `When is ${p?.label ?? 'this treatment'} planned?`,
-      reason: 'The date determines which benefit year applies.',
-      kind: 'date',
-    };
-  if (
-    path === 'policy' ||
-    path === 'planYears' ||
-    path === 'procedures' ||
-    path.startsWith('policy.')
-  )
-    return {
-      path,
-      title: 'Add the missing coverage rule',
-      reason: fact.message,
-      kind: 'rules',
-    };
-  const label = fieldLabel(input, path);
-  return {
-    path,
-    title: path.endsWith('insurerAlreadyPaidCents')
-      ? 'How much has your insurer already paid this benefit year?'
-      : `What is ${label.toLowerCase()}?`,
-    reason: fact.message,
-    kind: 'money',
-  };
-}
 const labels: Record<string, string> = {
   providerChargeCents: 'Dentist’s charge',
   allowedCents: 'Plan’s allowed amount',

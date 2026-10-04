@@ -12,26 +12,23 @@ import {
   PageHeading,
 } from '../../components/ui';
 import { money, scenarioTitle } from '../../domain/model';
-import { useDemo } from '../../state/demo-store';
+import { isSampleCase } from '../../domain/provenance';
+import { useCase, useResults } from '../../state/case-store';
 import {
   BenefitYears,
   Conditions,
   ProcedureDetails,
   TreatmentTimeline,
 } from '../options/financial-components';
-import { useComparison } from '../options/use-comparison';
 export function DetailsPage() {
-  const { state, select } = useDemo();
-  const { scenarios } = useComparison();
+  const { record, saved: savedPlan, select } = useCase();
+  const { selected } = useResults();
   const [params] = useSearchParams();
   const saved = params.get('saved') === '1';
   const navigate = useNavigate();
   const [sources, setSources] = useState(false);
-  const scenario = saved
-    ? state.saved?.scenario
-    : (scenarios.find((s) => s.scenarioId === state.selectedId) ??
-      scenarios[0]);
-  if (!scenario)
+  const scenario = saved ? savedPlan?.scenario : selected;
+  if (!scenario || !record)
     return (
       <div className="page">
         <EmptyState
@@ -44,8 +41,7 @@ export function DetailsPage() {
         />
       </div>
     );
-  const stale =
-    saved && state.saved?.input.caseRevision !== state.input?.caseRevision;
+  const stale = saved && savedPlan?.caseRevision !== record.caseRevision;
   return (
     <div className="page">
       <PageHeading
@@ -74,7 +70,7 @@ export function DetailsPage() {
         <div>
           <span className="muted small">Selected option</span>
           <h3>{scenarioTitle(scenario)}</h3>
-          <Badge>Sample data</Badge>
+          {isSampleCase(record) && <Badge>Sample data</Badge>}
         </div>
         <div>
           <span className="muted small">Estimated patient cost</span>
@@ -103,26 +99,24 @@ export function DetailsPage() {
       </Card>
       <div className="financial-grid">
         <div className="stack">
-          <TreatmentTimeline
-            scenario={scenario}
-            input={saved ? state.saved!.input : state.input!}
-          />
+          <TreatmentTimeline scenario={scenario} input={record} />
           <ProcedureDetails
             scenario={scenario}
-            input={saved ? state.saved!.input : state.input!}
+            input={record}
             onSources={() => setSources(true)}
           />
         </div>
         <div className="stack">
-          <BenefitYears
-            scenario={scenario}
-            input={saved ? state.saved!.input : state.input!}
-          />
+          <BenefitYears scenario={scenario} input={record} />
           <Conditions />
           <Card>
             <h3>How to read the labels</h3>
             <div className="label-explanation">
-              <Badge>From sample document</Badge>
+              <Badge tone="green">From your document · From your words</Badge>
+              <p className="small muted">
+                Quoted exactly from what you shared, then confirmed by you.
+              </p>
+              <Badge>Sample data</Badge>
               <p className="small muted">
                 Fictional plan terms and treatment fees.
               </p>
@@ -158,13 +152,7 @@ export function DetailsPage() {
           {stale ? 'Recompare current details' : 'Review this plan'}
         </Button>
       </FooterActions>
-      {sources && (
-        <Evidence
-          input={saved ? state.saved!.input : state.input!}
-          provenance={saved ? state.saved!.provenance : state.provenance}
-          onClose={() => setSources(false)}
-        />
-      )}
+      {sources && <Evidence onClose={() => setSources(false)} />}
     </div>
   );
 }

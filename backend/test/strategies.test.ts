@@ -1,4 +1,4 @@
-import { ErrorEnvelopeSchema, LedgerPageSchema, SaveStrategyResponseSchema } from '@actionbridge/contracts';
+import { ErrorEnvelopeSchema, LedgerPageSchema, SaveStrategyResponseSchema, StrategyListSchema } from '@actionbridge/contracts';
 import { describe, expect, it } from 'vitest';
 import { createTestApi, fixtureCreateRequest, OTHER, type TestApi } from './helpers.js';
 
@@ -133,5 +133,22 @@ describe('case ledger', () => {
     expect(second.body.events).toHaveLength(5);
     expect(second.body.nextCursor).toBeNull();
     expect(second.body.events.at(-1).action).toBe('case_created');
+  });
+});
+
+describe('saved plans can be read back (web reload)', () => {
+  const LIST = 'GET /v1/cases/{caseId}/strategies';
+
+  it('lists the owner’s saved plans newest first, and only for their own case', async () => {
+    const api = createTestApi();
+    const caseId = await newCase(api);
+    expect((await api.call(LIST, { caseId })).body).toEqual({ strategies: [] });
+    await api.call(SAVE, { caseId, headers: KEY, body: { scenarioId: 'baseline', expectedRevision: 1, consent: true } });
+    await api.call(SAVE, { caseId, headers: { 'idempotency-key': 'save-tap-0009' }, body: { scenarioId: 'alt-1', expectedRevision: 1, consent: true } });
+
+    const listed = StrategyListSchema.parse((await api.call(LIST, { caseId })).body);
+    expect(listed.strategies).toHaveLength(2);
+    expect(listed.strategies[0]!.savedAt >= listed.strategies[1]!.savedAt).toBe(true);
+    expect(errorCode(await api.call(LIST, { caseId, user: OTHER }))).toBe('NOT_FOUND');
   });
 });

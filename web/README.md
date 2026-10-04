@@ -1,60 +1,52 @@
 # ActionBridge Dental web
 
-Responsive React + TypeScript frontend built from `App mockups in progress/ActionBridge Dental Web.dc.html`, with the mobile theme, financial breakdowns, review and saved-plan patterns as references. The mobile application, backend, infrastructure and shared fixtures are unchanged.
+Responsive React + TypeScript site for ActionBridge Dental, connected to the same live API as the mobile app. It uses the same sign-in (Cognito), the same calculator results and the same assistant. Nothing in the site simulates data: every amount comes from the server's benefits engine for the exact case revision on screen.
 
-## Run
+## Run locally
 
 Requires Node 22.13+ and npm. From the repository root:
 
 ```powershell
 npm.cmd ci
-npm.cmd run build
+npm.cmd run build          # builds the shared contracts package
 cd web
 npm.cmd ci
+copy .env.example .env.local   # then fill in the three public values (see below)
 npm.cmd run dev
 ```
 
-Open **http://127.0.0.1:5173/**. On shells without PowerShell's script restriction, `npm` works in place of `npm.cmd`.
+Open **http://127.0.0.1:5173/** and sign in with an account your team admin created (`infra/scripts/create-demo-user.sh`). A first sign-in asks for a new password.
 
-Click **Fill demo credentials**, or enter:
+### Settings (public, not secrets)
 
-- Email: `jordan@example.com`
-- Password: `DentalDemo123!`
+| Variable                 | Value                                                           |
+| ------------------------ | --------------------------------------------------------------- |
+| `VITE_API_BASE_URL`      | Stack output `ApiBaseUrl` (https, includes the stage, no `/v1`) |
+| `VITE_COGNITO_CLIENT_ID` | Stack output `UserPoolClientId`                                 |
+| `VITE_COGNITO_REGION`    | `us-east-2`                                                     |
 
-Create account and password reset are local simulations. Demo credentials are public sample values, not real account access. Passwords are never persisted. No backend credentials or AWS configuration are required.
+These are embedded in the built site. They are the same values as the mobile app's `EXPO_PUBLIC_*` settings. A missing or malformed value shows a configuration error on the sign-in page, never sample data.
 
-## Included journey
+The API only accepts browser calls from the origins in the stack's `WebOrigins` parameter (CORS): the Vercel site, `http://localhost:5173` and `http://127.0.0.1:5173`. A new domain must be added there and deployed.
 
-Login → Home → type, local document upload, sample voice or camera → editable fact review → focused missing-information questions → simulated analysis → insured scheduling / self-pay comparison → details and evidence → explicit review and local save → My plan and Activity.
+## Journey
 
-Profile supports editing the display name, sign-out and reset. Demo controls expose permission fallback, analysis failure/retry, incomplete input, empty state and expired-session examples. Browser Back/Forward, dialog Escape/focus handling, keyboard controls, reduced motion and responsive navigation are supported.
+Sign in → Home → **composer** (speak, type, attach up to three pages or take a photo — all as a draft) → **Analyse** once → assistant: "Here's what I understood" (each item quotes the words or document it came from) and grouped questions with "I don't know" → facts review (every value labeled with its source) → options (server results) → details → review and save (one idempotency key per Save, safe to retry) → My plan and Activity (server ledger). "Try a sample case" and "Enter details step by step" are also available.
 
-### Additional interfaces
+- **Voice:** the browser records WebM/Ogg (Opus) or MP4, uploads it to a private, time-limited S3 slot, and Amazon Transcribe returns words you can edit. The microphone is on only while recording.
+- **Documents and photos:** PDF, JPEG or PNG, one page each, up to 5 MB. Files go straight to private storage and are deleted after the server reads them.
+- **Sessions:** the access token stays in memory. The refresh token and email are kept in `sessionStorage` (this tab only) so a reload doesn't sign you out. Nothing goes to `localStorage` except the IDs of cases you opened and a display-name preference.
 
-- **Manual treatment entry** from Home or Type: add/remove up to six procedures, enter separate billed/allowed/write-off amounts, network status and planned dates. Missing values remain unknown; arbitrary notes still use explicitly labeled sample analysis.
-- **Coverage editing** from fact review: service percentages, deductible and maximum applicability, current/next benefit periods, maximum, paid balance, deductible and deductible met. Contradictory amounts and overlapping benefit periods are rejected.
-- **Focused questions** for missing engine fields, benefit-year dates, deductible conflicts and missing documents. Sample voice answers require explicit acceptance or discard. Demo controls expose the date, conflict and document examples.
-- **Case history** in Activity and My plan: each case has its own identity, answers, quote, saved snapshot and reminder. Starting another sample or manual case preserves the previous case; Resume case restores its state. Up to 20 previous cases are kept locally.
-- **Sources and saved history** distinguish original sample excerpts from entered/edited answers. Saved details use the snapshot's source labels. Routine history entries can be shown or hidden.
-- **Save recovery** is available through Demo controls → Save failure. Retry preserves the option and consent; saves remain unique per case/revision/option. The dentist question follows the saved schedule, including the original-date option.
-- **Individual cash quotes** require a price for every procedure and explicit confirmation of equivalent service scope. A genuine quoted $0 is supported; blank is unavailable. The combined quote input remains available.
-- **First-sign-in password change** can be previewed on login. It validates the mobile application's password rules and confirmation; it does not store or change a real password.
+## Code layout
 
-## Frontend boundaries
-
-- `src/components/`: shared controls, shell, accessible dialog, brand, orb, evidence drawer.
-- `src/features/`: page components grouped by user flow.
-- `src/domain/`: web view models and formatting.
-- `src/domain/case-fields.ts`: field labels, provenance values and the engine-driven missing-information mapping.
-- `src/features/intake/case-forms.tsx`: shared treatment, currency and coverage form controls used by manual entry and editing.
-- `src/services/dental-service.ts`: calculation adapter behind `DentalService`. Currently invokes the existing pure engine locally; replace this adapter when adding HTTP requests.
-- `src/features/options/use-comparison.ts`: central result-loading boundary. For asynchronous API integration, add pending/error state here and adapt the job completion call in `src/state/job-store.tsx`.
-- `src/state/demo-store.tsx`: versioned browser-only case, selection, saved snapshot and activity state, with independent archived cases. All critical edits invalidate comparison results. Saves are checked against the current case identity and revision and are idempotent per selected scenario/revision.
-- `src/state/job-store.tsx`: local simulated task lifecycle. Replace with actual job polling/events during integration.
-
-Insured amounts come from `@actionbridge/benefits-engine`, using the shared fictional regression case. The web mockup's January 10 date is estimated explicitly inside the existing dentist window; the shared fixture and optimizer rules are not modified. Reported insurer payments remain separate from projected usage. Unknown amounts remain unknown.
-
-Voice, camera, document interpretation, login, reminder delivery and evidence documents are **simulated** and labeled accordingly. Files stay in browser memory; they are not uploaded or interpreted. Saved fictional cases, plans, activity and reminders use localStorage, with an in-memory fallback. File contents, previews, descriptions and passwords are not persisted. Sign-out clears the local demo state.
+- `src/config.ts`: public settings.
+- `src/services/api.ts`: typed API client (every response validated against `@actionbridge/contracts`) and S3 upload.
+- `src/services/cognito.ts`: sign-in, first-sign-in password, refresh and revoke.
+- `src/state/auth.tsx`: session and the API client.
+- `src/state/case-store.tsx`: current case, edits (PATCH with expected revision), results per revision, saved plan.
+- `src/state/use-job.ts`: assistant job polling.
+- `src/domain/`: pure helpers: edits → PATCH with sources (`edits.ts`), source labels (`provenance.ts`), assistant answers, composer rules, self-pay quotes, the labeled sample case.
+- `src/features/`: pages by flow (`intake` composer, `assistant`, `case`, `options`, `plan`, `saved`, `account`).
 
 ## Verify
 
@@ -65,22 +57,15 @@ npx.cmd playwright install chromium
 npm.cmd test
 ```
 
-Browser tests cover the sample and manual journeys, case switching/reload, edited coverage, individual quotes and scope validation, authentication/password-change simulations, all intake methods, explicit voice confirmation, stale-result protection, lower cash quotes, duplicate saves, save retry, background completion, extra question types, reset, and layouts at 360, 390, 768, 1024, 1280 and 1440 pixels. Axe checks cover the main journey, manual forms and coverage drawers. Browser artifacts are under `test-results/` and `playwright-report/` and are ignored by Git.
+Browser tests run against a contract-shaped mock of the API and Cognito (`tests/mock-api.ts`). Its amounts come from the real benefits engine, so the site is tested against server-shaped results without touching the live stack. They cover sign-in errors, the first-sign-in password change and session restore, the sample journey with saving once on retry, the composer (words plus a page, analysed once, confirmations with quotes), fact edits saved with sources, self-pay quotes, and layout plus axe accessibility checks at 360, 390, 768, 1024 and 1440 px.
 
-`npm.cmd run preview` serves the production build locally.
+## Deploy (Vercel)
 
-## Deploy
-
-The site is static and needs no environment variables or secrets. Vercel must build from the **repository root**, because the web app uses the shared packages and their `dist/` folders are not committed. One command does it: `npm ci && npm run build:web`, output `web/dist`. `vercel.json` rewrites unknown paths to `index.html` so direct links and reloads work.
-
-On vercel.com: Add New → Project → import the GitHub repo and keep the root directory as the repository root. Build settings come from `vercel.json`. Pushes to the production branch (`main`) deploy the live site; other branches get preview URLs.
-
-Node 22.13 or later is required (`engines` in the root `package.json`). When the web app is connected to the live API later, its public settings (API URL, Cognito region and client ID) will be `VITE_*` variables set in Vercel's project settings; they are public values, not secrets.
+Vercel builds from the **repository root** (`vercel.json`): `npm ci && npm run build:web`, output `web/dist`. In the Vercel project, set the three `VITE_*` variables above under Settings → Environment Variables, then redeploy. Pushes to `main` deploy production; other branches get preview URLs. Preview URLs are not in the API's CORS list unless added to `WebOrigins`.
 
 ## Asset attribution
 
 - Login photo (tooth and mirror): shared with the mobile app (`mobile/assets/images/welcome.jpg`), served from `public/assets/welcome.jpg`. Source and license still to be recorded before release.
-- Dental room (previous login photo, kept for now): Ozkan Guner, Unsplash, photo `1643916800611-1302e8d27c38`. [Photo source](https://images.unsplash.com/photo-1643916800611-1302e8d27c38). `public/assets/dental-room.jpg`.
-- Plus Jakarta Sans: distributed by `@fontsource/plus-jakarta-sans`, SIL Open Font License. Served locally.
+- Dental room: Ozkan Guner, Unsplash, photo `1643916800611-1302e8d27c38`. `public/assets/dental-room.jpg`.
+- Plus Jakarta Sans: `@fontsource/plus-jakarta-sans`, SIL Open Font License.
 - Icons: Lucide, ISC license.
-- Brand and orbital illustration: code-native SVG adapted from the provided web/mobile references.

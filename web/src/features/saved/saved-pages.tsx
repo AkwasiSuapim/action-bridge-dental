@@ -1,12 +1,12 @@
+import type { LedgerEvent } from '@actionbridge/contracts';
 import {
-  Bell,
   Check,
   CheckCheck,
   ClipboardList,
   Copy,
   ShieldCheck,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Badge,
@@ -15,48 +15,54 @@ import {
   EmptyState,
   Field,
   FooterActions,
-  Notice,
   Orb,
   PageHeading,
   Row,
 } from '../../components/ui';
 import {
-  dateLabel,
+  amountLabel,
+  currentYear,
   dentistQuestion,
   money,
   scenarioTitle,
-  currentYear,
-  amountLabel,
   treatmentTitle,
 } from '../../domain/model';
-import { useDemo } from '../../state/demo-store';
-import { useJob } from '../../state/job-store';
+import { isSampleCase } from '../../domain/provenance';
+import { asApiError, type ApiError } from '../../services/api';
+import { useApi } from '../../state/auth';
+import { useCase, useResults } from '../../state/case-store';
+import { ApiNotice } from '../assistant/assistant-page';
 import { Conditions, TreatmentTimeline } from '../options/financial-components';
-import { useComparison } from '../options/use-comparison';
 
+/**
+ * Review and save. The server recomputes the chosen option for this exact revision; the browser
+ * sends only the option ID, the revision and consent. One idempotency key per Save action, reused
+ * for retries, so a double click or a retry is one logical save.
+ */
 export function ReviewPage() {
-  const { state, save } = useDemo();
-  const { controls, setControl } = useJob();
-  const { scenarios } = useComparison();
+  const api = useApi();
+  const { record, setSaved, reload } = useCase();
+  const { selected: scenario, status } = useResults();
   const navigate = useNavigate();
   const [consent, setConsent] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState(false);
-  const attempts = useRef(0);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const lock = useRef(false);
-  const latest = useRef(state);
-  latest.current = state;
-  useEffect(() => () => clearTimeout(timer.current), []);
-  const scenario =
-    scenarios.find((s) => s.scenarioId === state.selectedId) ?? scenarios[0];
+  const [failure, setFailure] = useState<ApiError | null>(null);
+  const key = useRef<string | null>(null);
+
+  if (!record || (!scenario && status === 'loading'))
+    return (
+      <div className="page narrow centered" role="status">
+        <Orb size={120} active />
+        <p className="muted">Loading your plan…</p>
+      </div>
+    );
   if (!scenario)
     return (
       <div className="page">
         <EmptyState
           icon={ClipboardList}
           title="This estimate needs recalculation"
-          description="Your details have changed or no comparison is available. Review them before saving."
+          description="Your details changed or no comparison is available. Review them before saving."
           action={
             <Button onClick={() => navigate('/facts')}>
               Review information
@@ -65,70 +71,43 @@ export function ReviewPage() {
         />
       </div>
     );
+
+  const submit = async () => {
+    if (!consent || saving) return;
+    key.current ??= crypto.randomUUID();
+    setSaving(true);
+    setFailure(null);
+    try {
+      const result = await api.saveStrategy(
+        record.caseId,
+        {
+          scenarioId: scenario.scenarioId,
+          expectedRevision: record.caseRevision,
+          consent: true,
+        },
+        key.current,
+      );
+      setSaved(result.strategy);
+      key.current = null;
+      navigate('/saved', { replace: true });
+    } catch (caught) {
+      const error = asApiError(caught);
+      // The case moved on: this option no longer matches what's on screen.
+      if (error.code === 'REVISION_CONFLICT') {
+        key.current = null;
+        void reload();
+      }
+      setFailure(error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (saving)
     return (
       <div className="page narrow centered">
         <Orb size={180} active />
-        <h2 role="status">Saving your sample plan…</h2>
-        <p className="muted">Keeping the selected estimate in this browser.</p>
-      </div>
-    );
-  const submit = (retry = false) => {
-    if (!consent || lock.current) return;
-    lock.current = true;
-    attempts.current++;
-    setSaveError(false);
-    setSaving(true);
-    timer.current = setTimeout(() => {
-      if (
-        latest.current.input?.caseRevision !== scenario.estimate.caseRevision ||
-        !latest.current.confirmed ||
-        latest.current.caseId !== state.caseId
-      ) {
-        lock.current = false;
-        setSaving(false);
-        navigate('/facts');
-        return;
-      }
-      if (controls.failSave && !retry) {
-        lock.current = false;
-        setSaving(false);
-        setSaveError(true);
-        return;
-      }
-      save(scenario);
-      navigate('/saved', { replace: true });
-    }, 600);
-  };
-  if (saveError)
-    return (
-      <div className="page narrow centered">
-        <Orb size={170} alert />
-        <PageHeading
-          title="We couldn’t confirm your plan was saved"
-          description="Your selected option and consent are preserved. Retry when you are ready."
-        />
-        <Notice tone="warning">
-          Simulated save failure · Attempt {attempts.current}. No new plan was
-          saved. Retrying the same case, revision and option will not duplicate
-          a save.
-        </Notice>
-        <div className="actions">
-          <Button
-            onClick={() => {
-              setControl('failSave', false);
-              submit(true);
-            }}
-          >
-            Try saving again
-          </Button>
-          <Button variant="secondary" onClick={() => navigate('/options')}>
-            Back to options
-          </Button>
-          <Button variant="ghost" onClick={() => navigate('/')}>
-            Finish later
-          </Button>
-        </div>
+        <h2 role="status">Saving your plan…</h2>
       </div>
     );
   return (
@@ -137,6 +116,20 @@ export function ReviewPage() {
         title="Review this plan"
         description="Check the dates, costs and assumptions before you save."
       />
+      {failure && (
+        <div className="stack">
+          <ApiNotice error={failure} />
+          {failure.code === 'REVISION_CONFLICT' ? (
+            <p className="small muted">
+              Your details changed. Compare your options again before saving.
+            </p>
+          ) : (
+            <p className="small muted">
+              Your choice and consent are kept. Trying again won’t save twice.
+            </p>
+          )}
+        </div>
+      )}
       <div className="financial-grid">
         <div className="stack">
           <Card>
@@ -166,21 +159,15 @@ export function ReviewPage() {
             </div>
             <div className="check-point">
               <Check size={18} />
-              <p>
-                Stores a snapshot of this comparison and your sample answers in
-                this browser.
-              </p>
+              <p>Keeps this comparison and your answers in your account.</p>
             </div>
             <div className="check-point">
               <Check size={18} />
-              <p>
-                Makes the selected plan available in My plan and records the
-                save in Activity.
-              </p>
+              <p>Shows the plan in My plan and records the save in Activity.</p>
             </div>
             <p className="muted small">
-              It doesn't book treatment, submit a claim, contact anyone or
-              consume insurance benefits.
+              It doesn't book treatment, submit a claim, contact anyone or use
+              insurance benefits.
             </p>
           </Card>
           <Card>
@@ -188,22 +175,19 @@ export function ReviewPage() {
             <Row
               label="Coverage"
               value={
-                state.origin === 'sample'
+                isSampleCase(record)
                   ? 'Sample individual PPO'
-                  : 'Manually entered individual plan'
+                  : 'Your plan, as entered'
               }
             />
-            <Row label="Procedure scope" value={treatmentTitle(state.input)} />
+            <Row label="Procedure scope" value={treatmentTitle(record)} />
             <Row
               label="Reported paid this year"
               value={amountLabel(
-                currentYear(state.input!)?.[1].insurerAlreadyPaidCents,
+                currentYear(record)?.[1].insurerAlreadyPaidCents,
               )}
             />
-            <Row
-              label="Input revision"
-              value={scenario.estimate.caseRevision}
-            />
+            <Row label="Case version" value={record.caseRevision} />
             <Button variant="ghost" onClick={() => navigate('/facts')}>
               Change details
             </Button>
@@ -214,17 +198,17 @@ export function ReviewPage() {
               checked={consent}
               onChange={(e) => setConsent(e.target.checked)}
             />
-            <span>
-              Save this fictional plan and my answers in this browser.
-            </span>
+            <span>Save this plan and my answers in my account.</span>
           </label>
           <Button
             className="full"
             icon={Check}
             disabled={!consent}
-            onClick={() => submit()}
+            onClick={() => void submit()}
           >
-            Save this plan
+            {failure && failure.code !== 'REVISION_CONFLICT'
+              ? 'Try saving again'
+              : 'Save this plan'}
           </Button>
           <p className="small muted text-center">
             Your explicit choice. No external action.
@@ -234,11 +218,13 @@ export function ReviewPage() {
     </div>
   );
 }
+
 export function QuestionCard() {
-  const { state } = useDemo();
-  const question = state.saved
-    ? dentistQuestion(state.saved.input, state.saved.scenario)
-    : 'Confirm the fees, coverage and dates with your dentist before choosing a plan.';
+  const { record, saved } = useCase();
+  const question =
+    saved && record
+      ? dentistQuestion(record, saved.scenario)
+      : 'Confirm the fees, coverage and dates with your dentist before choosing a plan.';
   const [copied, setCopied] = useState(false);
   const [fallback, setFallback] = useState(false);
   useEffect(() => {
@@ -287,89 +273,67 @@ export function QuestionCard() {
     </Card>
   );
 }
-export function ReminderCard() {
-  const { state, setReminder } = useDemo();
-  const [date, setDate] = useState('2026-11-01');
-  const [error, setError] = useState('');
-  return (
-    <Card className="stack">
-      <div className="section-title">
-        <Bell size={20} />
-        <h3>Demo reminder</h3>
-        <Badge>Simulated</Badge>
-      </div>
-      <p className="small muted">
-        Kept in this browser only. No notification will be sent.
-      </p>
-      {state.reminder ? (
-        <>
-          <Notice>
-            Demo reminder saved for {dateLabel(state.reminder)} (simulated).
-          </Notice>
-          <div>
-            <Button variant="secondary" onClick={() => setReminder(null)}>
-              Remove reminder
-            </Button>
-          </div>
-        </>
-      ) : (
-        <form
-          className="actions"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!date || date < '2026-10-03' || date > '2027-12-31') {
-              setError(
-                'Choose a date from October 3, 2026 through December 31, 2027.',
-              );
-              return;
-            }
-            setError('');
-            setReminder(date);
-          }}
-        >
-          <Field label="Remind me on" error={error}>
-            <input
-              type="date"
-              min="2026-10-03"
-              max="2027-12-31"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
-          </Field>
-          <Button type="submit" variant="secondary">
-            Save demo reminder
-          </Button>
-        </form>
-      )}
-    </Card>
-  );
+
+const ACTION_TITLE: Record<LedgerEvent['action'], string> = {
+  case_created: 'Case started',
+  case_updated: 'Case details updated',
+  strategy_saved: 'Plan saved',
+};
+const ROUTINE = new Set<LedgerEvent['action']>(['case_updated']);
+
+/** Recorded history for one case, from the server ledger (never a simulated action). */
+export function useLedger(caseId: string | null | undefined) {
+  const api = useApi();
+  const [events, setEvents] = useState<LedgerEvent[] | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const load = useCallback(async () => {
+    if (!caseId) return;
+    setError(null);
+    try {
+      setEvents((await api.ledger(caseId)).events);
+    } catch (caught) {
+      setError(asApiError(caught));
+    }
+  }, [api, caseId]);
+  useEffect(() => {
+    setEvents(null);
+    void load();
+  }, [load]);
+  return { events, error, load };
 }
+
+export function ledgerTitle(event: LedgerEvent) {
+  return ACTION_TITLE[event.action];
+}
+
 export function PlanHistory() {
-  const { state } = useDemo();
+  const { record } = useCase();
+  const { events, error, load } = useLedger(record?.caseId);
   const [showRoutine, setShowRoutine] = useState(false);
-  const events = state.events.filter(
-    (e) =>
-      e.caseId === state.caseId ||
-      (!e.caseId && state.caseId === 'legacy-demo'),
-  );
-  const hidden = events.filter((e) => e.routine).length;
+  const hidden = (events ?? []).filter((e) => ROUTINE.has(e.action)).length;
   return (
     <Card>
       <h3>Plan history</h3>
       <p className="muted small">
-        Actions for this case, newest first. Stored only in this browser.
+        What happened to this case, newest first, as recorded by the service.
       </p>
-      {events.length ? (
+      {error ? (
+        <ApiNotice error={error} onRetry={() => void load()} />
+      ) : !events ? (
+        <p className="muted small" role="status">
+          Loading history…
+        </p>
+      ) : events.length ? (
         <ol className="history-list">
           {events
-            .filter((e) => showRoutine || !e.routine)
+            .filter((e) => showRoutine || !ROUTINE.has(e.action))
             .map((e) => (
-              <li key={e.id}>
-                <time className="small muted" dateTime={e.timestamp}>
-                  {new Date(e.timestamp).toLocaleString('en-US')} · You
+              <li key={e.eventId}>
+                <time className="small muted" dateTime={e.at}>
+                  {new Date(e.at).toLocaleString('en-US')} · You
                 </time>
-                <strong>{e.title}</strong>
-                <p className="small muted">{e.detail}</p>
+                <strong>{ledgerTitle(e)}</strong>
+                <p className="small muted">Version {e.caseRevision}</p>
               </li>
             ))}
         </ol>
@@ -380,17 +344,22 @@ export function PlanHistory() {
         <Button variant="ghost" onClick={() => setShowRoutine(!showRoutine)}>
           {showRoutine
             ? 'Hide routine entries'
-            : `Show ${hidden} routine entries`}
+            : `Show ${hidden} routine ${hidden === 1 ? 'entry' : 'entries'}`}
         </Button>
       )}
     </Card>
   );
 }
+
 export function SavedPage() {
-  const { state } = useDemo();
+  const { record, saved, loading } = useCase();
   const navigate = useNavigate();
-  if (!state.saved)
-    return (
+  if (!saved || !record)
+    return loading ? (
+      <div className="page narrow centered" role="status">
+        <Orb size={120} active />
+      </div>
+    ) : (
       <div className="page">
         <EmptyState
           icon={ClipboardList}
@@ -402,7 +371,7 @@ export function SavedPage() {
         />
       </div>
     );
-  const scenario = state.saved.scenario;
+  const scenario = saved.scenario;
   return (
     <div className="page medium">
       <div className="saved-heading">
@@ -415,7 +384,10 @@ export function SavedPage() {
         />
       </div>
       <Card>
-        <Badge tone="green">Saved locally · Sample data</Badge>
+        <Badge tone="green">
+          Saved {new Date(saved.savedAt).toLocaleString('en-US')}
+          {isSampleCase(record) ? ' · Sample data' : ''}
+        </Badge>
         <h2>{scenarioTitle(scenario)}</h2>
         <Row
           label="Estimated patient cost"
@@ -427,8 +399,8 @@ export function SavedPage() {
           value={money(scenario.estimate.totals.insurerPaysCents)}
         />
         <p className="small muted">
-          Saving preserves your plan. It doesn't book treatment, submit a claim
-          or use benefits.
+          Saving keeps your plan. It doesn't book treatment, submit a claim or
+          use benefits.
         </p>
         <Button
           variant="secondary"
@@ -438,7 +410,6 @@ export function SavedPage() {
         </Button>
       </Card>
       <QuestionCard />
-      <ReminderCard />
       <PlanHistory />
       <FooterActions>
         <Button variant="secondary" onClick={() => navigate('/')}>

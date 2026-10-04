@@ -1,4 +1,4 @@
-import type { DentalCase, LedgerEvent, LedgerPage } from '@actionbridge/contracts';
+import type { DentalCase, LedgerEvent, LedgerPage, SavedStrategy } from '@actionbridge/contracts';
 import type { CaseRepository, ReplaceOutcome } from '../features/cases/ports/case-repository.js';
 import type { LedgerReader } from '../features/ledger/ports/ledger-reader.js';
 import type { IdempotencyRecord, SaveOutcome, StrategyRepository, StrategySave } from '../features/strategies/ports/strategy-repository.js';
@@ -11,6 +11,7 @@ export class InMemoryStore implements CaseRepository, StrategyRepository, Ledger
   private readonly cases = new Map<string, DentalCase>();
   private readonly ledger = new Map<string, LedgerEvent[]>();
   private readonly idempotency = new Map<string, IdempotencyRecord>();
+  private readonly strategies = new Map<string, SavedStrategy[]>();
 
   // ---- cases ----
 
@@ -48,8 +49,13 @@ export class InMemoryStore implements CaseRepository, StrategyRepository, Ledger
     if (this.cases.get(key)?.caseRevision !== input.expectedRevision) return 'revision_conflict';
     if (this.idempotency.has(idempotencyKey)) return 'idempotency_key_taken';
     this.idempotency.set(idempotencyKey, structuredClone({ strategy: input.strategy, requestFingerprint: input.requestFingerprint }));
+    this.strategies.set(key, [...(this.strategies.get(key) ?? []), structuredClone(input.strategy)]);
     this.append(key, input.event);
     return 'saved';
+  }
+
+  async listForCase(ownerId: string, caseId: string): Promise<SavedStrategy[]> {
+    return structuredClone(this.strategies.get(this.key(ownerId, caseId)) ?? []);
   }
 
   // ---- ledger ----

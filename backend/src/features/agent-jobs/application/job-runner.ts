@@ -149,7 +149,7 @@ export async function runJob(deps: JobRunnerDeps, message: { ownerId: string; jo
   }
 
   /** Size and real file type (first bytes), never the file name. Removes the object when it fails. */
-  async function verifiedUpload(kind: 'audio' | 'document', documentId = job.documentId ?? '', label = ''): Promise<{ key: string; type: 'm4a' | 'pdf' | 'jpeg' | 'png' } | null> {
+  async function verifiedUpload(kind: 'audio' | 'document', documentId = job.documentId ?? '', label = ''): Promise<{ key: string; type: FileType } | null> {
     const store = deps.uploads;
     if (!store || !documentId) throw new Error('Uploads are not configured');
     const key = uploadKey(job.ownerId, job.caseId, documentId);
@@ -162,7 +162,7 @@ export async function runJob(deps: JobRunnerDeps, message: { ownerId: string; jo
     if (!head) return reject('The upload was not found. It may have expired — please upload it again.');
     if (head.sizeBytes > UPLOAD_LIMITS[kind].maxBytes) return reject('That file is too large. Please use a shorter recording or a smaller file.');
     const type = fileTypeOf(await store.firstBytes(key, 16));
-    const allowed = kind === 'audio' ? type === 'm4a' : type === 'pdf' || type === 'jpeg' || type === 'png';
+    const allowed = kind === 'audio' ? type === 'm4a' || type === 'webm' || type === 'ogg' : type === 'pdf' || type === 'jpeg' || type === 'png';
     if (!type || !allowed) return reject(kind === 'audio' ? 'That recording format isn’t supported. Please record again in the app.' : 'Please upload a PDF, JPEG or PNG — or take a photo of the page.');
     return { key, type };
   }
@@ -175,7 +175,7 @@ export async function runJob(deps: JobRunnerDeps, message: { ownerId: string; jo
     if (!upload) return;
     const name = `actionbridge-${job.jobId}`;
     try {
-      await transcriber.start(name, `s3://${deps.uploads.bucket}/${upload.key}`);
+      await transcriber.start(name, `s3://${deps.uploads.bucket}/${upload.key}`, upload.type === 'webm' || upload.type === 'ogg' ? upload.type : 'm4a');
     } catch (error) {
       // A retried attempt may find its own transcription job already started; keep following it.
       if (!(error instanceof Error && error.name === 'ConflictException')) throw error;
@@ -343,9 +343,14 @@ const GROUP_LABEL: Record<FactGroup['kind'], string> = {
 };
 
 /** First bytes → real file type. File names and declared types are not trusted. */
-export function fileTypeOf(bytes: Uint8Array): 'm4a' | 'pdf' | 'jpeg' | 'png' | null {
+export type FileType = 'm4a' | 'webm' | 'ogg' | 'pdf' | 'jpeg' | 'png';
+
+export function fileTypeOf(bytes: Uint8Array): FileType | null {
   const ascii = (from: number, to: number) => String.fromCharCode(...bytes.slice(from, to));
   if (bytes.length >= 8 && ascii(4, 8) === 'ftyp') return 'm4a';
+  // Matroska/WebM (EBML header) and Ogg: what browsers record (Opus audio).
+  if (bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) return 'webm';
+  if (ascii(0, 4) === 'OggS') return 'ogg';
   if (ascii(0, 4) === '%PDF') return 'pdf';
   if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'jpeg';
   if (bytes[0] === 0x89 && ascii(1, 4) === 'PNG') return 'png';

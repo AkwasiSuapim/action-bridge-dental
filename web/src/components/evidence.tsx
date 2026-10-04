@@ -1,49 +1,77 @@
-import { BookOpen, FileText, ShieldCheck } from 'lucide-react';
+import {
+  BookOpen,
+  FileText,
+  MessageSquareQuote,
+  ShieldCheck,
+} from 'lucide-react';
+import { fieldLabel } from '../domain/case-fields';
+import {
+  evidenceGroups,
+  isSampleCase,
+  SOURCE_LABEL,
+} from '../domain/provenance';
+import { useCase } from '../state/case-store';
 import { Badge, Card, Dialog, Row } from './ui';
-import type { DentalCaseInput } from '@actionbridge/contracts';
-import type { Provenance } from '../domain/model';
-import { useDemo } from '../state/demo-store';
-export function Evidence({
-  onClose,
-  input,
-  provenance,
-}: {
-  onClose: () => void;
-  input?: DentalCaseInput;
-  provenance?: Provenance;
-}) {
-  const { state } = useDemo();
-  const record = input ?? state.input;
-  const answers = provenance ?? state.provenance;
-  const sample = record?.procedures.some(
-    (p) => p.timingSource === 'fictional_dentist_supplied',
-  );
+
+/**
+ * Sources drawer: what was used and where it came from, read from the case's server-recorded
+ * source facts. Quotes are exact words from what the user shared (documents are deleted after
+ * reading). Origin is never insurer verification.
+ */
+export function Evidence({ onClose }: { onClose: () => void }) {
+  const { record } = useCase();
+  if (!record) return null;
+  const sample = isSampleCase(record);
+  const { quoted, entered, assumptions } = evidenceGroups(record);
   return (
     <Dialog title="Sources" onClose={onClose} drawer>
       <p className="muted">
-        What we used, where it came from, and what still needs confirmation.
+        What I used, where it came from, and what still needs confirmation.
       </p>
-      <Badge tone="green">
-        {sample
-          ? 'Sample evidence · Fictional documents'
-          : 'Manual demo case · Unverified answers'}
-      </Badge>
-      {Object.keys(answers).length > 0 && (
+      {quoted.length > 0 && (
+        <Card>
+          <div className="section-title">
+            <MessageSquareQuote size={20} />
+            <h3>Quoted from what you shared</h3>
+          </div>
+          <p className="muted small">
+            Each value was found in these exact words and confirmed by you
+            before it was used.
+          </p>
+          {quoted.map((q) => (
+            <div className="evidence-quote" key={`${q.kind}|${q.quote}`}>
+              <blockquote>{q.quote}</blockquote>
+              <div className="actions">
+                <Badge tone="green">{SOURCE_LABEL[q.kind]}</Badge>
+                <span className="small muted">
+                  {[...new Set(q.paths.map((p) => fieldLabel(record, p)))]
+                    .slice(0, 3)
+                    .join(' · ')}
+                </span>
+              </div>
+            </div>
+          ))}
+        </Card>
+      )}
+      {entered.length > 0 && (
         <Card>
           <h3>Provided by you</h3>
           <p className="muted small">
-            Your latest entered or corrected values. Origin and confirmation do
-            not mean insurer verification.
+            Values you entered or corrected. Not verified with your insurer.
           </p>
-          {Object.entries(answers).map(([path, fact]) => (
-            <div key={path}>
-              <Row label={fact.label} value={fact.value} />
+          {entered.map((fact) => (
+            <div key={fact.id}>
+              <Row
+                label={
+                  fact.location?.section ?? fieldLabel(record, fact.fieldPath)
+                }
+                value={String(fact.value ?? 'Unknown')}
+              />
               <span className="small muted">
                 Updated {new Date(fact.recordedAt).toLocaleString('en-US')}
               </span>
             </div>
           ))}
-          <Badge>Provided by you · Not insurer verified</Badge>
         </Card>
       )}
       {sample && (
@@ -53,34 +81,24 @@ export function Evidence({
               <FileText size={20} />
               <h3>Jordan's treatment estimate</h3>
             </div>
-            <p className="small muted">
-              Sample document · Page 1 · Treatment fees
-            </p>
+            <p className="small muted">Sample document · Treatment fees</p>
             <blockquote>
               Two basic fillings at $250 each. One crown at $1,000. Total quoted
               treatment: $1,500.
             </blockquote>
-            <Row
-              label="Billed and allowed amounts"
-              value="Equal in this sample"
-            />
-            <Badge>From sample document</Badge>
+            <Badge>Sample data</Badge>
           </Card>
           <Card>
             <div className="section-title">
               <BookOpen size={20} />
               <h3>Sample benefits summary</h3>
             </div>
-            <p className="small muted">Fictional individual PPO · Page 2</p>
+            <p className="small muted">Fictional individual PPO</p>
             <blockquote>
               Annual insurer maximum: $800. Individual deductible: $50. Basic
               services: 80%; major services: 50%, after the deductible.
             </blockquote>
-            <Row
-              label="Reported 2026 insurer payments"
-              value="$500 in the original sample"
-            />
-            <Badge>From sample document</Badge>
+            <Badge>Sample data</Badge>
           </Card>
           <Card>
             <div className="section-title">
@@ -98,21 +116,20 @@ export function Evidence({
       <Card>
         <h3>Assumed for comparison</h3>
         <p className="muted">
-          {record &&
-          Object.values(record.planYears).some(
+          {Object.values(record.planYears).some(
             (y) => y.sourceStatus === 'explicit_unchanged_plan_assumption',
           )
             ? 'Next-year coverage, maximum, deductible and treatment fees are assumed unchanged. '
             : ''}
-          No other claims consume these balances. The supported model assumes
-          covered services and deductible-before-coinsurance unless a coverage
-          issue prevents estimation.
+          {assumptions.length > 0
+            ? 'You pay the deductible before your plan’s percentage applies, and these services are covered with no waiting period, exclusion or frequency limit — unless you told me otherwise. '
+            : ''}
+          No other claims use these balances.
         </p>
         <Badge tone="assumed">Assumed · Requires confirmation</Badge>
       </Card>
       <p className="small muted">
-        These excerpts are fictional. Nothing has been verified with an insurer.
-        Uploaded files are never used as evidence for sample calculations.
+        Nothing here has been verified with an insurer.
       </p>
     </Dialog>
   );

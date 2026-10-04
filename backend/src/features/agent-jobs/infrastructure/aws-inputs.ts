@@ -7,7 +7,7 @@ import {
   StartTranscriptionJobCommand,
   type TranscribeClient,
 } from '@aws-sdk/client-transcribe';
-import type { DocumentReader, Transcriber, UploadStore } from '../ports.js';
+import type { AudioFormat, DocumentReader, Transcriber, UploadStore } from '../ports.js';
 
 export class S3UploadStore implements UploadStore {
   constructor(
@@ -57,9 +57,9 @@ export class AwsTranscriber implements Transcriber {
     private readonly fetchImpl: typeof fetch = fetch,
   ) {}
 
-  async start(name: string, s3Uri: string) {
+  async start(name: string, s3Uri: string, format: AudioFormat = 'm4a') {
     await this.client.send(
-      new StartTranscriptionJobCommand({ TranscriptionJobName: name, LanguageCode: 'en-US', MediaFormat: 'm4a', Media: { MediaFileUri: s3Uri } }),
+      new StartTranscriptionJobCommand({ TranscriptionJobName: name, LanguageCode: 'en-US', MediaFormat: format, Media: { MediaFileUri: s3Uri } }),
     );
   }
 
