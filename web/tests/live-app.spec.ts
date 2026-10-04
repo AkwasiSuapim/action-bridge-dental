@@ -156,9 +156,11 @@ test('composer: words and a page, analysed once, confirmations quote their sourc
   expect(api.requests.filter((r) => r.path.endsWith('/jobs'))).toHaveLength(0);
 
   await page.getByRole('button', { name: 'Analyse' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Here’s what I understood' }),
-  ).toBeVisible();
+  // One card at a time, with its quote and a one-line meaning.
+  await expect(page.getByText('Is this right? · 1 of 2')).toBeVisible();
+  await expect(page.locator('.understood-card .term-meaning')).toContainText(
+    'Dental insurance:',
+  );
   const job = api.requests.find((r) => r.path.endsWith('/jobs'))!;
   expect(job.body).toMatchObject({
     operation: 'interpret',
@@ -171,7 +173,18 @@ test('composer: words and a page, analysed once, confirmations quote their sourc
     'From your words',
   );
 
-  await page.getByRole('button', { name: 'Looks right — continue' }).click();
+  await page.getByRole('button', { name: 'Yes, that’s right' }).click();
+  await expect(page.getByText('Is this right? · 2 of 2')).toBeVisible();
+  await page.getByRole('button', { name: 'Not right' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Check before I use these' }),
+  ).toBeVisible();
+  await expect(page.getByText('✓ Yes, use this')).toBeVisible();
+  await expect(page.getByText('✗ Not right — left out')).toBeVisible();
+  // Change of mind from the summary: back to that card, then Yes.
+  await page.getByRole('button', { name: /^Change: Crown/ }).click();
+  await page.getByRole('button', { name: 'Yes, that’s right' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
   await expect(
     page.getByRole('heading', { name: 'Your estimate is ready' }),
   ).toBeVisible();

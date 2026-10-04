@@ -1,12 +1,13 @@
-import type {
-  AgentJobView,
-  MissingFieldBlock,
-  UiBlock,
+import {
+  jobSteps,
+  termFor,
+  type AgentJobView,
+  type MissingFieldBlock,
+  type UiBlock,
 } from '@actionbridge/contracts';
 import {
   Check,
   CheckCircle2,
-  Circle,
   ClipboardCopy,
   LoaderCircle,
   MinusCircle,
@@ -123,16 +124,6 @@ export function ApiNotice({
   );
 }
 
-const STAGE_LABEL: Record<string, string> = {
-  reading_input: 'Reading what you shared',
-  checking_missing_facts: 'Checking what’s still needed',
-  retrieving_evidence: 'Finding the supporting details',
-  calculating_costs: 'Calculating with your plan’s rules',
-  comparing_dates: 'Comparing permitted dates',
-  preparing_explanation: 'Preparing what to show you',
-  analyzing: 'Analyzing',
-};
-
 function Working({
   job,
   timedOut,
@@ -151,57 +142,52 @@ function Working({
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
-  const seconds = Math.max(
-    0,
-    Math.round((now - new Date(job.createdAt).getTime()) / 1000),
-  );
-  // The latest status per stage, in the order stages first appeared.
-  const stages = useMemo(() => {
-    const latest = new Map<string, AgentJobView['events'][number]>();
-    for (const event of job.events) latest.set(event.stage, event);
-    return [...latest.values()];
-  }, [job.events]);
+  const steps = useMemo(() => jobSteps(job.events), [job.events]);
+  const seconds = (from: string) =>
+    Math.max(0, Math.round((now - new Date(from).getTime()) / 1000));
   return (
     <div className="page working-layout">
       <div className="working-intro">
         <Orb size={220} active />
         <PageHeading
           title="Working on it"
-          description={`${seconds < 2 ? 'Just started' : `${seconds} seconds`} · your case is unchanged until you confirm.`}
+          description={`${seconds(job.createdAt)} seconds so far · nothing changes in your case until you confirm.`}
         />
       </div>
       <Card className="working-stages">
         <p className="eyebrow">What I’m doing</p>
-        {stages.length === 0 ? (
+        {steps.length === 0 ? (
           <p className="muted" role="status">
-            Waiting to start…
+            Starting…
           </p>
         ) : (
           <ol className="stage-list" aria-live="polite">
-            {stages.map((event) => {
+            {steps.map((step) => {
               const Icon =
-                event.status === 'completed'
+                step.status === 'done'
                   ? CheckCircle2
-                  : event.status === 'failed'
+                  : step.status === 'failed'
                     ? XCircle
-                    : event.status === 'skipped'
+                    : step.status === 'skipped'
                       ? MinusCircle
-                      : event.status === 'started'
-                        ? LoaderCircle
-                        : Circle;
+                      : LoaderCircle;
               return (
                 <li
-                  key={event.stage}
-                  className={event.status === 'completed' ? 'done' : 'current'}
+                  key={step.key}
+                  className={step.status === 'active' ? 'current' : 'done'}
                 >
                   <Icon
                     size={20}
-                    className={event.status === 'started' ? 'spin' : undefined}
+                    className={step.status === 'active' ? 'spin' : undefined}
                     aria-hidden="true"
                   />
                   <div>
-                    <strong>{STAGE_LABEL[event.stage] ?? event.stage}</strong>
-                    <small>{event.summary}</small>
+                    <strong>{step.label}</strong>
+                    <small>
+                      {step.status === 'active'
+                        ? `${seconds(step.startedAt)}s${step.hint ? ` · ${step.hint}` : ''}`
+                        : (step.result ?? 'Done')}
+                    </small>
                   </div>
                 </li>
               );
@@ -227,6 +213,10 @@ function Working({
   );
 }
 
+/**
+ * One item at a time: each "Is this right?" card, then each question, then a short summary to
+ * check before anything is sent. Answers are the same drafts the grouped view used.
+ */
 function Step({ job }: { job: AgentJobView }) {
   const api = useApi();
   const navigate = useNavigate();
@@ -234,16 +224,28 @@ function Step({ job }: { job: AgentJobView }) {
   const questions = questionsOf(job.questions);
   const [drafts, setDrafts] = useState<Drafts>(() => initialDrafts(questions));
   const [problems, setProblems] = useState<Record<string, string>>({});
+  const [index, setIndex] = useState(0);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<ApiError | null>(null);
-  const confirmations = questions.filter((q) => q.inputType === 'fact_review');
-  const asks = questions.filter((q) => q.inputType !== 'fact_review');
   const notices = (job.questions?.blocks ?? []).filter(
     (b): b is Extract<UiBlock, { type: 'notice' }> => b.type === 'notice',
   );
+  const current = questions[index];
+  const reviewing = index >= questions.length;
+
   const set = (questionId: string, draft: Draft) => {
-    setDrafts((current) => ({ ...current, [questionId]: draft }));
+    setDrafts((existing) => ({ ...existing, [questionId]: draft }));
     setProblems(({ [questionId]: _cleared, ...rest }) => rest);
+  };
+  /** Checks only this item before moving on. */
+  const next = () => {
+    if (!current) return;
+    const built = buildAnswers([current], drafts, job.caseRevision);
+    if (!built.ok) {
+      setProblems({ [current.questionId]: built.problems[0]!.message });
+      return;
+    }
+    setIndex((i) => i + 1);
   };
   const submit = async () => {
     if (busy) return;
@@ -252,6 +254,11 @@ function Step({ job }: { job: AgentJobView }) {
       setProblems(
         Object.fromEntries(
           built.problems.map((p) => [p.questionId, p.message]),
+        ),
+      );
+      setIndex(
+        questions.findIndex(
+          (q) => q.questionId === built.problems[0]!.questionId,
         ),
       );
       return;
@@ -268,61 +275,143 @@ function Step({ job }: { job: AgentJobView }) {
       setBusy(false);
     }
   };
-  const declined = confirmations.filter((q) => {
-    const d = drafts[q.questionId];
-    return d?.kind === 'confirm' && !d.value;
-  }).length;
-  const cta =
-    confirmations.length > 0 && asks.length === 0
-      ? declined > 0
-        ? 'Use the rest and continue'
-        : 'Looks right — continue'
-      : 'Continue';
+
   return (
-    <div className="page medium assistant-page">
-      {notices.map((n) => (
-        <AssistantMessage key={n.id} title={n.title} body={n.body} />
-      ))}
-      {confirmations.length > 0 && (
-        <section className="stack" aria-labelledby="understood">
-          <div>
-            <h3 id="understood">Here’s what I understood</h3>
-            <p className="small muted">
-              Choose “Not right” on anything that’s wrong — I’ll leave it out
-              and you can add it yourself.
-            </p>
-          </div>
-          <div className="understood-grid">
-            {confirmations.map((q) => (
-              <UnderstoodCard
+    <div className="page narrow assistant-page">
+      {index === 0 &&
+        notices.map((n) => (
+          <AssistantMessage key={n.id} title={n.title} body={n.body} />
+        ))}
+      <div
+        className="step-progress"
+        aria-label={
+          reviewing ? 'Summary' : `Item ${index + 1} of ${questions.length}`
+        }
+      >
+        {questions.map((q, i) => (
+          <span
+            key={q.questionId}
+            className={i < index ? 'done' : i === index ? 'current' : ''}
+          />
+        ))}
+        <span className={reviewing ? 'current' : ''} />
+      </div>
+      {current && !reviewing ? (
+        <>
+          <p className="eyebrow">
+            {current.inputType === 'fact_review'
+              ? 'Is this right?'
+              : 'A quick question'}{' '}
+            · {index + 1} of {questions.length}
+          </p>
+          {current.inputType === 'fact_review' ? (
+            <UnderstoodCard
+              key={current.questionId}
+              block={current}
+              draft={drafts[current.questionId]}
+              onChange={(d) => {
+                set(current.questionId, d);
+                // A tap answers it; move straight on.
+                setTimeout(() => setIndex((i) => i + 1), 180);
+              }}
+            />
+          ) : (
+            <QuestionCard
+              key={current.questionId}
+              block={current}
+              draft={drafts[current.questionId]}
+              problem={problems[current.questionId]}
+              onChange={(d) => set(current.questionId, d)}
+            />
+          )}
+          <FooterActions>
+            {index > 0 ? (
+              <Button
+                variant="secondary"
+                onClick={() => setIndex((i) => i - 1)}
+              >
+                Back
+              </Button>
+            ) : (
+              <Button variant="secondary" onClick={() => navigate('/facts')}>
+                Finish later
+              </Button>
+            )}
+            {current.inputType !== 'fact_review' && (
+              <Button onClick={next}>Next</Button>
+            )}
+          </FooterActions>
+        </>
+      ) : (
+        <>
+          <PageHeading
+            title="Check before I use these"
+            description="Choose any item to change it. Nothing is used until you continue."
+          />
+          <Card className="summary-list">
+            {questions.map((q, i) => (
+              <button
+                type="button"
                 key={q.questionId}
-                block={q}
-                draft={drafts[q.questionId]}
-                onChange={(d) => set(q.questionId, d)}
-              />
+                className="summary-row"
+                onClick={() => setIndex(i)}
+                aria-label={`Change: ${q.inputType === 'fact_review' ? String(q.candidateValue ?? '') : q.label}`}
+              >
+                <span>
+                  <strong>
+                    {q.inputType === 'fact_review'
+                      ? String(q.candidateValue ?? '')
+                      : q.label}
+                  </strong>
+                  <small className="muted">
+                    {answerLabel(q, drafts[q.questionId])}
+                  </small>
+                </span>
+                <span className="summary-change">Change</span>
+              </button>
             ))}
-          </div>
-        </section>
+          </Card>
+          {failure && (
+            <ApiNotice error={failure} onRetry={() => void submit()} />
+          )}
+          <FooterActions note="Each answer goes straight into the calculator.">
+            <Button
+              variant="secondary"
+              onClick={() => setIndex(questions.length - 1)}
+            >
+              Back
+            </Button>
+            <Button icon={Check} busy={busy} onClick={() => void submit()}>
+              Continue
+            </Button>
+          </FooterActions>
+        </>
       )}
-      {asks.map((q) => (
-        <QuestionCard
-          key={q.questionId}
-          block={q}
-          draft={drafts[q.questionId]}
-          problem={problems[q.questionId]}
-          onChange={(d) => set(q.questionId, d)}
-        />
-      ))}
-      {failure && <ApiNotice error={failure} onRetry={() => void submit()} />}
-      <FooterActions note="Each answer goes straight into the calculator. Nothing is used until you continue.">
-        <Button variant="secondary" onClick={() => navigate('/facts')}>
-          Finish later
-        </Button>
-        <Button icon={Check} busy={busy} onClick={() => void submit()}>
-          {cta}
-        </Button>
-      </FooterActions>
     </div>
+  );
+}
+
+function answerLabel(q: MissingFieldBlock, draft: Draft | undefined): string {
+  if (!draft) return 'Not answered';
+  if (draft.kind === 'unknown')
+    return 'I don’t know — I’ll add it to your questions';
+  if (draft.kind === 'confirm')
+    return draft.value ? '✓ Yes, use this' : '✗ Not right — left out';
+  if (draft.kind === 'choice')
+    return q.options.find((o) => o.id === draft.optionId)?.label ?? 'Chosen';
+  return q.inputType === 'currency'
+    ? `$${draft.text.replace(/^\$/, '')}`
+    : draft.text;
+}
+
+/** One line saying what a term means, for the fields people find confusing. */
+function Meaning({ fieldPath }: { fieldPath: string }) {
+  const term = termFor(fieldPath);
+  if (!term) return null;
+  return (
+    <p className="term-meaning small">
+      <strong>{term.term}:</strong> {term.definition}
+    </p>
   );
 }
 
@@ -347,49 +436,44 @@ function UnderstoodCard({
   draft: Draft | undefined;
   onChange: (d: Draft) => void;
 }) {
-  const accepted = draft?.kind === 'confirm' ? draft.value : true;
+  const answered = draft?.kind === 'confirm' ? draft.value : null;
   const fromDocument = block.reason.startsWith('From your document');
   const quote = block.reason.replace(
     /^From your (description|document):\s*/,
     '',
   );
-  const name = `confirm-${block.questionId}`;
   return (
-    <Card className={`understood-card ${accepted ? '' : 'declined'}`}>
+    <Card className="understood-card focus-card">
       <span className="small muted">
         {block.label.replace(/^Is this right\?\s*/, '')}
       </span>
-      <strong>{String(block.candidateValue ?? '')}</strong>
+      <strong className="understood-value">
+        {String(block.candidateValue ?? '')}
+      </strong>
       <blockquote>
         <Badge tone="green">
           {fromDocument ? 'From your document' : 'From your words'}
         </Badge>{' '}
         {quote}
       </blockquote>
-      <fieldset className="segmented confirm-choice">
-        <legend className="visually-hidden">
-          Is this right? {String(block.candidateValue ?? '')}
-        </legend>
-        {[
-          [true, 'Yes'],
-          [false, 'Not right'],
-        ].map(([value, label]) => (
-          <label
-            key={String(label)}
-            className={accepted === value ? 'active' : ''}
-          >
-            <input
-              type="radio"
-              name={name}
-              checked={accepted === value}
-              onChange={() =>
-                onChange({ kind: 'confirm', value: value as boolean })
-              }
-            />
-            {label}
-          </label>
-        ))}
-      </fieldset>
+      <Meaning fieldPath={block.fieldPath} />
+      <div className="confirm-buttons">
+        <Button
+          variant={answered === false ? 'danger' : 'secondary'}
+          aria-pressed={answered === false}
+          onClick={() => onChange({ kind: 'confirm', value: false })}
+        >
+          Not right
+        </Button>
+        <Button
+          icon={Check}
+          variant={answered === true ? 'primary' : 'secondary'}
+          aria-pressed={answered === true}
+          onClick={() => onChange({ kind: 'confirm', value: true })}
+        >
+          Yes, that’s right
+        </Button>
+      </div>
     </Card>
   );
 }
@@ -408,11 +492,12 @@ function QuestionCard({
   const unknown = draft?.kind === 'unknown';
   const name = `q-${block.questionId}`;
   return (
-    <Card className="stack question-card">
+    <Card className="stack question-card focus-card">
       <div>
         <h3>{block.label}</h3>
         <p className="small muted">{block.reason}</p>
       </div>
+      <Meaning fieldPath={block.fieldPath} />
       {block.inputType === 'single_select' && (
         <fieldset className="choice-list">
           <legend className="visually-hidden">{block.label}</legend>
@@ -439,6 +524,7 @@ function QuestionCard({
             <input
               inputMode="decimal"
               disabled={unknown}
+              autoFocus
               value={draft?.kind === 'text' ? draft.text : ''}
               onChange={(e) => onChange({ kind: 'text', text: e.target.value })}
             />

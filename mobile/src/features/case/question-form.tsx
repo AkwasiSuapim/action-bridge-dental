@@ -1,3 +1,4 @@
+import { termFor } from '@actionbridge/contracts';
 import type { DentalCase } from '@actionbridge/contracts';
 import { randomUUID } from 'expo-crypto';
 import { useState, type ReactNode } from 'react';
@@ -9,7 +10,7 @@ import { centsToInput, formatCents, formatDate, isIsoDate, parseDollarsToCents }
 import type { QuestionSpec } from '../../lib/questions';
 import { asApiError, type ApiError } from '../../services/api';
 import { useApi } from '../../services/api-context';
-import { space } from '../../theme/tokens';
+import { fonts, space } from '../../theme/tokens';
 
 /**
  * One focused question for one field (design v3 question card): the question, why it matters,
@@ -130,6 +131,14 @@ export function QuestionForm({
       <View style={{ gap: space(2) }}>
         <AppText variant="title">{question.label}</AppText>
         <AppText muted>{question.reason}</AppText>
+        {termFor(question.fieldPath) ? (
+          <AppText variant="caption" muted>
+            <AppText variant="caption" style={{ fontFamily: fonts.semibold }}>
+              {termFor(question.fieldPath)!.term}:
+            </AppText>{' '}
+            {termFor(question.fieldPath)!.definition}
+          </AppText>
+        ) : null}
       </View>
 
       {notice ? <Notice tone="warning" title={notice} /> : null}

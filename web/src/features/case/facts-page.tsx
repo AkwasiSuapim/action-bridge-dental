@@ -1,3 +1,4 @@
+import { termFor } from '@actionbridge/contracts';
 import { Check, ClipboardList, FileText, Pencil, Quote } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -93,6 +94,11 @@ export function FactsPage() {
       <div>
         <span className="small muted">{label}</span>
         <strong>{value}</strong>
+        {termFor(path) && (
+          <span className="term-meaning small">
+            {termFor(path)!.definition}
+          </span>
+        )}
         {badge(path)}
       </div>
       <Button

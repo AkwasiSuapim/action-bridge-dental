@@ -1,9 +1,9 @@
-import type { AgentJobView, EstimateResult, MissingFieldBlock, ScenarioComparisonResult, UiBlock } from '@actionbridge/contracts';
+import { jobSteps, termFor, type AgentJobView, type EstimateResult, type MissingFieldBlock, type ScenarioComparisonResult, type UiBlock } from '@actionbridge/contracts';
 import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
-import { CheckCircle2, Circle, ClipboardCopy, MinusCircle, XCircle } from 'lucide-react-native';
+import { CheckCircle2, ClipboardCopy, MinusCircle, XCircle } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { AccessibilityInfo, Pressable, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Pressable, View } from 'react-native';
 import { AgentOrb } from '../../components/orb';
 import { ErrorNotice, LoadingState } from '../../components/states';
 import { AppText, Badge, Button, Card, MoneyField, Notice, RadioCards, Row, Screen, TextField } from '../../components/ui';
@@ -62,25 +62,17 @@ export function AssistantScreen() {
   return <Failed job={job} caseId={caseId} onRetried={refresh} />;
 }
 
-// ---- Working: real stages only, no fake progress ----------------------------------------------
-
-const STAGE_LABEL: Record<string, string> = {
-  reading_input: 'Reading what you shared',
-  checking_missing_facts: 'Checking what’s still needed',
-  retrieving_evidence: 'Finding the supporting details',
-  calculating_costs: 'Calculating with your plan’s rules',
-  comparing_dates: 'Comparing permitted dates',
-  preparing_explanation: 'Preparing what to show you',
-  analyzing: 'Analyzing',
-};
+// ---- Working: a checklist of real steps, no fake progress ------------------------------------
 
 function Working({ job, timedOut, onCancel, onRefresh, actionError }: { job: AgentJobView; timedOut: boolean; onCancel: () => void; onRefresh: () => void; actionError: ApiError | null }) {
-  const [now, setNow] = useState(Date.now());
+  const { colors } = useTheme();
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
-  const seconds = Math.max(0, Math.round((now - new Date(job.createdAt).getTime()) / 1000));
+  const steps = useMemo(() => jobSteps(job.events), [job.events]);
+  const seconds = (from: string) => Math.max(0, Math.round((now - new Date(from).getTime()) / 1000));
 
   return (
     <Screen footer={<Button label="Stop" variant="ghost" onPress={onCancel} />}>
@@ -90,10 +82,33 @@ function Working({ job, timedOut, onCancel, onRefresh, actionError }: { job: Age
           Working on it
         </AppText>
         <AppText variant="caption" muted accessibilityRole="text">
-          {seconds < 2 ? 'Just started' : `${seconds} seconds`} · your case is unchanged until you confirm
+          {seconds(job.createdAt)} seconds so far · nothing changes until you confirm
         </AppText>
       </View>
-      <StageList job={job} />
+      {steps.length === 0 ? (
+        <AppText variant="caption" muted style={{ textAlign: 'center' }}>
+          Starting…
+        </AppText>
+      ) : (
+        <Card>
+          {steps.map((step) => {
+            const done = step.status === 'done';
+            const Icon = done ? CheckCircle2 : step.status === 'failed' ? XCircle : step.status === 'skipped' ? MinusCircle : null;
+            const detail = step.status === 'active' ? `${seconds(step.startedAt)}s${step.hint ? ` · ${step.hint}` : ''}` : (step.result ?? 'Done');
+            return (
+              <View key={step.key} style={{ flexDirection: 'row', gap: space(3), alignItems: 'flex-start' }} accessible accessibilityLabel={`${step.label}: ${detail}`}>
+                {Icon ? <Icon size={20} color={done ? colors.primary : colors.textMuted} /> : <ActivityIndicator size="small" color={colors.primary} />}
+                <View style={{ flex: 1 }}>
+                  <AppText variant="label">{step.label}</AppText>
+                  <AppText variant="caption" muted>
+                    {detail}
+                  </AppText>
+                </View>
+              </View>
+            );
+          })}
+        </Card>
+      )}
       {timedOut ? (
         <Notice tone="warning" title="This is taking longer than usual" body="Your input is safe. Check again, or stop and enter the details step by step.">
           <Button label="Check again" variant="secondary" onPress={onRefresh} />
@@ -104,69 +119,44 @@ function Working({ job, timedOut, onCancel, onRefresh, actionError }: { job: Age
   );
 }
 
-function StageList({ job }: { job: AgentJobView }) {
-  const { colors } = useTheme();
-  // Show the latest status per stage, in the order stages first appeared.
-  const stages = useMemo(() => {
-    const latest = new Map<string, AgentJobView['events'][number]>();
-    for (const event of job.events) latest.set(event.stage, event);
-    return [...latest.values()];
-  }, [job.events]);
-  if (stages.length === 0) {
-    return (
-      <AppText variant="caption" muted style={{ textAlign: 'center' }}>
-        Waiting to start…
-      </AppText>
-    );
-  }
-  return (
-    <Card>
-      {stages.map((event) => {
-        const Icon = event.status === 'completed' ? CheckCircle2 : event.status === 'failed' ? XCircle : event.status === 'skipped' ? MinusCircle : Circle;
-        const tint = event.status === 'completed' ? colors.primary : event.status === 'failed' ? colors.danger : colors.textMuted;
-        return (
-          <View key={event.stage} style={{ flexDirection: 'row', gap: space(3), alignItems: 'flex-start' }} accessible accessibilityLabel={`${STAGE_LABEL[event.stage] ?? event.stage}: ${event.status}. ${event.summary}`}>
-            <Icon size={20} color={tint} />
-            <View style={{ flex: 1 }}>
-              <AppText variant="label">{STAGE_LABEL[event.stage] ?? event.stage}</AppText>
-              <AppText variant="caption" muted>
-                {event.summary}
-              </AppText>
-            </View>
-          </View>
-        );
-      })}
-    </Card>
-  );
-}
-
-// ---- A step that needs the user ----------------------------------------------------------------
+// ---- A step that needs the user: one item at a time, then a summary -------------------------
 
 function Step({ job, caseId }: { job: AgentJobView; caseId: string }) {
   const api = useApi();
   const questions = questionsOf(job.questions);
   const [drafts, setDrafts] = useState<Drafts>(() => initialDrafts(questions));
   const [problems, setProblems] = useState<Record<string, string>>({});
+  const [index, setIndex] = useState(0);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<ApiError | null>(null);
-  const confirmations = questions.filter((q) => q.inputType === 'fact_review');
-  const asks = questions.filter((q) => q.inputType !== 'fact_review');
   const notices = (job.questions?.blocks ?? []).filter((b): b is Extract<UiBlock, { type: 'notice' }> => b.type === 'notice');
+  const current = questions[index];
+  const reviewing = index >= questions.length;
 
   const set = (questionId: string, draft: Draft) => {
-    setDrafts((current) => ({ ...current, [questionId]: draft }));
-    setProblems((current) => {
-      const { [questionId]: _cleared, ...rest } = current;
+    setDrafts((existing) => ({ ...existing, [questionId]: draft }));
+    setProblems((existing) => {
+      const { [questionId]: _cleared, ...rest } = existing;
       return rest;
     });
   };
-
+  /** Checks only this item before moving on. */
+  const next = () => {
+    if (!current) return;
+    const built = buildAnswers([current], drafts, job.caseRevision);
+    if (!built.ok) {
+      setProblems({ [current.questionId]: built.problems[0]!.message });
+      AccessibilityInfo.announceForAccessibility(built.problems[0]!.message);
+      return;
+    }
+    setIndex((i) => i + 1);
+  };
   const submit = async () => {
     if (busy) return;
     const built = buildAnswers(questions, drafts, job.caseRevision);
     if (!built.ok) {
       setProblems(Object.fromEntries(built.problems.map((p) => [p.questionId, p.message])));
-      AccessibilityInfo.announceForAccessibility(`${built.problems.length} ${built.problems.length === 1 ? 'answer needs' : 'answers need'} attention.`);
+      setIndex(questions.findIndex((q) => q.questionId === built.problems[0]!.questionId));
       return;
     }
     setBusy(true);
@@ -181,40 +171,122 @@ function Step({ job, caseId }: { job: AgentJobView; caseId: string }) {
     }
   };
 
-  const declined = confirmations.filter((q) => drafts[q.questionId]?.kind === 'confirm' && (drafts[q.questionId] as { value: boolean }).value === false).length;
-  const cta = confirmations.length > 0 && asks.length === 0 ? (declined > 0 ? 'Use the rest and continue' : 'Looks right — continue') : 'Continue';
+  const footer = reviewing ? (
+    <>
+      <Button label="Continue" onPress={submit} loading={busy} />
+      <Button label="Back" variant="ghost" onPress={() => setIndex(questions.length - 1)} />
+    </>
+  ) : current && current.inputType !== 'fact_review' ? (
+    <>
+      <Button label="Next" onPress={next} />
+      <Button label={index > 0 ? 'Back' : 'Finish later'} variant="ghost" onPress={() => (index > 0 ? setIndex(index - 1) : router.replace({ pathname: '/case/[caseId]/facts', params: { caseId } }))} />
+    </>
+  ) : (
+    <Button
+      label={index > 0 ? 'Back' : 'Finish later'}
+      variant="ghost"
+      onPress={() => (index > 0 ? setIndex(index - 1) : router.replace({ pathname: '/case/[caseId]/facts', params: { caseId } }))}
+    />
+  );
 
   return (
-    <Screen
-      footer={
+    <Screen footer={footer}>
+      {index === 0 ? notices.map((n) => <AssistantMessage key={n.id} title={n.title} body={n.body} />) : null}
+      <StepBar count={questions.length + 1} current={index} />
+      {current && !reviewing ? (
         <>
-          <Button label={cta} onPress={submit} loading={busy} />
-          <Button label="Finish later" variant="ghost" onPress={() => router.replace({ pathname: '/case/[caseId]/facts', params: { caseId } })} />
-        </>
-      }
-    >
-      {notices.map((n) => (
-        <AssistantMessage key={n.id} title={n.title} body={n.body} />
-      ))}
-
-      {confirmations.length > 0 ? (
-        <View style={{ gap: space(3) }}>
-          <AppText variant="heading">Here’s what I understood</AppText>
-          <AppText variant="caption" muted>
-            Tap “Not right” on anything that’s wrong — I’ll leave it out and you can add it yourself.
+          <AppText variant="label" muted>
+            {current.inputType === 'fact_review' ? 'Is this right?' : 'A quick question'} · {index + 1} of {questions.length}
           </AppText>
-          {confirmations.map((q) => (
-            <UnderstoodCard key={q.questionId} block={q} draft={drafts[q.questionId]} onChange={(d) => set(q.questionId, d)} />
-          ))}
-        </View>
-      ) : null}
-
-      {asks.map((q) => (
-        <QuestionCard key={q.questionId} block={q} draft={drafts[q.questionId]} problem={problems[q.questionId]} onChange={(d) => set(q.questionId, d)} />
-      ))}
-
-      {failure ? <ErrorNotice error={failure} onRetry={submit} /> : null}
+          {current.inputType === 'fact_review' ? (
+            <UnderstoodCard
+              key={current.questionId}
+              block={current}
+              draft={drafts[current.questionId]}
+              onChange={(d) => {
+                set(current.questionId, d);
+                // A tap answers it; move straight on.
+                setTimeout(() => setIndex((i) => i + 1), 180);
+              }}
+            />
+          ) : (
+            <QuestionCard key={current.questionId} block={current} draft={drafts[current.questionId]} problem={problems[current.questionId]} onChange={(d) => set(current.questionId, d)} />
+          )}
+        </>
+      ) : (
+        <>
+          <View style={{ gap: space(1) }}>
+            <AppText variant="title">Check before I use these</AppText>
+            <AppText variant="caption" muted>
+              Tap any item to change it. Nothing is used until you continue.
+            </AppText>
+          </View>
+          <Card style={{ padding: 0, gap: 0, overflow: 'hidden' }}>
+            {questions.map((q, i) => (
+              <SummaryRow key={q.questionId} first={i === 0} title={q.inputType === 'fact_review' ? String(q.candidateValue ?? '') : q.label} answer={answerLabel(q, drafts[q.questionId])} onPress={() => setIndex(i)} />
+            ))}
+          </Card>
+          {failure ? <ErrorNotice error={failure} onRetry={submit} /> : null}
+        </>
+      )}
     </Screen>
+  );
+}
+
+function answerLabel(q: MissingFieldBlock, draft: Draft | undefined): string {
+  if (!draft) return 'Not answered';
+  if (draft.kind === 'unknown') return 'I don’t know — added to your questions';
+  if (draft.kind === 'confirm') return draft.value ? '✓ Yes, use this' : '✗ Not right — left out';
+  if (draft.kind === 'choice') return q.options.find((o) => o.id === draft.optionId)?.label ?? 'Chosen';
+  return q.inputType === 'currency' ? `$${draft.text.replace(/^\$/, '')}` : draft.text;
+}
+
+function StepBar({ count, current }: { count: number; current: number }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', gap: space(1.5) }} aria-hidden>
+      {Array.from({ length: count }, (_, i) => (
+        <View key={i} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: i <= current ? colors.primary : colors.border }} />
+      ))}
+    </View>
+  );
+}
+
+function SummaryRow({ title, answer, first, onPress }: { title: string; answer: string; first: boolean; onPress: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${answer}. Change`}
+      onPress={onPress}
+      style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space(3), padding: space(4), borderTopWidth: first ? 0 : 1, borderTopColor: colors.border, backgroundColor: pressed ? colors.surfaceMuted : 'transparent' })}
+    >
+      <View style={{ flex: 1, gap: space(0.5) }}>
+        <AppText variant="label" style={{ fontFamily: fonts.semibold }}>
+          {title}
+        </AppText>
+        <AppText variant="caption" muted>
+          {answer}
+        </AppText>
+      </View>
+      <AppText variant="caption" color={colors.primary} style={{ fontFamily: fonts.semibold }}>
+        Change
+      </AppText>
+    </Pressable>
+  );
+}
+
+/** One line saying what a term means, for the fields people find confusing. */
+function Meaning({ fieldPath }: { fieldPath: string }) {
+  const term = termFor(fieldPath);
+  if (!term) return null;
+  return (
+    <AppText variant="caption" muted>
+      <AppText variant="caption" style={{ fontFamily: fonts.semibold }}>
+        {term.term}:
+      </AppText>{' '}
+      {term.definition}
+    </AppText>
   );
 }
 
@@ -239,48 +311,34 @@ function AssistantMessage({ title, body }: { title: string; body: string }) {
 
 function UnderstoodCard({ block, draft, onChange }: { block: MissingFieldBlock; draft: Draft | undefined; onChange: (d: Draft) => void }) {
   const { colors } = useTheme();
-  const accepted = draft?.kind === 'confirm' ? draft.value : true;
+  const answered = draft?.kind === 'confirm' ? draft.value : null;
   const fromDocument = block.reason.startsWith('From your document');
   const quote = block.reason.replace(/^From your (description|document):\s*/, '');
-  const option = (value: boolean, label: string) => {
-    const selected = accepted === value;
-    return (
-      <Pressable
-        accessibilityRole="radio"
-        accessibilityState={{ checked: selected }}
-        accessibilityLabel={label}
-        onPress={() => onChange({ kind: 'confirm', value })}
-        style={{
-          flex: 1,
-          minHeight: layout.minHitArea,
-          borderRadius: 999,
-          borderWidth: 1.5,
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderColor: selected ? (value ? colors.primary : colors.danger) : colors.border,
-          backgroundColor: selected ? (value ? colors.primarySoft : colors.dangerSoft) : colors.surface,
-        }}
-      >
-        <AppText variant="label" color={selected ? (value ? colors.primary : colors.danger) : colors.text} style={{ fontFamily: fonts.semibold }}>
-          {label}
-        </AppText>
-      </Pressable>
-    );
-  };
   return (
-    <Card tone={accepted ? 'default' : 'muted'}>
+    <Card>
       <AppText variant="caption" muted>
         {block.label.replace(/^Is this right\?\s*/, '')}
       </AppText>
-      <AppText variant="body" style={{ fontFamily: fonts.semibold, opacity: accepted ? 1 : 0.6 }}>
+      <AppText variant="heading" style={{ fontSize: 20, lineHeight: 27 }}>
         {String(block.candidateValue ?? '')}
       </AppText>
       <AppText variant="caption" muted style={{ fontStyle: 'italic' }}>
         {fromDocument ? 'From the document' : 'From your words'}: {quote}
       </AppText>
-      <View style={{ flexDirection: 'row', gap: space(2) }} accessibilityRole="radiogroup" accessibilityLabel={`Is this right? ${String(block.candidateValue ?? '')}`}>
-        {option(true, 'Yes')}
-        {option(false, 'Not right')}
+      <Meaning fieldPath={block.fieldPath} />
+      <View style={{ gap: space(2), marginTop: space(1) }} accessibilityRole="radiogroup" accessibilityLabel={`Is this right? ${String(block.candidateValue ?? '')}`}>
+        <Button label="Yes, that’s right" variant={answered === true ? 'primary' : 'secondary'} onPress={() => onChange({ kind: 'confirm', value: true })} />
+        <Pressable
+          accessibilityRole="radio"
+          accessibilityState={{ checked: answered === false }}
+          accessibilityLabel="Not right"
+          onPress={() => onChange({ kind: 'confirm', value: false })}
+          style={{ minHeight: layout.minHitArea + 8, borderRadius: layout.radius, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', borderColor: answered === false ? colors.danger : colors.border, backgroundColor: answered === false ? colors.dangerSoft : colors.surface }}
+        >
+          <AppText variant="label" color={answered === false ? colors.danger : colors.text} style={{ fontFamily: fonts.semibold, fontSize: 16 }}>
+            Not right
+          </AppText>
+        </Pressable>
       </View>
     </Card>
   );
@@ -294,6 +352,7 @@ function QuestionCard({ block, draft, problem, onChange }: { block: MissingField
       <AppText variant="caption" muted>
         {block.reason}
       </AppText>
+      <Meaning fieldPath={block.fieldPath} />
       {block.inputType === 'single_select' ? (
         <>
           <RadioCards
