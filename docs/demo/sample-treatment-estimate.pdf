@@ -1,0 +1,52 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1550 >>
+stream
+BT /F1 9 Tf 56 735 Td (SAMPLE DOCUMENT - FICTIONAL OFFICE AND PATIENT - FOR DEMONSTRATION ONLY) Tj ET
+BT /F2 17 Tf 56 705 Td (Bright Harbor Dental \(fictional\) - Treatment Estimate) Tj ET
+BT /F1 11 Tf 56 687 Td (Estimate date: 2026-10-01    Patient: SAMPLE PATIENT    Estimate number: DEMO-1042) Tj ET
+BT /F1 11 Tf 56 669 Td (Bright Harbor Dental is in network with Harbor Mutual Dental PPO.) Tj ET
+BT /F2 12 Tf 56 635 Td (Recommended treatment) Tj ET
+56 629 m 556 629 l 0.8 G S
+BT /F1 9.5 Tf 56 617 Td (Filling, tooth 14 \(D2391\): fee $250.00, allowed $250.00, write-off $0.00, cash price $200.00, planned 2026-11-10) Tj ET
+BT /F1 9.5 Tf 56 599 Td (Filling, tooth 15 \(D2391\): fee $250.00, allowed $250.00, write-off $0.00, cash price $200.00, planned 2026-11-11) Tj ET
+BT /F1 9.5 Tf 56 581 Td (Crown, tooth 30 \(D2740\): fee $1,000.00, allowed $1,000.00, write-off $0.00, cash price $900.00, planned 2026-11-12) Tj ET
+BT /F1 11 Tf 56 563 Td (Total quoted treatment: $1,500.00) Tj ET
+BT /F2 12 Tf 56 529 Td (Timing from your dentist) Tj ET
+56 523 m 556 523 l 0.8 G S
+BT /F1 11 Tf 56 511 Td (The fillings should be done in November 2026 as planned.) Tj ET
+BT /F1 11 Tf 56 493 Td (The crown can safely be done any time between 2026-11-12 and 2027-01-15.) Tj ET
+BT /F1 9 Tf 56 468 Td (Cash price: what you pay without insurance, for the same service.) Tj ET
+BT /F1 9 Tf 56 443 Td (This estimate is not a guarantee of payment. Your insurer decides final benefits.) Tj ET
+BT /F1 9 Tf 56 428 Td (SAMPLE DOCUMENT - no real person, office or plan.) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000001853 00000 n 
+0000001923 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+1998
+%%EOF

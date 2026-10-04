@@ -1,0 +1,51 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1407 >>
+stream
+BT /F1 9 Tf 56 735 Td (SAMPLE DOCUMENT - FICTIONAL PLAN AND MEMBER - FOR DEMONSTRATION ONLY) Tj ET
+BT /F2 17 Tf 56 705 Td (Harbor Mutual Dental PPO \(fictional\) - Summary of Benefits) Tj ET
+BT /F1 11 Tf 56 687 Td (Member: SAMPLE MEMBER    Plan: Individual PPO    Statement date: 2026-10-01) Tj ET
+BT /F2 12 Tf 56 653 Td (Your benefit year) Tj ET
+56 647 m 556 647 l 0.8 G S
+BT /F1 11 Tf 56 635 Td (Benefit year: 2026-01-01 to 2026-12-31. Annual maximum: $800.00. Annual deductible: $50.00.) Tj ET
+BT /F1 11 Tf 56 617 Td (Used so far this benefit year: insurer already paid $500.00. Deductible met so far: $0.00.) Tj ET
+BT /F1 11 Tf 56 599 Td (Next benefit year: 2027-01-01 to 2027-12-31, with the same annual maximum and deductible.) Tj ET
+BT /F2 12 Tf 56 565 Td (What the plan pays \(in network\)) Tj ET
+56 559 m 556 559 l 0.8 G S
+BT /F1 11 Tf 56 547 Td (Preventive services such as cleanings: plan pays 100%, deductible does not apply.) Tj ET
+BT /F1 11 Tf 56 529 Td (Basic services such as fillings: plan pays 80% after the deductible.) Tj ET
+BT /F1 11 Tf 56 511 Td (Major services such as crowns: plan pays 50% after the deductible.) Tj ET
+BT /F1 11 Tf 56 493 Td (The annual maximum applies to basic and major services.) Tj ET
+BT /F1 9 Tf 56 468 Td (This summary is not a contract. Benefits are subject to plan terms.) Tj ET
+BT /F1 9 Tf 56 453 Td (SAMPLE DOCUMENT - no real person, office or plan.) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000001710 00000 n 
+0000001780 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+1855
+%%EOF
