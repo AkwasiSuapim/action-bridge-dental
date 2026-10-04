@@ -98,7 +98,7 @@ export function QuestionsScreen() {
         <AppText variant="title">Add your plan’s coverage</AppText>
         <Card>
           <AppText muted>
-            We need what your plan pays for each type of service and when its benefit year starts. Your benefits summary lists these.
+            What your plan pays for each type of service, from your benefits summary.
           </AppText>
         </Card>
       </Screen>

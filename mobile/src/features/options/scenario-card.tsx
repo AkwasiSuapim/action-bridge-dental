@@ -6,8 +6,11 @@ import { useTheme } from '../../theme/theme';
 import { fonts, space } from '../../theme/tokens';
 import type { OptionCard } from './options-model';
 
-/** One timing option (design v3 scenario card). Selection is a radio choice, never an approval. */
-export function ScenarioCard({ card, selected, onSelect }: { card: OptionCard; selected: boolean; onSelect: () => void }) {
+/**
+ * One timing option (design v3 scenario card). Selection is a radio choice, never an approval.
+ * `fill` stretches the card to its column's height (side-by-side layout on tablets).
+ */
+export function ScenarioCard({ card, selected, onSelect, fill = false }: { card: OptionCard; selected: boolean; onSelect: () => void; fill?: boolean }) {
   const { colors } = useTheme();
   const summary = `${card.title}. ${card.timing}. You pay ${formatCents(card.youPayCents)}, estimated. Plan pays ${formatCents(card.planPaysCents)}.${
     card.lowest ? ' Lower estimated cost under these assumptions.' : ''
@@ -19,6 +22,7 @@ export function ScenarioCard({ card, selected, onSelect }: { card: OptionCard; s
       accessibilityLabel={summary}
       onPress={onSelect}
       style={({ pressed }) => ({
+        ...(fill ? { flex: 1 } : {}),
         gap: space(3.5),
         padding: space(4.5),
         borderRadius: 20,

@@ -1,5 +1,7 @@
 import {
+  AgentJobViewSchema,
   CoverageComparisonSchema,
+  CreateJobResponseSchema,
   CreateCaseResponseSchema,
   DentalCaseSchema,
   ErrorEnvelopeSchema,
@@ -10,6 +12,8 @@ import {
   SaveStrategyResponseSchema,
   ScenarioComparisonResultSchema,
   type CreateCaseRequest,
+  type CreateJobRequest,
+  type JobAnswersRequest,
   type ErrorIssue,
   type PatchCaseRequest,
   type SaveStrategyRequest,
@@ -142,6 +146,7 @@ export function createApiClient({
   }
 
   const casePath = (caseId: string) => `/v1/cases/${encodeURIComponent(caseId)}`;
+  const jobPath = (jobId: string) => `/v1/jobs/${encodeURIComponent(jobId)}`;
 
   return {
     health: () => fetchImpl(`${baseUrl}/health`).then((r) => r.ok),
@@ -162,6 +167,17 @@ export function createApiClient({
       once('POST', `${casePath(caseId)}/strategies`, SaveStrategyResponseSchema, request, { 'idempotency-key': idempotencyKey }),
     ledger: (caseId: string, cursor?: string) =>
       read(`${casePath(caseId)}/ledger${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`, LedgerPageSchema),
+
+    // Agent jobs (system design §6, phases 5–6): interpret, explain, analyze_document, transcribe_audio.
+    // Planned routes, not deployed yet; until they are, these fail with NOT_FOUND like any unknown route.
+    createJob: (caseId: string, request: CreateJobRequest) => once('POST', `${casePath(caseId)}/jobs`, CreateJobResponseSchema, request),
+    /** Poll with backoff until a terminal status; safe to retry. */
+    getJob: (jobId: string) => read(jobPath(jobId), AgentJobViewSchema),
+    /** Validated answers to a job's questions; the server starts a follow-up job. */
+    answerJob: (jobId: string, request: JobAnswersRequest) => once('POST', `${jobPath(jobId)}/answers`, CreateJobResponseSchema, request),
+    retryJob: (jobId: string) => once('POST', `${jobPath(jobId)}/retry`, CreateJobResponseSchema, {}),
+    /** Best effort: returns the job's actual state, which may already be terminal. */
+    cancelJob: (jobId: string) => once('POST', `${jobPath(jobId)}/cancel`, AgentJobViewSchema, {}),
   };
 }
 

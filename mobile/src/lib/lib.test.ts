@@ -3,7 +3,7 @@ import { DentalCaseSchema, PatchCaseRequestSchema, type DentalCase } from '@acti
 import { describe, expect, it } from 'vitest';
 import { readConfig } from './config';
 import { centsToInput, formatBps, formatCents, formatDate, isIsoDate, parseDollarsToCents, parsePercentToBps } from './format';
-import { changesForAnswer, questionFor } from './questions';
+import { changesForAnswer, questionFor, questionFromBlock } from './questions';
 
 describe('format', () => {
   it('formats integer cents exactly', () => {
@@ -98,5 +98,40 @@ describe('adaptive questions (typed path)', () => {
     expect(network.procedures?.find((p) => p.id === 'filling-1')).toEqual(record.procedures[0]);
 
     expect(() => changesForAnswer(record, 'procedures.ghost.network', 'in')).toThrow();
+  });
+});
+
+describe('agent question blocks', () => {
+  const block = {
+    id: 'b1',
+    type: 'missing_field' as const,
+    questionId: 'q1',
+    fieldPath: 'procedures.crown-1.network',
+    inputType: 'single_select' as const,
+    label: 'Is your dentist in network?',
+    reason: 'Network status decides the allowed amount.',
+    options: [
+      { id: 'in', label: 'In network' },
+      { id: 'out', label: 'Out of network' },
+    ],
+    allowedResponseModes: ['tap' as const],
+    required: true,
+    allowUnknown: true,
+    sourceRefs: [],
+    expectedRevision: 3,
+  };
+
+  it('renders agent questions with the same controls as engine questions', () => {
+    expect(questionFromBlock(block)).toEqual({
+      kind: 'choice',
+      fieldPath: 'procedures.crown-1.network',
+      label: 'Is your dentist in network?',
+      reason: 'Network status decides the allowed amount.',
+      options: [
+        { id: 'in', label: 'In network', value: 'in' },
+        { id: 'out', label: 'Out of network', value: 'out' },
+      ],
+    });
+    expect(questionFromBlock({ ...block, inputType: 'attachment', options: [] }).kind).toBe('edit_case');
   });
 });

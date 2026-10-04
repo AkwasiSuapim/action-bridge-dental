@@ -6,6 +6,7 @@ import { BrandLockup } from '../../components/brand';
 import { AgentOrb } from '../../components/orb';
 import { ErrorNotice } from '../../components/states';
 import { AppText, Badge, Card, Screen } from '../../components/ui';
+import { capabilities } from '../../lib/capabilities';
 import { asApiError, type ApiError } from '../../services/api';
 import { useApi } from '../../services/api-context';
 import { ThemeProvider, useTheme } from '../../theme/theme';
@@ -16,15 +17,12 @@ import { useRecentCases } from '../activity/recent-cases';
 import { useRefreshOnFocus } from '../activity/use-refresh-on-focus';
 import { sampleCaseRequest } from '../intake/sample-case';
 
-/**
- * Intake methods (design v3 "Home · multimodal start"). Voice, upload and photo need the job and
- * upload APIs, which do not exist yet, so they are shown as unavailable rather than simulated.
- */
+/** Intake methods (design v3 "Home · multimodal start"), switched on in `lib/capabilities.ts`. */
 const METHODS: { id: 'speak' | 'upload' | 'photo' | 'type'; label: string; Icon: LucideIcon; available: boolean }[] = [
-  { id: 'speak', label: 'Speak', Icon: Mic, available: false },
-  { id: 'upload', label: 'Upload', Icon: Upload, available: false },
-  { id: 'photo', label: 'Take photo', Icon: Camera, available: false },
-  { id: 'type', label: 'Type', Icon: Keyboard, available: true },
+  { id: 'speak', label: 'Speak', Icon: Mic, available: capabilities.voice },
+  { id: 'upload', label: 'Upload', Icon: Upload, available: capabilities.upload },
+  { id: 'photo', label: 'Take photo', Icon: Camera, available: capabilities.photo },
+  { id: 'type', label: 'Type', Icon: Keyboard, available: capabilities.typing },
 ];
 
 const STEPS = [
@@ -67,7 +65,6 @@ function HomeBody() {
     }
   };
   const [speak, ...others] = METHODS;
-  const anyUnavailable = METHODS.some((method) => !method.available);
 
   return (
     <Screen headerless>
@@ -89,9 +86,11 @@ function HomeBody() {
             <MethodButton key={method.id} method={method} />
           ))}
         </View>
-        <AppText variant="caption" muted>
-          {anyUnavailable ? 'Speaking, uploading and photos are coming soon. ' : ''}Photos are for documents like estimates, not your teeth.
-        </AppText>
+        {capabilities.photo ? (
+          <AppText variant="caption" muted>
+            Photos are for documents like estimates, not your teeth.
+          </AppText>
+        ) : null}
       </View>
 
       {latest?.status === 'ok' ? <CaseCard summary={latest.summary} label="Continue your plan" /> : null}
@@ -119,7 +118,9 @@ function HomeBody() {
         <AppText variant="label" color={colors.primary} style={{ fontFamily: fonts.semibold, fontSize: 16 }}>
           {starting ? 'Starting the sample…' : 'Try a sample'}
         </AppText>
-        <Badge label="Sample data" tone="neutral" />
+        <View>
+          <Badge label="Sample data" tone="neutral" />
+        </View>
       </Pressable>
       {failure ? <ErrorNotice error={failure} onRetry={trySample} /> : null}
 

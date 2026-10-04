@@ -4,7 +4,7 @@ import { Plus, Trash2 } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Pressable, View } from 'react-native';
 import { ErrorNotice } from '../../components/states';
-import { AppText, Button, Card, ChoiceChips, MoneyField, Notice, Screen, TextField } from '../../components/ui';
+import { AppText, Button, Card, ChoiceChips, MoneyField, Notice, RadioCards, Screen, TextField } from '../../components/ui';
 import { asApiError, type ApiError } from '../../services/api';
 import { useApi } from '../../services/api-context';
 import { useTheme } from '../../theme/theme';
@@ -94,7 +94,7 @@ export function NewCaseScreen() {
       {failure ? <ErrorNotice error={failure} onRetry={submit} /> : null}
 
       <Section title="Coverage">
-        <ChoiceChips
+        <RadioCards
           label="Do you have dental insurance for this treatment?"
           options={[...COVERAGE_OPTIONS]}
           value={draft.coverage}
@@ -219,12 +219,10 @@ function ProcedureCard({
         autoCapitalize="sentences"
         error={errors[`${at}.label`] ?? null}
       />
-      <ChoiceChips
-        label="Type"
-        options={CATEGORIES.map((c) => ({ id: c.id, label: `${c.label} · ${c.hint}` }))}
-        value={procedure.category}
-        onChange={(category) => onChange({ category })}
-      />
+      <ChoiceChips label="Type" options={CATEGORIES.map((c) => ({ id: c.id, label: c.label }))} value={procedure.category} onChange={(category) => onChange({ category })} />
+      <AppText variant="caption" muted>
+        {CATEGORIES.map((c) => `${c.label}: ${c.hint.toLowerCase()}`).join(' · ')}
+      </AppText>
       <FieldError message={errors[`${at}.category`]} />
       <MoneyField label="Dentist’s charge" text={procedure.charge.text} unknown={procedure.charge.unknown} onChange={(charge) => onChange({ charge })} />
       <FieldError message={errors[`${at}.charge`]} />

@@ -62,7 +62,7 @@ function SelfPayForm({ record, reload }: { record: DentalCase; reload: () => Pro
     <Screen footer={<Button label="Save quotes" onPress={save} loading={busy} />}>
       <View style={{ gap: space(2) }}>
         <AppText variant="title">Self-pay quotes</AppText>
-        <AppText muted>Use the written cash price from your dentist’s office. Leave a procedure empty if there’s no quote.</AppText>
+        <AppText muted>Use the written cash price from your dentist’s office.</AppText>
       </View>
       {notice ? <Notice tone="warning" title={notice} /> : null}
       {failure ? <ErrorNotice error={failure} /> : null}
@@ -91,10 +91,6 @@ function SelfPayForm({ record, reload }: { record: DentalCase; reload: () => Pro
         </AppText>
       </Pressable>
       {errors.scope ? <Notice tone="danger" title={errors.scope} /> : null}
-
-      <AppText variant="caption" muted>
-        Ask your dentist whether a cash payment counts toward your deductible. We don’t assume it does.
-      </AppText>
     </Screen>
   );
 }

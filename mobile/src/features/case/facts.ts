@@ -20,6 +20,8 @@ export interface FactGroup {
   key: string;
   title: string;
   rows: FactRow[];
+  /** Collapsible groups (procedures, an assumed benefit year): the line shown before expanding. */
+  summary?: { value: string; detail: string; needsAnswer: boolean; source?: FactSource };
 }
 
 const NETWORK: Record<Procedure['network'], string> = { in: 'In network', out: 'Out of network', unknown: 'Not sure' };
@@ -30,6 +32,14 @@ const ASSUMPTIONS: Record<string, string> = {
 };
 
 const COVERAGE: Record<DentalCase['coverageMode'], string> = { insured: 'I have dental insurance', self_pay: 'Paying myself', unknown: 'Not sure' };
+
+/** "2026" for a calendar benefit year, otherwise "2026–27". */
+export function planYearLabel(year: PlanYear): string {
+  const start = year.startDate.slice(0, 4);
+  const end = year.endDate.slice(0, 4);
+  if (year.startDate.endsWith('-01-01') && year.endDate.endsWith('-12-31') && start === end) return start;
+  return `${start}–${end.slice(2)}`;
+}
 
 /** True when the case carries the labeled synthetic fixture rather than the user's own data. */
 export function isSampleCase(record: DentalCase): boolean {
@@ -126,7 +136,21 @@ export function buildFactGroups(record: DentalCase): FactGroup[] {
       // "Not sure" is an answer: show it, but keep it flagged as unconfirmed.
       rows[3] = { ...rows[3]!, value: NETWORK.unknown, source: 'missing' };
     }
-    groups.push({ key: path, title: procedure.label, rows });
+    const amount = (cents: number | null, missing: string) => (cents === null ? missing : formatCents(cents));
+    groups.push({
+      key: path,
+      title: procedure.label,
+      rows,
+      summary: {
+        value: `${amount(procedure.providerChargeCents, 'Charge not answered')} · ${procedure.proposedDate ? formatDate(procedure.proposedDate) : 'Date not answered'}`,
+        detail: [
+          procedure.network === 'unknown' ? 'Network not confirmed' : NETWORK[procedure.network],
+          `allowed ${amount(procedure.allowedCents, 'not answered')}`,
+          ...(window && !window.startsWith('Fixed') ? [`dentist allows ${window}`] : []),
+        ].join(' · '),
+        needsAnswer: rows.some((r) => r.source === 'missing' && r.editPath),
+      },
+    });
   }
 
   const coverage: FactRow[] = [
@@ -153,12 +177,28 @@ export function buildFactGroups(record: DentalCase): FactGroup[] {
   }
   groups.push({ key: 'coverage', title: 'Your coverage', rows: coverage });
 
-  orderedPlanYears(record).forEach(([id, year], index) => {
+  const years = orderedPlanYears(record);
+  years.forEach(([id, year], index) => {
     const path = `planYears.${id}`;
     const base = fromPlanYear(year);
+    const assumedSame = year.sourceStatus === 'explicit_unchanged_plan_assumption' && index > 0;
+    const firstLabel = years[0] ? planYearLabel(years[0][1]) : 'this year';
+    const amountText = (cents: number | null) => (cents === null ? 'not answered' : formatCents(cents));
     groups.push({
       key: path,
-      title: `${index === 0 ? 'This benefit year' : 'Next benefit year'} · ${formatDate(year.startDate)} – ${formatDate(year.endDate)}`,
+      title: `${index === 0 ? 'This benefit year' : 'Next benefit year'} · ${planYearLabel(year)}`,
+      ...(assumedSame
+        ? {
+            summary: {
+              value: `Same as ${firstLabel}`,
+              detail: `${amountText(year.annualMaximumCents)} maximum · ${amountText(year.annualDeductibleCents)} deductible · ${
+                year.insurerAlreadyPaidCents === 0 ? 'nothing paid yet' : `${amountText(year.insurerAlreadyPaidCents)} paid`
+              }`,
+              needsAnswer: false,
+              source: 'assumed' as const,
+            },
+          }
+        : {}),
       rows: [
         row(`${path}.annualMaximumCents`, 'Annual maximum', year.annualMaximumCents, money, base),
         row(`${path}.annualDeductibleCents`, 'Deductible', year.annualDeductibleCents, money, base),

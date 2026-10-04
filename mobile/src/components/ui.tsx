@@ -356,6 +356,53 @@ export function ChoiceChips<T extends string>({
   );
 }
 
+/** Full-width single choice (design v3 question options): radio, title and an optional one-line hint. */
+export function RadioCards<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: { id: T; label: string; hint?: string }[];
+  value: T | null;
+  onChange: (id: T) => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ gap: space(2.5) }} accessibilityRole="radiogroup" accessibilityLabel={label}>
+      {options.map((option) => {
+        const selected = option.id === value;
+        return (
+          <Pressable
+            key={option.id}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: selected }}
+            accessibilityLabel={option.hint ? `${option.label}. ${option.hint}` : option.label}
+            onPress={() => onChange(option.id)}
+            style={({ pressed }) => [
+              styles.radioCard,
+              { borderColor: selected ? colors.primary : colors.border, borderWidth: selected ? 2 : 1, backgroundColor: colors.surface, opacity: pressed ? 0.9 : 1 },
+            ]}
+          >
+            <View style={[styles.radio, { borderColor: selected ? colors.primary : colors.textMuted }]}>
+              {selected ? <View style={[styles.radioDot, { backgroundColor: colors.primary }]} /> : null}
+            </View>
+            <View style={{ flex: 1, gap: space(0.5) }}>
+              <AppText style={{ fontFamily: fonts.semibold }}>{option.label}</AppText>
+              {option.hint ? (
+                <AppText variant="caption" muted>
+                  {option.hint}
+                </AppText>
+              ) : null}
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 /**
  * Currency input with an explicit "I don't know" route. Unknown is `null`, never 0.
  * `cents` is null while the text is empty, invalid or marked unknown.
@@ -383,7 +430,7 @@ export function MoneyField({
         <View style={{ gap: space(1) }}>
           <AppText variant="label">{label}</AppText>
           <AppText variant="caption" muted>
-            Marked as unknown — we’ll ask for it only if the estimate needs it.
+            Marked as unknown.
           </AppText>
         </View>
       ) : (
@@ -447,6 +494,9 @@ const styles = StyleSheet.create({
   input: { minHeight: layout.minHitArea + 4, borderWidth: 1, borderRadius: layout.radiusSmall, paddingHorizontal: space(3), fontFamily: fonts.regular, fontSize: 16 },
   trailing: { position: 'absolute', right: space(1) },
   iconButton: { width: layout.minHitArea, height: layout.minHitArea, alignItems: 'center', justifyContent: 'center', borderRadius: layout.radiusSmall },
+  radioCard: { minHeight: layout.minHitArea + 12, borderRadius: layout.radius, padding: space(4), flexDirection: 'row', alignItems: 'center', gap: space(3) },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  radioDot: { width: 10, height: 10, borderRadius: 5 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space(2) },
   chip: { minHeight: layout.minHitArea, borderWidth: 1.5, borderRadius: 999, paddingHorizontal: space(4), justifyContent: 'center' },
   unknownToggle: { flexDirection: 'row', alignItems: 'center', gap: space(2), minHeight: layout.minHitArea, alignSelf: 'flex-start' },

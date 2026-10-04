@@ -17,8 +17,9 @@ interface CaseStore {
 
 const CaseContext = createContext<CaseStore | null>(null);
 
-export function CaseProvider({ children }: { children: ReactNode }) {
-  const [cases, setCases] = useState<Record<string, DentalCase>>({});
+/** `initialCases` seeds the cache (tests and previews); in the app the cache starts empty. */
+export function CaseProvider({ children, initialCases = [] }: { children: ReactNode; initialCases?: DentalCase[] }) {
+  const [cases, setCases] = useState<Record<string, DentalCase>>(() => Object.fromEntries(initialCases.map((c) => [c.caseId, c])));
   const [saves, setSaves] = useState<Record<string, SaveStrategyResponse>>({});
   const put = useCallback((record: DentalCase) => setCases((current) => ({ ...current, [record.caseId]: record })), []);
   const putSave = useCallback((caseId: string, save: SaveStrategyResponse) => setSaves((current) => ({ ...current, [caseId]: save })), []);

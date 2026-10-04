@@ -1,6 +1,8 @@
 import type { CoverageComparison, DentalCase, PlanYear, Scenario, ScenarioComparison } from '@actionbridge/contracts';
 import { formatCents, formatDate } from '../../lib/format';
-import { orderedPlanYears } from '../case/facts';
+import { orderedPlanYears, planYearLabel } from '../case/facts';
+
+export { planYearLabel };
 
 /**
  * View model for "Your dental options" (design v3). Every amount is copied from engine results;
@@ -35,13 +37,6 @@ export interface OptionsModel {
   whatCouldChange: string[];
 }
 
-/** "2026" for a calendar benefit year, otherwise "2026–27". */
-export function planYearLabel(year: PlanYear): string {
-  const start = year.startDate.slice(0, 4);
-  const end = year.endDate.slice(0, 4);
-  if (year.startDate.endsWith('-01-01') && year.endDate.endsWith('-12-31') && start === end) return start;
-  return `${start}–${end.slice(2)}`;
-}
 
 function names(record: DentalCase, ids: string[]): string {
   const labels = ids.map((id) => record.procedures.find((p) => p.id === id)?.label ?? id);

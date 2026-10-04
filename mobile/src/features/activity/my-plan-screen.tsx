@@ -27,7 +27,7 @@ export function MyPlanScreen() {
           <ClipboardList size={32} color={colors.textMuted} />
           <AppText variant="heading">No plan yet</AppText>
           <AppText muted style={{ textAlign: 'center' }}>
-            Start an estimate on Home. It will appear here so you can pick it up later.
+            Start an estimate on Home to see it here.
           </AppText>
           <Button label="Start on Home" variant="secondary" onPress={() => router.navigate('/')} />
         </Card>
