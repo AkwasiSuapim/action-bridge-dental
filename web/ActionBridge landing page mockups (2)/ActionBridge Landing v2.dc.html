@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+html{scroll-behavior:smooth}
+body{margin:0;background:#F5F6F3;color:#101814;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+*{box-sizing:border-box}
+a{color:#146B4D;text-decoration:none}
+a:hover{color:#0F563D}
+:focus-visible{outline:2px solid #146B4D;outline-offset:3px}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+</style>
+</helmet>
+
+<div style="background:#F5F6F3;color:#101814;font-family:'Geist',system-ui,sans-serif">
+
+<header style="position:fixed;top:0;left:0;right:0;z-index:50;background:{{ headerBg }};border-bottom:1px solid {{ headerRule }};transition:background 300ms ease,border-color 300ms ease">
+  <div style="max-width:1320px;margin:0 auto;padding:0 clamp(20px,5vw,64px);height:76px;display:flex;align-items:center;justify-content:space-between;gap:32px">
+    <a href="#top" aria-label="ActionBridge Dental home" style="display:flex;align-items:center;gap:12px;color:#101814;flex:none">
+      <span style="font-size:18px;font-weight:600;letter-spacing:-0.02em">ActionBridge</span>
+      <span style="width:1px;height:16px;background:rgba(16,24,20,.24)"></span>
+      <span style="font-size:18px;font-weight:400;letter-spacing:-0.01em;color:#66706A">Dental</span>
+    </a>
+    <sc-if value="{{ navFull }}" hint-placeholder-val="{{ true }}">
+      <nav aria-label="Primary" style="display:flex;align-items:center;gap:40px">
+        <div style="display:flex;align-items:center;gap:32px">
+          <a href="#how" style="font-size:15px;font-weight:500;color:#101814;white-space:nowrap;padding:8px 0;transition:color 200ms" style-hover="color:#146B4D">How it works</a>
+          <a href="#product" style="font-size:15px;font-weight:500;color:#101814;white-space:nowrap;padding:8px 0;transition:color 200ms" style-hover="color:#146B4D">Product</a>
+          <a href="#privacy" style="font-size:15px;font-weight:500;color:#101814;white-space:nowrap;padding:8px 0;transition:color 200ms" style-hover="color:#146B4D">Privacy</a>
+          <a href="#faq" style="font-size:15px;font-weight:500;color:#101814;white-space:nowrap;padding:8px 0;transition:color 200ms" style-hover="color:#146B4D">FAQ</a>
+        </div>
+        <span style="width:1px;height:20px;background:rgba(16,24,20,.12)"></span>
+        <div style="display:flex;align-items:center;gap:24px">
+          <a href="Sign%20In%20v2.dc.html" style="font-size:15px;font-weight:500;color:#101814;white-space:nowrap;padding:8px 0;transition:color 200ms" style-hover="color:#146B4D">Sign in</a>
+          <a href="Sign%20In%20v2.dc.html?mode=create" style="height:40px;padding:0 18px;display:inline-flex;align-items:center;background:#146B4D;color:#fff;font-size:15px;font-weight:500;border-radius:10px;white-space:nowrap;transition:background 200ms,transform 150ms" style-hover="background:#0F563D;color:#fff" style-active="transform:scale(.98)">Get started</a>
+        </div>
+      </nav>
+    </sc-if>
+    <sc-if value="{{ navCompact }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:center;gap:8px">
+        <a href="Sign%20In%20v2.dc.html?mode=create" style="height:40px;padding:0 16px;display:inline-flex;align-items:center;background:#146B4D;color:#fff;font-size:15px;font-weight:500;border-radius:10px;white-space:nowrap" style-hover="background:#0F563D;color:#fff">Get started</a>
+        <button type="button" onClick="{{ toggleMenu }}" aria-expanded="{{ menuOpen }}" aria-controls="mobile-menu" aria-label="{{ menuLabel }}" style="width:44px;height:44px;border:0;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#101814;border-radius:10px" style-hover="background:rgba(16,24,20,.05)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="{{ menuIconPath }}"></path></svg>
+        </button>
+      </div>
+    </sc-if>
+  </div>
+  <sc-if value="{{ showMenu }}" hint-placeholder-val="{{ false }}">
+    <nav id="mobile-menu" aria-label="Mobile" style="border-top:1px solid rgba(16,24,20,.12);padding:8px clamp(20px,5vw,64px) 24px;display:flex;flex-direction:column;background:#F5F6F3">
+      <a href="#how" onClick="{{ closeMenu }}" style="font-size:22px;font-weight:500;letter-spacing:-0.02em;color:#101814;padding:16px 0;border-bottom:1px solid rgba(16,24,20,.12)">How it works</a>
+      <a href="#product" onClick="{{ closeMenu }}" style="font-size:22px;font-weight:500;letter-spacing:-0.02em;color:#101814;padding:16px 0;border-bottom:1px solid rgba(16,24,20,.12)">Product</a>
+      <a href="#privacy" onClick="{{ closeMenu }}" style="font-size:22px;font-weight:500;letter-spacing:-0.02em;color:#101814;padding:16px 0;border-bottom:1px solid rgba(16,24,20,.12)">Privacy</a>
+      <a href="#faq" onClick="{{ closeMenu }}" style="font-size:22px;font-weight:500;letter-spacing:-0.02em;color:#101814;padding:16px 0;border-bottom:1px solid rgba(16,24,20,.12)">FAQ</a>
+      <a href="Sign%20In%20v2.dc.html" style="font-size:22px;font-weight:500;letter-spacing:-0.02em;color:#146B4D;padding:16px 0">Sign in</a>
+    </nav>
+  </sc-if>
+</header>
+
+<main id="top">
+
+<!-- HERO -->
+<section aria-labelledby="hero-h" style="position:relative;height:{{ heroH }};min-height:{{ heroMin }};overflow:hidden;background:#EDF3F5">
+  <div data-hero-img="" style="position:absolute;left:0;right:0;bottom:0;top:{{ heroImgTop }}">
+    <img src="assets/hero-tooth.png" alt="White tooth model beside a dental mirror and probe on a bright clinical surface" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:{{ heroImgPos }};transform:scaleX(-1)">
+  </div>
+  <div aria-hidden="true" style="position:absolute;inset:0;background:{{ heroOverlay }};pointer-events:none"></div>
+  <div style="position:relative;height:100%;display:flex;flex-direction:column;justify-content:{{ heroJustify }};padding:{{ heroPad }}">
+    <div style="max-width:{{ heroTextMax }};display:flex;flex-direction:column">
+      <div style="font-size:12.5px;font-weight:500;letter-spacing:.1em;color:#146B4D">DENTAL COST CLARITY</div>
+      <h1 id="hero-h" style="margin:20px 0 0;font-size:clamp(38px,4.6vw,64px);line-height:1.06;font-weight:500;letter-spacing:-0.035em;color:#101814;text-wrap:balance">Turn a confusing dental estimate into a clear plan.</h1>
+      <p style="margin:24px 0 0;font-size:clamp(16px,1.25vw,18px);line-height:1.6;font-weight:400;color:#3A443F;max-width:440px;text-wrap:pretty">Understand your treatment estimate, see how your benefits may apply, and compare your next steps with greater clarity.</p>
+      <sc-if value="{{ heroCtaInline }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:16px 24px;margin-top:36px">
+          <a href="Sign%20In%20v2.dc.html?mode=create" style="height:52px;padding:0 26px;display:inline-flex;align-items:center;background:#146B4D;color:#fff;font-size:16px;font-weight:500;border-radius:10px;transition:background 200ms,transform 150ms" style-hover="background:#0F563D;color:#fff" style-active="transform:scale(.98)">Get started</a>
+          <a href="#how" style="height:52px;display:inline-flex;align-items:center;gap:8px;color:#101814;font-size:16px;font-weight:500;transition:color 200ms,gap 200ms" style-hover="color:#146B4D;gap:12px">See how it works<span aria-hidden="true">→</span></a>
+        </div>
+        <p style="margin:24px 0 0;font-size:13.5px;line-height:1.5;color:#4E5852">Estimates only. Your dentist and insurer determine final treatment and costs.</p>
+      </sc-if>
+    </div>
+    <sc-if value="{{ heroCtaStacked }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:12px;max-width:540px">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px">
+          <a href="Sign%20In%20v2.dc.html?mode=create" style="height:52px;padding:0 26px;display:inline-flex;align-items:center;background:#146B4D;color:#fff;font-size:16px;font-weight:500;border-radius:10px" style-hover="background:#0F563D;color:#fff" style-active="transform:scale(.98)">Get started</a>
+          <a href="#how" style="height:52px;display:inline-flex;align-items:center;gap:8px;color:#101814;font-size:16px;font-weight:500" style-hover="color:#146B4D">See how it works<span aria-hidden="true">→</span></a>
+        </div>
+        <p style="margin:0;font-size:13px;line-height:1.5;color:#3A443F">Estimates only. Your dentist and insurer determine final treatment and costs.</p>
+      </div>
+    </sc-if>
+  </div>
+  <sc-if value="{{ showScrollCue }}" hint-placeholder-val="{{ true }}">
+    <a href="#idea" aria-label="Scroll to next section" style="position:absolute;left:50%;bottom:24px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;font-weight:500;letter-spacing:.14em;color:#3A443F;padding:8px" style-hover="color:#101814">SCROLL
+      <svg width="12" height="20" viewBox="0 0 12 20" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 1v17M1.5 13.5L6 18l4.5-4.5"></path></svg>
+    </a>
+  </sc-if>
+</section>
+
+<!-- 01 STATEMENT -->
+<section id="idea" style="scroll-margin-top:76px;background:#FFFFFF;padding:clamp(96px,12vw,168px) 0">
+  <div style="max-width:1320px;margin:0 auto;padding:0 clamp(20px,5vw,64px);display:grid;grid-template-columns:{{ grid }};column-gap:24px;row-gap:32px">
+    <div style="grid-column:{{ c.label }};font-size:13px;font-weight:500;letter-spacing:.06em;color:#66706A;padding-top:12px">01 — The idea</div>
+    <div data-reveal="" style="grid-column:{{ c.statement }}">
+      <p style="margin:0;font-size:clamp(32px,4vw,56px);line-height:1.1;font-weight:500;letter-spacing:-0.035em;text-wrap:pretty">Dental paperwork gives you numbers. <span style="color:#7C8680">ActionBridge helps you understand what they mean together.</span></p>
+    </div>
+    <div data-reveal="" style="grid-column:{{ c.statementBody }};border-top:1px solid rgba(16,24,20,.12);padding-top:32px;margin-top:{{ stmtGap }}">
+      <p style="margin:0;font-size:18px;line-height:1.65;color:#4E5852;max-width:520px;text-wrap:pretty">Bring the treatment information you know, an estimate, or your benefits information. ActionBridge organizes the important details before presenting estimated options.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 02 PRODUCT -->
+<section id="product" style="scroll-margin-top:76px;background:#F5F6F3;padding:clamp(96px,12vw,168px) 0;overflow:hidden">
+  <div style="max-width:1320px;margin:0 auto;padding:0 clamp(20px,5vw,64px);display:grid;grid-template-columns:{{ grid }};column-gap:24px;row-gap:56px;align-items:center">
+    <div data-reveal="" style="grid-column:{{ c.productText }};display:flex;flex-direction:column">
+      <div style="font-size:13px;font-weight:500;letter-spacing:.06em;color:#66706A">02 — The product</div>
+      <h2 style="margin:24px 0 0;font-size:clamp(36px,4.2vw,56px);line-height:1.04;font-weight:600;letter-spacing:-0.04em;text-wrap:balance">Everything important, in one place.</h2>
+      <p style="margin:24px 0 0;font-size:18px;line-height:1.65;color:#4E5852;max-width:440px;text-wrap:pretty">Review treatment details, benefits, estimated costs, timing, and the information behind your plan without jumping between documents.</p>
+      <div style="margin-top:40px;display:flex;flex-direction:column;max-width:440px;border-top:1px solid rgba(16,24,20,.12)">
+        <div style="display:flex;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid rgba(16,24,20,.12);font-size:15px"><span style="font-weight:500">Your plan</span><span style="color:#66706A">Estimated options by timing</span></div>
+        <div style="display:flex;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid rgba(16,24,20,.12);font-size:15px"><span style="font-weight:500">Review</span><span style="color:#66706A">Facts confirmed before calculating</span></div>
+        <div style="display:flex;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid rgba(16,24,20,.12);font-size:15px"><span style="font-weight:500">History</span><span style="color:#66706A">Saved plans to return to</span></div>
+      </div>
+    </div>
+    <div style="grid-column:{{ c.productMedia }}">
+      <div style="position:relative;width:100%;max-width:640px;margin:0 auto;aspect-ratio:1 / 1.04">
+        <div data-parallax="14" style="position:absolute;left:0;top:9%;width:37%;aspect-ratio:9 / 19.5;z-index:1">
+          <img src="assets/s2.jpg" alt="ActionBridge recording screen: Tell us about your treatment" style="display:block;width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:30px">
+        </div>
+        <div data-parallax="10" style="position:absolute;right:0;top:13%;width:37%;aspect-ratio:9 / 19.5;z-index:1">
+          <img src="assets/s3.jpg" alt="ActionBridge photo check screen flagging a blurry estimate photo" style="display:block;width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:30px">
+        </div>
+        <div style="position:absolute;left:26.5%;top:0;width:47%;aspect-ratio:9 / 19.5;z-index:2;border-radius:38px;box-shadow:0 40px 80px -24px rgba(16,24,20,.28),0 12px 24px -12px rgba(16,24,20,.18)">
+          <img src="assets/s5.jpg" alt="ActionBridge home screen: Let's make sense of your dental costs" style="display:block;width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:38px">
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 HOW IT WORKS -->
+<section id="how" style="scroll-margin-top:76px;background:#FFFFFF;padding:clamp(96px,12vw,168px) 0">
+  <div style="max-width:1320px;margin:0 auto;padding:0 clamp(20px,5vw,64px);display:grid;grid-template-columns:{{ grid }};column-gap:24px;row-gap:64px">
+    <div data-reveal="" style="grid-column:{{ c.howHead }};display:flex;flex-direction:column">
+      <div style="font-size:13px;font-weight:500;letter-spacing:.06em;color:#66706A">03 — How it works</div>
+      <h2 style="margin:24px 0 0;font-size:clamp(36px,4.2vw,56px);line-height:1.04;font-weight:600;letter-spacing:-0.04em;text-wrap:balance">Three steps from paperwork to a plan.</h2>
+    </div>
+    <ol data-reveal="" style="grid-column:1 / -1;list-style:none;margin:0;padding:0;display:grid;grid-template-columns:{{ stepCols }};border-top:1px solid #101814">
+      <li style="padding:{{ stepPadFirst }};border-left:0;display:flex;flex-direction:column">
+        <span style="font-size:clamp(56px,6vw,88px);line-height:1;font-weight:400;letter-spacing:-0.05em;color:#146B4D;font-variant-numeric:tabular-nums">01</span>
+        <h3 style="margin:40px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em">Bring what you have</h3>
+        <p style="margin:12px 0 0;font-size:17px;line-height:1.6;color:#4E5852;max-width:340px;text-wrap:pretty">Speak, type, upload an estimate, or photograph a document.</p>
+      </li>
+      <li style="padding:{{ stepPad }};border-left:{{ stepRule }};border-top:{{ stepRuleTop }};display:flex;flex-direction:column">
+        <span style="font-size:clamp(56px,6vw,88px);line-height:1;font-weight:400;letter-spacing:-0.05em;color:#146B4D;font-variant-numeric:tabular-nums">02</span>
+        <h3 style="margin:40px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em">Review the details</h3>
+        <p style="margin:12px 0 0;font-size:17px;line-height:1.6;color:#4E5852;max-width:340px;text-wrap:pretty">Check treatment information, benefits, and anything that still needs confirmation.</p>
+      </li>
+      <li style="padding:{{ stepPad }};border-left:{{ stepRule }};border-top:{{ stepRuleTop }};display:flex;flex-direction:column">
+        <span style="font-size:clamp(56px,6vw,88px);line-height:1;font-weight:400;letter-spacing:-0.05em;color:#146B4D;font-variant-numeric:tabular-nums">03</span>
+        <h3 style="margin:40px 0 0;font-size:24px;font-weight:600;letter-spacing:-0.025em">Understand your options</h3>
+        <p style="margin:12px 0 0;font-size:17px;line-height:1.6;color:#4E5852;max-width:340px;text-wrap:pretty">Compare estimated costs and timing before saving your plan.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- 04 INPUT -->
+<section style="background:#F5F6F3;padding:clamp(96px,12vw,168px) 0">
+  <div style="max-width:1320px;margin:0 auto;padding:0 clamp(20px,5vw,64px);display:grid;grid-template-columns:{{ grid }};column-gap:24px;row-gap:48px;align-items:start">
+    <div data-reveal="" style="grid-column:{{ c.inputText }};display:flex;flex-direction:column;position:{{ stickyPos }};top:140px">
+      <div style="font-size:13px;font-weight:500;letter-spacing:.06em;color:#66706A">04 — Getting started</div>
+      <h2 style="margin:24px 0 0;font-size:clamp(36px,4.2vw,56px);line-height:1.04;font-weight:600;letter-spacing:-0.04em;text-wrap:balance">Start with whatever you have.</h2>
+      <p style="margin:24px 0 0;font-size:18px;line-height:1.65;color:#4E5852;max-width:420px;text-wrap:pretty">Whether the details are in your head, on paper, or inside a PDF, there’s a simple place to begin.</p>
+    </div>
+    <div data-reveal="" style="grid-column:{{ c.inputList }}">
+      <div style="border-top:1px solid #101814">
+        <a href="Sign%20In%20v2.dc.html?mode=create" style="display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:center;gap:24px;padding:28px 8px;border-bottom:1px solid rgba(16,24,20,.12);color:#101814;transition:background 250ms,padding 250ms" style-hover="background:#FFFFFF;padding:28px 20px;color:#101814">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"></path></svg>
+          <span style="display:flex;flex-direction:column;gap:4px"><span style="font-size:clamp(22px,2.2vw,28px);font-weight:500;letter-spacing:-0.025em">Speak</span><span style="font-size:15px;color:#66706A">Describe your treatment in your own words</span></span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#146B4D" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+        </a>
+        <a href="Sign%20In%20v2.dc.html?mode=create" style="display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:center;gap:24px;padding:28px 8px;border-bottom:1px solid rgba(16,24,20,.12);color:#101814;transition:background 250ms,padding 250ms" style-hover="background:#FFFFFF;padding:28px 20px;color:#101814">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M12 17v-6M9.5 13.5L12 11l2.5 2.5"></path></svg>
+          <span style="display:flex;flex-direction:column;gap:4px"><span style="font-size:clamp(22px,2.2vw,28px);font-weight:500;letter-spacing:-0.025em">Upload document</span><span style="font-size:15px;color:#66706A">An estimate, statement, or benefits PDF</span></span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#146B4D" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+        </a>
+        <a href="Sign%20In%20v2.dc.html?mode=create" style="display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:center;gap:24px;padding:28px 8px;border-bottom:1px solid rgba(16,24,20,.12);color:#101814;transition:background 250ms,padding 250ms" style-hover="background:#FFFFFF;padding:28px 20px;color:#101814">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.5-2h6l1.5 2h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z"></path><circle cx="12" cy="13" r="3.5"></circle></svg>
+          <span style="display:flex;flex-direction:column;gap:4px"><span style="font-size:clamp(22px,2.2vw,28px);font-weight:500;letter-spacing:-0.025em">Take photo</span><span style="font-size:15px;color:#66706A">Capture a paper estimate or statement</span></span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#146B4D" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+        </a>
+        <a href="Sign%20In%20v2.dc.html?mode=create" style="display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:center;gap:24px;padding:28px 8px;border-bottom:1px solid rgba(16,24,20,.12);color:#101814;transition:background 250ms,padding 250ms" style-hover="background:#FFFFFF;padding:28px 20px;color:#101814">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h7"></path><path d="M18 15v6"></path></svg>
+          <span style="display:flex;flex-direction:column;gap:4px"><span style="font-size:clamp(22px,2.2vw,28px);font-weight:500;letter-spacing:-0.025em">Type details</span><span style="font-size:15px;color:#66706A">Enter what you already know</span></span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#146B4D" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+        </a>
+      </div>
+      <p style="margin:28px 0 0;padding:0 8px;font-size:15px;line-height:1.6;color:#66706A;max-width:520px">Documents are for estimates, statements, and benefits information—not photos of your teeth.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 05 NUMBERS -->
+<section style="background:#FFFFFF;padding:clamp(96px,12vw,168px) 0;overflow:hidden">
+  <div style="max-width:1320px;margin:0 auto;padding:0 clamp(20px,5vw,64px);display:grid;grid-template-columns:{{ grid }};column-gap:24px;row-gap:64px;align-items:center">
+    <div style="grid-column:{{ c.numbersMedia }};order:{{ numbersMediaOrder }};display:flex;flex-direction:column;align-items:center;gap:20px">
+      <div data-parallax="10" style="width:min(100%,360px);aspect-ratio:9 / 19.5;border-radius:40px;box-shadow:0 40px 80px -24px rgba(16,24,20,.28),0 12px 24px -12px rgba(16,24,20,.18)">
+        <img src="assets/s1.jpg" alt="ActionBridge screen calculating estimated costs step by step" style="display:block;width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:40px">
+      </div>
+      <span style="font-size:13px;color:#66706A">Sample data · Estimates only</span>
+    </div>
+    <div data-reveal="" style="grid-column:{{ c.numbersText }};display:flex;flex-direction:column">
+      <div style="font-size:13px;font-weight:500;letter-spacing:.06em;color:#66706A">05 — Your estimate</div>
+      <h2 style="margin:24px 0 0;font-size:clamp(36px,4.2vw,56px);line-height:1.04;font-weight:600;letter-spacing:-0.04em;text-wrap:balance">See the numbers with the context behind them.</h2>
+      <p style="margin:24px 0 0;font-size:18px;line-height:1.65;color:#4E5852;max-width:480px;text-wrap:pretty">Each estimate is shown alongside the benefits, timing, and sources that shaped it—so a number never stands on its own.</p>
+      <dl style="margin:48px 0 0;display:grid;grid-template-columns:{{ termCols }};column-gap:32px">
+        <div style="padding:20px 0;border-top:1px solid rgba(16,24,20,.12)"><dt style="font-size:16px;font-weight:500">Estimated out-of-pocket</dt><dd style="margin:6px 0 0;font-size:15px;line-height:1.5;color:#66706A">What you may pay for each option</dd></div>
+        <div style="padding:20px 0;border-top:1px solid rgba(16,24,20,.12)"><dt style="font-size:16px;font-weight:500">Plan contribution</dt><dd style="margin:6px 0 0;font-size:15px;line-height:1.5;color:#66706A">What your benefits may cover</dd></div>
+        <div style="padding:20px 0;border-top:1px solid rgba(16,24,20,.12)"><dt style="font-size:16px;font-weight:500">Benefits remaining</dt><dd style="margin:6px 0 0;font-size:15px;line-height:1.5;color:#66706A">What’s left of your annual maximum</dd></div>
+        <div style="padding:20px 0;border-top:1px solid rgba(16,24,20,.12)"><dt style="font-size:16px;font-weight:500">Treatment timing</dt><dd style="margin:6px 0 0;font-size:15px;line-height:1.5;color:#66706A">How plan-year timing changes costs</dd></div>
+        <div style="padding:20px 0;border-top:1px solid rgba(16,24,20,.12)"><dt style="font-size:16px;font-weight:500">Sources</dt><dd style="margin:6px 0 0;font-size:15px;line-height:1.5;color:#66706A">Where each important figure came from</dd></div>
+        <div style="padding:20px 0;border-top:1px solid rgba(16,24,20,.12)"><dt style="font-size:16px;font-weight:500">What could change</dt><dd style="margin:6px 0 0;font-size:15px;line-height:1.5;color:#66706A">Open questions that may move the estimate</dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<!-- 06 TRANSPARENCY -->
+<section style="background:#F5F6F3;padding:clamp(96px,12vw,168px) 0">
+  <div style="max-width:1320px;margin:0 auto;padding:0 clamp(20px,5vw,64px);display:grid;grid-template-columns:{{ grid }};column-gap:24px;row-gap:64px">
+    <div data-reveal="" style="grid-column:{{ c.transHead }};display:flex;flex-direction:column">
+      <div style="font-size:13px;font-weight:500;letter-spacing:.06em;color:#66706A">06 — Transparency</div>
+      <h2 style="margin:24px 0 0;font-size:clamp(36px,4.2vw,56px);line-height:1.04;font-weight:600;letter-spacing:-0.04em;text-wrap:balance">Know where the information came from.</h2>
+    </div>
+    <div data-reveal="" style="grid-column:1 / -1;border-top:1px solid #101814">
+      <div style="display:grid;grid-template-columns:{{ grid }};column-gap:24px;row-gap:12px;padding:40px 0;border-bottom:1px solid rgba(16,24,20,.12);align-items:baseline">
+        <div style="grid-column:{{ c.rowLabel }};display:flex;align-items:center;gap:14px;font-size:13px;font-weight:600;letter-spacing:.1em"><span style="width:10px;height:10px;background:#146B4D;flex:none"></span>FROM YOUR DOCUMENTS</div>
+        <p style="grid-column:{{ c.rowText }};margin:0;font-size:clamp(20px,1.8vw,24px);line-height:1.4;letter-spacing:-0.015em;text-wrap:pretty">Information extracted from the documents you provide.</p>
+        <span style="grid-column:{{ c.rowEx }};font-size:14px;color:#66706A;justify-self:{{ exAlign }}">e.g. Annual maximum — Benefits, p.2</span>
+      </div>
+      <div style="display:grid;grid-template-columns:{{ grid }};column-gap:24px;row-gap:12px;padding:40px 0;border-bottom:1px solid rgba(16,24,20,.12);align-items:baseline">
+        <div style="grid-column:{{ c.rowLabel }};display:flex;align-items:center;gap:14px;font-size:13px;font-weight:600;letter-spacing:.1em"><span style="width:10px;height:10px;background:#101814;flex:none"></span>PROVIDED BY YOU</div>
+        <p style="grid-column:{{ c.rowText }};margin:0;font-size:clamp(20px,1.8vw,24px);line-height:1.4;letter-spacing:-0.015em;text-wrap:pretty">Details you entered or confirmed yourself.</p>
+        <span style="grid-column:{{ c.rowEx }};font-size:14px;color:#66706A;justify-self:{{ exAlign }}">e.g. Deductible already met</span>
+      </div>
+      <div style="display:grid;grid-template-columns:{{ grid }};column-gap:24px;row-gap:12px;padding:40px 0;border-bottom:1px solid rgba(16,24,20,.12);align-items:baseline">
+        <div style="grid-column:{{ c.rowLabel }};display:flex;align-items:center;gap:14px;font-size:13px;font-weight:600;letter-spacing:.1em"><span style="width:10px;height:10px;border:1.5px dashed #66706A;flex:none"></span>ASSUMED FOR COMPARISON</div>
+        <p style="grid-column:{{ c.rowText }};margin:0;font-size:clamp(20px,1.8vw,24px);line-height:1.4;letter-spacing:-0.015em;text-wrap:pretty">Information used only to help model an estimated scenario.</p>
+        <span style="grid-column:{{ c.rowEx }};font-size:14px;color:#66706A;justify-self:{{ exAlign }}">e.g. Next year’s fee unchanged</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 07 PRIVACY -->
+<section id="privacy" style="scroll-margin-top:76px;background:#101814;color:#FFFFFF;padding:clamp(96px,12vw,168px) 0">
+  <div style="max-width:1320px;margin:0 auto;padding:0 clamp(20px,5vw,64px);display:grid;grid-template-columns:{{ grid }};column-gap:24px;row-gap:40px;align-items:end">
+    <div data-reveal="" style="grid-column:{{ c.privHead }};display:flex;flex-direction:column">
+      <div style="font-size:13px;font-weight:500;letter-spacing:.06em;color:rgba(255,255,255,.6)">07 — Privacy</div>
+      <h2 style="margin:24px 0 0;font-size:clamp(36px,4.6vw,64px);line-height:1.02;font-weight:600;letter-spacing:-0.045em;color:#FFFFFF;text-wrap:balance">Your information stays under your control.</h2>
+    </div>
+    <p data-reveal="" style="grid-column:{{ c.privText }};margin:0;font-size:18px;line-height:1.65;color:rgba(255,255,255,.72);text-wrap:pretty">Your documents and answers help build your plan. ActionBridge does not automatically send them to your dentist, insurer, or employer.</p>
+    <div data-reveal="" style="grid-column:1 / -1;margin-top:{{ privGap }};display:grid;grid-template-columns:{{ stepCols }};border-top:1px solid rgba(255,255,255,.16)">
+      <div style="padding:{{ privPadFirst }};border-left:0;display:flex;flex-direction:column;gap:20px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5FD39A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"></path></svg>
+        <span style="font-size:clamp(20px,1.8vw,24px);font-weight:500;letter-spacing:-0.02em;line-height:1.3">You review before calculation</span>
+      </div>
+      <div style="padding:{{ privPad }};border-left:{{ privRule }};border-top:{{ privRuleTop }};display:flex;flex-direction:column;gap:20px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5FD39A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"></path></svg>
+        <span style="font-size:clamp(20px,1.8vw,24px);font-weight:500;letter-spacing:-0.02em;line-height:1.3">You decide what gets saved</span>
+      </div>
+      <div style="padding:{{ privPad }};border-left:{{ privRule }};border-top:{{ privRuleTop }};display:flex;flex-direction:column;gap:20px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5FD39A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"></path></svg>
+        <span style="font-size:clamp(20px,1.8vw,24px);font-weight:500;letter-spacing:-0.02em;line-height:1.3">You control what gets shared</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 08 FAQ -->
+<section id="faq" style="scroll-margin-top:76px;background:#F5F6F3;padding:clamp(96px,12vw,168px) 0 0">
+  <div style="max-width:1320px;margin:0 auto;padding:0 clamp(20px,5vw,64px);display:grid;grid-template-columns:{{ grid }};column-gap:24px;row-gap:40px;align-items:start">
+    <div data-reveal="" style="grid-column:{{ c.faqHead }};display:flex;flex-direction:column">
+      <div style="font-size:13px;font-weight:500;letter-spacing:.06em;color:#66706A">08 — Questions</div>
+      <h2 style="margin:24px 0 0;font-size:clamp(32px,3.4vw,44px);line-height:1.08;font-weight:600;letter-spacing:-0.035em">Good to know.</h2>
+    </div>
+    <div data-reveal="" style="grid-column:{{ c.faqList }};border-top:1px solid #101814">
+      <sc-for list="{{ faqs }}" as="f" hint-placeholder-count="4">
+        <div style="border-bottom:1px solid rgba(16,24,20,.12)">
+          <button type="button" onClick="{{ f.toggle }}" aria-expanded="{{ f.open }}" style="width:100%;min-height:76px;display:flex;justify-content:space-between;align-items:center;gap:24px;padding:20px 0;background:none;border:0;cursor:pointer;text-align:left;font-family:inherit;font-size:clamp(18px,1.6vw,21px);font-weight:500;letter-spacing:-0.015em;color:#101814" style-hover="color:#146B4D">
+            <span>{{ f.q }}</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="flex:none"><path d="{{ f.icon }}"></path></svg>
+          </button>
+          <sc-if value="{{ f.open }}" hint-placeholder-val="{{ false }}">
+            <p style="margin:0;padding:0 48px 28px 0;font-size:17px;line-height:1.65;color:#4E5852;max-width:640px;text-wrap:pretty">{{ f.a }}</p>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<!-- CLOSING -->
+<section style="background:#F5F6F3;padding:clamp(120px,16vw,224px) 0 clamp(96px,12vw,160px)">
+  <div data-reveal="" style="max-width:1320px;margin:0 auto;padding:0 clamp(20px,5vw,64px);display:flex;flex-direction:column">
+    <h2 style="margin:0;font-size:clamp(44px,7.4vw,108px);line-height:.98;font-weight:600;letter-spacing:-0.05em;max-width:1120px;text-wrap:balance">Dental costs are complicated. <span style="color:#146B4D">Your next step shouldn’t be.</span></h2>
+    <div style="margin-top:56px;padding-top:32px;border-top:1px solid rgba(16,24,20,.12);display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:24px 48px">
+      <p style="margin:0;font-size:clamp(18px,1.6vw,21px);line-height:1.5;color:#4E5852">Bring what you know and build a clearer plan.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:12px">
+        <a href="Sign%20In%20v2.dc.html?mode=create" style="height:52px;padding:0 28px;display:inline-flex;align-items:center;background:#146B4D;color:#fff;font-size:16px;font-weight:500;border-radius:10px;transition:background 200ms,transform 150ms" style-hover="background:#0F563D;color:#fff" style-active="transform:scale(.98)">Get started</a>
+        <a href="Sign%20In%20v2.dc.html" style="height:52px;padding:0 24px;display:inline-flex;align-items:center;color:#101814;font-size:16px;font-weight:500;border-radius:10px;border:1px solid rgba(16,24,20,.24);transition:border-color 200ms,background 200ms" style-hover="border-color:#101814;color:#101814" style-active="transform:scale(.98)">Sign in</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer style="background:#F5F6F3">
+  <div style="max-width:1320px;margin:0 auto;padding:0 clamp(20px,5vw,64px) 40px">
+    <div style="border-top:1px solid #101814;padding-top:40px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:32px 64px">
+      <div style="display:flex;flex-direction:column;gap:12px;max-width:360px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-size:17px;font-weight:600;letter-spacing:-0.02em">ActionBridge</span>
+          <span style="width:1px;height:15px;background:rgba(16,24,20,.24)"></span>
+          <span style="font-size:17px;color:#66706A">Dental</span>
+        </div>
+        <p style="margin:0;font-size:15px;line-height:1.6;color:#66706A">Clearer dental cost planning, built around the information you already have.</p>
+      </div>
+      <nav aria-label="Footer" style="display:flex;flex-wrap:wrap;gap:4px 32px;align-items:flex-start">
+        <a href="#how" style="font-size:15px;color:#101814;padding:6px 0" style-hover="color:#146B4D">How it works</a>
+        <a href="#privacy" style="font-size:15px;color:#101814;padding:6px 0" style-hover="color:#146B4D">Privacy</a>
+        <a href="#" style="font-size:15px;color:#101814;padding:6px 0" style-hover="color:#146B4D">Terms</a>
+        <a href="#faq" style="font-size:15px;color:#101814;padding:6px 0" style-hover="color:#146B4D">Help</a>
+        <a href="Sign%20In%20v2.dc.html" style="font-size:15px;color:#101814;padding:6px 0" style-hover="color:#146B4D">Sign in</a>
+      </nav>
+    </div>
+    <div style="margin-top:64px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;font-size:13px;color:#66706A">
+      <span>© 2026 ActionBridge</span>
+      <span>Estimates only. Your dentist and insurer determine final treatment and costs.</span>
+    </div>
+  </div>
+</footer>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { w: typeof window !== 'undefined' ? window.innerWidth : 1440, menu: false, scrolled: false, faq: 0 };
+  componentDidMount() {
+    this.reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.onR = () => this.forceUpdate();
+    this.poll = setInterval(this.onR, 250); setTimeout(() => clearInterval(this.poll), 3000);
+    this.onR();
+    this.onS = () => {
+      const s = window.scrollY > 24;
+      if (s !== this.state.scrolled) this.setState({ scrolled: s });
+      if (!this.reduce && !this.raf) this.raf = requestAnimationFrame(() => { this.raf = 0; this.parallax(); });
+    };
+    window.addEventListener('resize', this.onR);
+    window.addEventListener('load', this.onR);
+    setTimeout(this.onR, 0);
+    if ('ResizeObserver' in window) { this.ro = new ResizeObserver(() => { this.onR(); }); this.ro.observe(document.documentElement); }
+    window.addEventListener('scroll', this.onS, { passive: true });
+    setTimeout(() => { this.setupReveal(); this.parallax(); }, 60);
+  }
+  componentWillUnmount() {
+    clearInterval(this.poll);
+    window.removeEventListener('resize', this.onR);
+    window.removeEventListener('scroll', this.onS);
+    window.removeEventListener('load', this.onR);
+    this.ro && this.ro.disconnect();
+    this.io && this.io.disconnect();
+  }
+  parallax() {
+    if (this.reduce) return;
+    const vh = window.innerHeight;
+    document.querySelectorAll('[data-parallax]').forEach(el => {
+      const amt = +el.dataset.parallax || 8;
+      const r = el.parentElement.getBoundingClientRect();
+      const p = Math.max(-1, Math.min(1, ((r.top + r.height / 2) - vh / 2) / vh));
+      el.style.transform = 'translateY(' + (p * amt).toFixed(1) + 'px)';
+    });
+  }
+  setupReveal() {
+    const hero = document.querySelector('[data-hero-img]');
+    if (hero && !this.reduce) {
+      hero.style.transition = 'none';
+      hero.style.opacity = '0'; hero.style.transform = 'scale(1.025)';
+      void hero.offsetWidth;
+      hero.style.transition = 'opacity 500ms ease, transform 900ms cubic-bezier(.2,.7,.2,1)';
+      hero.style.opacity = '1'; hero.style.transform = 'none';
+      setTimeout(() => { hero.style.opacity = '1'; hero.style.transform = 'none'; }, 1000);
+    }
+    if (this.reduce || !('IntersectionObserver' in window)) return;
+    this.io = new IntersectionObserver(es => es.forEach(e => {
+      if (e.isIntersecting) { e.target.style.opacity = '1'; e.target.style.transform = 'none'; this.io.unobserve(e.target); }
+    }), { rootMargin: '0px 0px -8% 0px' });
+    document.querySelectorAll('[data-reveal]').forEach(el => {
+      if (el.getBoundingClientRect().top < window.innerHeight) return;
+      el.style.opacity = '0'; el.style.transform = 'translateY(16px)';
+      el.style.transition = 'opacity 450ms ease, transform 450ms cubic-bezier(.2,.7,.2,1)';
+      this.io.observe(el);
+    });
+  }
+  renderVals() {
+    const w = typeof window !== 'undefined' ? window.innerWidth : 1440, desk = w >= 1024, wide = w >= 1180, mid = w >= 720;
+    const all = '1 / -1';
+    const c = desk ? {
+      label: '1 / 4', statement: '4 / 13', statementBody: '7 / 13',
+      productText: '1 / 6', productMedia: '7 / 13',
+      howHead: '1 / 8',
+      inputText: '1 / 6', inputList: '7 / 13',
+      numbersMedia: '1 / 6', numbersText: '7 / 13',
+      transHead: '1 / 8', rowLabel: '1 / 5', rowText: '5 / 10', rowEx: '10 / 13',
+      privHead: '1 / 8', privText: '9 / 13',
+      faqHead: '1 / 5', faqList: '5 / 13'
+    } : new Proxy({}, { get: () => all });
+    const FAQ = [
+      ['Is ActionBridge a dentist or an insurer?', 'No. ActionBridge doesn’t provide dental care or insurance coverage. It helps you understand the estimate and benefits information you already have.'],
+      ['Are the numbers guaranteed?', 'No. Every figure is an estimate. Your dentist and insurer determine final treatment and costs.'],
+      ['What should I bring?', 'A treatment estimate, a benefits summary or statement, or simply what you remember about your treatment. You can add more later.'],
+      ['Can I come back to a plan later?', 'Yes. Save a plan, return to it, and review its history whenever you sign in.']
+    ];
+    const navFull = w >= 900, full = w >= 1180, solid = this.state.scrolled || this.state.menu;
+    return {
+      navFull, navCompact: !navFull, menuOpen: this.state.menu, showMenu: !navFull && this.state.menu,
+      menuLabel: this.state.menu ? 'Close menu' : 'Open menu',
+      menuIconPath: this.state.menu ? 'M6 6l12 12M18 6L6 18' : 'M4 8h16M4 16h16',
+      toggleMenu: () => this.setState(s => ({ menu: !s.menu })),
+      closeMenu: () => this.setState({ menu: false }),
+      headerRule: solid ? 'rgba(16,24,20,.12)' : 'transparent',
+      headerBg: solid ? 'rgba(245,246,243,.97)' : 'transparent',
+      grid: desk ? 'repeat(12,minmax(0,1fr))' : 'minmax(0,1fr)',
+      c,
+      heroH: full ? '100svh' : '94svh',
+      heroMin: full ? '640px' : '720px',
+      heroImgTop: full ? '0' : (mid ? '38%' : '40%'),
+      heroImgPos: full ? '0% 58%' : '32% 50%',
+      heroOverlay: full
+        ? 'linear-gradient(180deg, rgba(243,246,247,.55) 0px, rgba(243,246,247,0) 140px), linear-gradient(90deg, rgba(243,246,247,.86) 0%, rgba(243,246,247,.62) 30%, rgba(243,246,247,.26) 50%, rgba(243,246,247,0) 65%)'
+        : 'linear-gradient(180deg, #EDF3F5 0%, #EDF3F5 ' + (mid ? 38 : 40) + '%, rgba(237,243,245,0) ' + (mid ? 48 : 50) + '%), linear-gradient(0deg, rgba(245,246,243,.94) 0%, rgba(245,246,243,.7) 14%, rgba(245,246,243,0) 30%)',
+      heroJustify: full ? 'center' : 'space-between',
+      heroPad: full ? '124px 24px 64px max(clamp(20px,5vw,64px), calc((100vw - 1320px) / 2 + clamp(20px,5vw,64px)))' : (mid ? '112px 24px 32px max(clamp(20px,5vw,64px), calc((100vw - 1320px) / 2 + clamp(20px,5vw,64px)))' : '100px 20px 24px'),
+      heroTextMax: full ? 'min(540px, 42vw)' : '540px',
+      heroCtaInline: full, heroCtaStacked: !full, showScrollCue: full,
+      stmtGap: desk ? '24px' : '8px',
+      stepCols: desk ? 'repeat(3,minmax(0,1fr))' : 'minmax(0,1fr)',
+      stepPad: desk ? '40px 32px 0 32px' : '40px 0',
+      stepPadFirst: desk ? '40px 32px 0 0' : '40px 0', stepRule: desk ? '1px solid rgba(16,24,20,.12)' : '0',
+      stepRuleTop: desk ? '0' : '1px solid rgba(16,24,20,.12)',
+      privPad: desk ? '40px 32px 0' : '32px 0',
+      privPadFirst: desk ? '40px 32px 0 0' : '32px 0', privRule: desk ? '1px solid rgba(255,255,255,.16)' : '0',
+      privRuleTop: desk ? '0' : '1px solid rgba(255,255,255,.16)',
+      privGap: desk ? '56px' : '24px',
+      stickyPos: desk ? 'sticky' : 'static',
+      numbersMediaOrder: desk ? 0 : 1,
+      termCols: mid ? 'repeat(2,minmax(0,1fr))' : 'minmax(0,1fr)',
+      exAlign: desk ? 'end' : 'start',
+      faqs: FAQ.map(([q, a], i) => ({ q, a, open: this.state.faq === i,
+        icon: this.state.faq === i ? 'M5 12h14' : 'M12 5v14M5 12h14',
+        toggle: () => this.setState(s => ({ faq: s.faq === i ? -1 : i })) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -15,7 +15,7 @@ copy .env.example .env.local   # then fill in the three public values (see below
 npm.cmd run dev
 ```
 
-Open **http://127.0.0.1:5173/** and sign in with an account your team admin created (`infra/scripts/create-demo-user.sh`). A first sign-in asks for a new password.
+Open **http://127.0.0.1:5173/**, choose **Sign in**, and sign in with an account your team admin created (`infra/scripts/create-demo-user.sh`). A first sign-in asks for a new password.
 
 ### Settings (public, not secrets)
 
@@ -31,7 +31,7 @@ The API only accepts browser calls from the origins in the stack's `WebOrigins` 
 
 ## Journey
 
-Sign in → Home → **composer** (speak, type, attach up to three pages or take a photo — all as a draft) → **Analyse** once → assistant: "Here's what I understood" (each item quotes the words or document it came from) and grouped questions with "I don't know" → facts review (every value labeled with its source) → options (server results) → details → review and save (one idempotency key per Save, safe to retry) → My plan and Activity (server ledger). "Try a sample case" and "Enter details step by step" are also available.
+Landing page at `/` for signed-out visitors → **Sign in** (`/sign-in`; returns you to the page you asked for) → Home → **composer** (speak, type, attach up to three pages or take a photo — all as a draft) → **Analyse** once → assistant: "Here's what I understood" (each item quotes the words or document it came from) and grouped questions with "I don't know" → facts review (every value labeled with its source) → options (server results) → details → review and save (one idempotency key per Save, safe to retry) → My plan and Activity (server ledger). "Try a sample case" and "Enter details step by step" are also available.
 
 - **Voice:** the browser records WebM/Ogg (Opus) or MP4, uploads it to a private, time-limited S3 slot, and Amazon Transcribe returns words you can edit. The microphone is on only while recording.
 - **Documents and photos:** PDF, JPEG or PNG, one page each, up to 5 MB. Files go straight to private storage and are deleted after the server reads them.

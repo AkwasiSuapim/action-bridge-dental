@@ -405,7 +405,7 @@ export function ProfilePage() {
           icon={LogOut}
           onClick={() => {
             void signOut();
-            navigate('/login', { replace: true });
+            navigate('/sign-in', { replace: true });
           }}
         >
           Sign out
