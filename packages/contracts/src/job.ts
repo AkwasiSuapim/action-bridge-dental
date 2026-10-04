@@ -56,6 +56,9 @@ export const CreateJobResponseSchema = z.strictObject({
   jobId: IdSchema,
 });
 
+/** Body of `POST /v1/jobs/{jobId}/retry` and `/cancel`. */
+export const EmptyRequestSchema = z.strictObject({});
+
 /** `GET /v1/jobs/{jobId}`. Lease and queue internals are not part of the public contract. */
 export const AgentJobViewSchema = z.strictObject({
   jobId: IdSchema,

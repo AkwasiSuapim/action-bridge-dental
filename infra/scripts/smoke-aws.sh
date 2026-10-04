@@ -40,3 +40,9 @@ export SMOKE_BEARER_TOKEN SMOKE_OTHER_BEARER_TOKEN
 
 echo "Smoke testing $API (stack $STACK)"
 API_BASE_URL="$API" node "$(dirname "$0")/../../backend/scripts/smoke.mjs"
+
+if [ "${SMOKE_AGENT:-1}" = "1" ]; then
+  echo
+  echo "Agent smoke test (real Bedrock calls; set SMOKE_AGENT=0 to skip)"
+  API_BASE_URL="$API" node "$(dirname "$0")/../../backend/scripts/smoke-agent.mjs"
+fi

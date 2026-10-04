@@ -7,6 +7,9 @@ const EnvSchema = z.object({
   TABLE_NAME: z.string().min(1).optional(),
   /** Demo data expires via DynamoDB TTL (eventual deletion, not an immediate-delete guarantee). */
   RETENTION_DAYS: z.coerce.number().int().min(1).max(90).optional(),
+  JOB_QUEUE_URL: z.string().url().optional(),
+  /** Bedrock model or inference profile ID, e.g. us.anthropic.claude-haiku-4-5-20251001-v1:0. */
+  BEDROCK_MODEL_ID: z.string().min(1).optional(),
 });
 
 export interface AppConfig {
@@ -14,6 +17,8 @@ export interface AppConfig {
   authMode: AuthMode;
   tableName: string | null;
   retentionDays: number | null;
+  jobQueueUrl: string | null;
+  bedrockModelId: string | null;
 }
 
 /** Fails closed: a missing or unknown setting is a configuration error, never a silent default. */
@@ -24,10 +29,16 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     authMode: parsed.AUTH_MODE,
     tableName: parsed.TABLE_NAME ?? null,
     retentionDays: parsed.RETENTION_DAYS ?? null,
+    jobQueueUrl: parsed.JOB_QUEUE_URL ?? null,
+    bedrockModelId: parsed.BEDROCK_MODEL_ID ?? null,
   };
 }
 
-export function requireTableName(config: AppConfig): string {
-  if (config.tableName === null) throw new Error('TABLE_NAME is not configured');
-  return config.tableName;
+function required<T>(value: T | null, name: string): T {
+  if (value === null) throw new Error(`${name} is not configured`);
+  return value;
 }
+
+export const requireTableName = (config: AppConfig) => required(config.tableName, 'TABLE_NAME');
+export const requireJobQueueUrl = (config: AppConfig) => required(config.jobQueueUrl, 'JOB_QUEUE_URL');
+export const requireBedrockModelId = (config: AppConfig) => required(config.bedrockModelId, 'BEDROCK_MODEL_ID');

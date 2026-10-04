@@ -11,7 +11,9 @@
   "dependencies": {
     "@actionbridge/benefits-engine": "0.1.0",
     "@actionbridge/contracts": "0.1.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1146.0",
     "@aws-sdk/client-dynamodb": "^3.1146.0",
+    "@aws-sdk/client-sqs": "^3.1146.0",
     "@aws-sdk/lib-dynamodb": "^3.1146.0",
     "zod": "^4.6.5"
   },
