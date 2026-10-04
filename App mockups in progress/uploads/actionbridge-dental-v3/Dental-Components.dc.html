@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dental components and states</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1640px; box-sizing: border-box; padding: 56px; background: #EEF2EF; color: #101512; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-variant-numeric: tabular-nums; display: flex; flex-direction: column; gap: 40px">
+  <header style="display: flex; flex-direction: column; gap: 8px">
+    <span style="font-size: 13px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: #0E6B4D">ActionBridge Dental · reusable components</span>
+    <h1 style="margin: 0; font-size: 40px; line-height: 46px; font-weight: 700; letter-spacing: -1px">Components and states</h1>
+    <p style="margin: 0; max-width: 920px; font-size: 17px; line-height: 26px; color: #3F4A44">Every block the prototype uses, with its states. Tokens: ink #07110D, surface #101C17, emerald #31E981, paper #F5F7F2, white #FFFFFF, deep green #0E6B4D, text #101512 / #F4F8F5. Amber and red appear only for caution and errors. Plus Jakarta Sans, Lucide-style outline icons, 4 px rhythm, 16–24 px radii, 48–56 px primary actions, 44 px minimum targets.</p>
+  </header>
+
+  <!-- Row 1: source labels, statuses, buttons -->
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px">
+    <section style="padding: 24px; border-radius: 24px; background: #FFFFFF; display: flex; flex-direction: column; gap: 14px">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700">Source labels</h2>
+      <p style="margin: 0; font-size: 14px; line-height: 20px; color: #3F4A44">Every fact and every amount carries one. Icon + text, never colour alone.</p>
+      <sc-for list="{{badges}}" as="b" hint-placeholder-count="5">
+        <div style="display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1px solid #EEF2EF">
+          <span style="align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: {{b.bg}}; color: {{b.fg}}; border: 1px {{b.dash}} {{b.bd}}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{b.icon}}"></path></svg>{{b.text}}</span>
+          <span style="font-size: 14px; line-height: 20px; color: #3F4A44">{{b.use}}</span>
+        </div>
+      </sc-for>
+    </section>
+    <section style="padding: 24px; border-radius: 24px; background: #FFFFFF; display: flex; flex-direction: column; gap: 14px">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700">Case status chips</h2>
+      <p style="margin: 0; font-size: 14px; line-height: 20px; color: #3F4A44">Used in Activity, My plan and the Home “Continue your plan” card. Tapping a case resumes it.</p>
+      <sc-for list="{{statuses}}" as="s" hint-placeholder-count="5">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid #EEF2EF">
+          <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: {{s.bg}}; color: {{s.fg}}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{s.icon}}"></path></svg>{{s.text}}</span>
+          <span style="font-size: 13px; color: #5C6861; text-align: right">{{s.goes}}</span>
+        </div>
+      </sc-for>
+    </section>
+    <section style="padding: 24px; border-radius: 24px; background: #FFFFFF; display: flex; flex-direction: column; gap: 14px">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700">Buttons</h2>
+      <div style="padding: 16px; border-radius: 18px; background: #07110D; display: flex; flex-direction: column; gap: 10px">
+        <span style="min-height: 56px; display: flex; align-items: center; justify-content: center; border-radius: 16px; background: #31E981; color: #07110D; font-size: 16px; font-weight: 700">Primary on dark</span>
+        <span style="min-height: 52px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; border: 1.5px solid rgba(244,248,245,0.28); border-radius: 16px; color: #F4F8F5; font-size: 16px; font-weight: 600">Secondary on dark</span>
+        <span style="min-height: 44px; display: flex; align-items: center; justify-content: center; color: #31E981; font-size: 15px; font-weight: 600">Text action</span>
+      </div>
+      <div style="padding: 16px; border-radius: 18px; background: #F5F7F2; display: flex; flex-direction: column; gap: 10px">
+        <span style="min-height: 56px; display: flex; align-items: center; justify-content: center; border-radius: 16px; background: #0E6B4D; color: #FFFFFF; font-size: 16px; font-weight: 700">Primary on light</span>
+        <span style="min-height: 52px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; border: 1.5px solid #0E6B4D; border-radius: 16px; background: #FFFFFF; color: #0E6B4D; font-size: 16px; font-weight: 600">Secondary on light</span>
+        <span style="font-size: 13px; color: #5C6861; text-align: center">Tick the box above to save.</span>
+        <button disabled="{{true}}" style="min-height: 56px; border: 0; border-radius: 16px; background: #0E6B4D; color: #FFFFFF; font: inherit; font-size: 16px; font-weight: 700; opacity: 0.45">Disabled, with its reason above</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- Generative UI blocks -->
+  <section style="display: flex; flex-direction: column; gap: 16px">
+    <div style="display: flex; flex-direction: column; gap: 6px">
+      <h2 style="margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.4px">Adaptive question blocks</h2>
+      <p style="margin: 0; max-width: 1000px; font-size: 15px; line-height: 22px; color: #3F4A44">The agent asks only for what's missing, choosing one block per question. Each block has a “Why we ask” line and, where it helps, “I don't know”. The header says “Question 2 of 3” only when the remaining count is certain; otherwise “A quick detail”. Every block also accepts a spoken answer, confirmed before use. Confirming information is separate from consenting to save.</p>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; align-items: start">
+
+      <div style="padding: 20px; border-radius: 22px; background: #F5F7F2; border: 1px solid #D8E7DE; display: flex; flex-direction: column; gap: 12px">
+        <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #5C6861">1 · Coverage status</span>
+        <span style="font-size: 13px; font-weight: 700; color: #3F4A44">A quick detail</span>
+        <h3 style="margin: 0; font-size: 19px; line-height: 25px; font-weight: 700">How will you pay for this treatment?</h3>
+        <p style="margin: 0; font-size: 13px; line-height: 19px; color: #3F4A44"><strong style="font-weight: 600">Why we ask:</strong> with insurance we use your plan's rules; without it we use your dentist's cash price.</p>
+        <sc-for list="{{coverage}}" as="o" hint-placeholder-count="3">
+          <span style="display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 16px; background: #FFFFFF; box-shadow: {{o.ring}}"><span style="width: 20px; height: 20px; border-radius: 50%; border: 2px solid {{o.radio}}; display: flex; align-items: center; justify-content: center; box-sizing: border-box"><span style="width: 9px; height: 9px; border-radius: 50%; background: {{o.dot}}"></span></span><span style="font-size: 15px; font-weight: 600">{{o.label}}</span></span>
+        </sc-for>
+      </div>
+
+      <div style="padding: 20px; border-radius: 22px; background: #F5F7F2; border: 1px solid #D8E7DE; display: flex; flex-direction: column; gap: 12px">
+        <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #5C6861">2 · Network</span>
+        <span style="font-size: 13px; font-weight: 700; color: #3F4A44">Question 1 of 2</span>
+        <h3 style="margin: 0; font-size: 19px; line-height: 25px; font-weight: 700">Is your dentist in your plan's network?</h3>
+        <p style="margin: 0; font-size: 13px; line-height: 19px; color: #3F4A44"><strong style="font-weight: 600">Why we ask:</strong> in-network dentists charge your plan's allowed amount.</p>
+        <sc-for list="{{network}}" as="o" hint-placeholder-count="3">
+          <span style="display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 16px; background: #FFFFFF; box-shadow: {{o.ring}}"><span style="width: 20px; height: 20px; border-radius: 50%; border: 2px solid {{o.radio}}; display: flex; align-items: center; justify-content: center; box-sizing: border-box"><span style="width: 9px; height: 9px; border-radius: 50%; background: {{o.dot}}"></span></span><span style="font-size: 15px; font-weight: 600">{{o.label}}</span></span>
+        </sc-for>
+        <span style="font-size: 12px; color: #5C6861">“Not sure” compares as in network and adds a Needs confirmation item.</span>
+      </div>
+
+      <div style="padding: 20px; border-radius: 22px; background: #F5F7F2; border: 1px solid #D8E7DE; display: flex; flex-direction: column; gap: 12px">
+        <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #5C6861">3 · Benefits already paid</span>
+        <span style="font-size: 13px; font-weight: 700; color: #3F4A44">Question 2 of 2</span>
+        <h3 style="margin: 0; font-size: 19px; line-height: 25px; font-weight: 700">How much has your plan already paid toward your 2026 maximum?</h3>
+        <p style="margin: 0; font-size: 13px; line-height: 19px; color: #3F4A44"><strong style="font-weight: 600">Why we ask:</strong> it decides how much of the $800 is left for 2026.</p>
+        <span style="display: flex; align-items: center; min-height: 52px; padding: 0 14px; border-radius: 14px; border: 1.5px solid #C9D6CE; background: #FFFFFF; font-size: 18px; font-weight: 600; color: #87928B">$ <span style="margin-left: 8px; font-weight: 500">Empty — no preset amounts</span></span>
+        <span style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px"><span style="min-height: 44px; border-radius: 12px; border: 1.5px solid #C9D6CE; background: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600">Say it</span><span style="min-height: 44px; border-radius: 12px; border: 1.5px solid #C9D6CE; background: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600">Attach statement</span></span>
+        <span style="font-size: 14px; font-weight: 600; color: #0E6B4D">I don't know</span>
+        <span style="padding: 12px; border-radius: 14px; background: #FFFFFF; border: 1px solid #D8E7DE; display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; font-weight: 600; color: #5C6861">Spoken answer · we heard</span><span style="font-size: 15px">“About five hundred dollars.”</span><span style="font-size: 14px; font-weight: 700">$500 · Use this / Say it again / Type instead</span></span>
+        <span style="font-size: 12px; line-height: 17px; color: #B42318">Error: “That's more than the $800 annual maximum in your benefits summary. Check the amount.”</span>
+      </div>
+
+      <div style="padding: 20px; border-radius: 22px; background: #F5F7F2; border: 1px solid #D8E7DE; display: flex; flex-direction: column; gap: 12px">
+        <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #5C6861">4 · Date (constrained)</span>
+        <span style="font-size: 13px; font-weight: 700; color: #3F4A44">A quick detail</span>
+        <h3 style="margin: 0; font-size: 19px; line-height: 25px; font-weight: 700">When is your crown appointment?</h3>
+        <p style="margin: 0; font-size: 13px; line-height: 19px; color: #3F4A44"><strong style="font-weight: 600">Why we ask:</strong> the benefit year it falls in changes what your plan pays.</p>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600">Appointment date
+          <input type="date" min="2026-11-12" max="2027-01-29" value="2027-01-10" style="min-height: 52px; box-sizing: border-box; border: 1.5px solid #C9D6CE; border-radius: 14px; padding: 0 12px; font: inherit; font-size: 16px; background: #FFFFFF; color: #101512">
+        </label>
+        <span style="font-size: 12px; line-height: 17px; color: #5C6861">Only dates inside your dentist's window, Nov 12, 2026 – Jan 29, 2027 (from your document), can be picked.</span>
+        <span style="font-size: 14px; font-weight: 600; color: #0E6B4D">I don't know yet</span>
+      </div>
+
+      <div style="padding: 20px; border-radius: 22px; background: #F5F7F2; border: 1px solid #D8E7DE; display: flex; flex-direction: column; gap: 12px">
+        <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #5C6861">5 · Multiple procedures</span>
+        <span style="font-size: 13px; font-weight: 700; color: #3F4A44">A quick detail</span>
+        <h3 style="margin: 0; font-size: 19px; line-height: 25px; font-weight: 700">Which of these are you planning now?</h3>
+        <p style="margin: 0; font-size: 13px; line-height: 19px; color: #3F4A44"><strong style="font-weight: 600">Why we ask:</strong> your estimate lists three procedures; we only include the ones you choose.</p>
+        <sc-for list="{{procedures}}" as="p" hint-placeholder-count="3">
+          <span style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #FFFFFF; box-shadow: {{p.ring}}">
+            <span style="width: 22px; height: 22px; border-radius: 6px; background: {{p.box}}; border: 2px solid {{p.boxBorder}}; box-sizing: border-box; color: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{p.tick}}"></path></svg></span>
+            <span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 15px; font-weight: 600">{{p.label}}</span><span style="font-size: 12px; color: #5C6861">{{p.detail}}</span></span>
+          </span>
+        </sc-for>
+      </div>
+
+      <div style="padding: 20px; border-radius: 22px; background: #F5F7F2; border: 1px solid #D8E7DE; display: flex; flex-direction: column; gap: 12px">
+        <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #5C6861">6 · Conflicting values</span>
+        <span style="font-size: 13px; font-weight: 700; color: #3F4A44">A quick detail</span>
+        <h3 style="margin: 0; font-size: 19px; line-height: 25px; font-weight: 700">Two documents list different crown fees</h3>
+        <p style="margin: 0; font-size: 13px; line-height: 19px; color: #3F4A44"><strong style="font-weight: 600">Why we ask:</strong> we calculate with one amount, and we won't guess which is right.</p>
+        <span style="padding: 12px 14px; border-radius: 14px; background: #FFFFFF; border: 1px solid #D8E7DE; display: flex; align-items: center; gap: 10px"><span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 17px; font-weight: 700">$1,000</span><span style="font-size: 12px; color: #5C6861">treatment-estimate.pdf · page 1 · View</span></span><span style="min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1.5px solid #0E6B4D; color: #0E6B4D; display: flex; align-items: center; font-size: 14px; font-weight: 600">Use this</span></span>
+        <span style="padding: 12px 14px; border-radius: 14px; background: #FFFFFF; border: 1px solid #D8E7DE; display: flex; align-items: center; gap: 10px"><span style="flex: 1; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 17px; font-weight: 700">$1,150</span><span style="font-size: 12px; color: #5C6861">Photo of treatment estimate · View</span></span><span style="min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1.5px solid #0E6B4D; color: #0E6B4D; display: flex; align-items: center; font-size: 14px; font-weight: 600">Use this</span></span>
+        <span style="font-size: 14px; font-weight: 600; color: #0E6B4D">Neither, I'll enter it</span>
+        <span style="font-size: 12px; color: #5C6861">Component example values, not part of Jordan's case.</span>
+      </div>
+
+      <div style="padding: 20px; border-radius: 22px; background: #F5F7F2; border: 1px solid #D8E7DE; display: flex; flex-direction: column; gap: 12px">
+        <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #5C6861">7 · Missing document</span>
+        <span style="font-size: 13px; font-weight: 700; color: #3F4A44">A quick detail</span>
+        <h3 style="margin: 0; font-size: 19px; line-height: 25px; font-weight: 700">Add your plan's benefits summary</h3>
+        <p style="margin: 0; font-size: 13px; line-height: 19px; color: #3F4A44"><strong style="font-weight: 600">Why we ask:</strong> it shows what your plan pays, your annual maximum and your deductible.</p>
+        <span style="min-height: 52px; padding: 0 14px; border-radius: 14px; background: #FFFFFF; border: 1px solid #D8E7DE; display: flex; align-items: center; font-size: 15px; font-weight: 600">Upload a file</span>
+        <span style="min-height: 52px; padding: 0 14px; border-radius: 14px; background: #FFFFFF; border: 1px solid #D8E7DE; display: flex; align-items: center; font-size: 15px; font-weight: 600">Take a photo</span>
+        <span style="min-height: 52px; padding: 0 14px; border-radius: 14px; background: #FFFFFF; border: 1px solid #D8E7DE; display: flex; align-items: center; font-size: 15px; font-weight: 600">I don't have it</span>
+        <span style="font-size: 12px; line-height: 17px; color: #5C6861">“I don't have it” explains where to get it and offers Finish later. Nothing already given is lost.</span>
+      </div>
+
+      <div style="padding: 20px; border-radius: 22px; background: #F5F7F2; border: 1px solid #D8E7DE; display: flex; flex-direction: column; gap: 12px">
+        <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #5C6861">8 · Extracted information</span>
+        <span style="font-size: 13px; font-weight: 700; color: #3F4A44">A quick detail</span>
+        <h3 style="margin: 0; font-size: 19px; line-height: 25px; font-weight: 700">Is this right?</h3>
+        <span style="padding: 14px; border-radius: 16px; background: #FFFFFF; border: 1px solid #D8E7DE; display: flex; flex-direction: column; gap: 6px">
+          <span style="font-size: 13px; color: #5C6861">Crown</span>
+          <span style="font-size: 16px; font-weight: 700">$1,000 · can be placed Nov 12, 2026 – Jan 29, 2027</span>
+          <span style="align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #E3F2E8; color: #0B5A40">From your document</span>
+          <span style="font-family: ui-monospace, Menlo, monospace; font-size: 12px; line-height: 17px; color: #3F4A44; padding: 8px; border-radius: 8px; background: #F4F8F5">“Crown, ceramic ... $1,000.00 Can be placed Nov 12, 2026 – Jan 29, 2027”</span>
+        </span>
+        <span style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px"><span style="min-height: 48px; border-radius: 12px; background: #0E6B4D; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700">Confirm</span><span style="min-height: 48px; border-radius: 12px; border: 1.5px solid #0E6B4D; color: #0E6B4D; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600">Edit</span></span>
+        <span style="font-size: 12px; line-height: 17px; color: #5C6861">Once confirmed, the label becomes “Provided by you” in the review.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Self-pay, bars, capture recovery -->
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; align-items: start">
+    <section style="padding: 24px; border-radius: 24px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+        <h2 style="margin: 0; font-size: 20px; font-weight: 700">Self-pay comparison</h2>
+        <span style="font-size: 12px; font-weight: 600; color: #5C6861; border: 1px dashed #7E9A8A; border-radius: 999px; padding: 3px 9px">Separate sample</span>
+      </div>
+      <p style="margin: 0; font-size: 13px; line-height: 19px; color: #3F4A44">Shown only when a comparable written quote exists. This fixture is not Jordan's case and is never mixed with it. Jordan's case shows the “Add a self-pay quote” state.</p>
+      <sc-for list="{{selfpay}}" as="r" hint-placeholder-count="7">
+        <span style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px; line-height: 20px; color: {{r.color}}; font-weight: {{r.weight}}; padding-top: {{r.pad}}; border-top: {{r.line}}"><span>{{r.k}}</span><span>{{r.v}}</span></span>
+      </sc-for>
+      <span style="padding: 12px 14px; border-radius: 14px; background: #E3F2E8; font-size: 15px; line-height: 22px; font-weight: 700; color: #0B4F39">Using insurance is estimated $675 less under these assumptions.</span>
+    </section>
+
+    <section style="padding: 24px; border-radius: 24px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700">Benefit-year bar</h2>
+      <p style="margin: 0; font-size: 13px; line-height: 19px; color: #3F4A44">Reported paid and projected use are told apart by pattern and by the text rows, not colour alone. One bar per year; maximums are never combined.</p>
+      <span style="font-size: 15px; font-weight: 700">2026 annual maximum · $800</span>
+      <div role="img" aria-label="2026: $500 paid so far, $300 projected, $0 left" style="display: flex; height: 22px; border-radius: 7px; overflow: hidden; border: 1.5px solid #9DB5A7"><span style="width: 62.5%; background: #0E6B4D"></span><span style="width: 37.5%; background: repeating-linear-gradient(45deg, #0E6B4D 0 3px, #CFE6D8 3px 8px)"></span></div>
+      <span style="font-size: 13px; color: #3F4A44">Solid: paid so far · $500 (provided by you) — Hatched: projected · $300 (estimated) — Empty: left · $0</span>
+      <span style="font-size: 15px; font-weight: 700; padding-top: 6px">2027 annual maximum · $800 (assumed)</span>
+      <div role="img" aria-label="2027: $475 projected, $325 left" style="display: flex; height: 22px; border-radius: 7px; overflow: hidden; border: 1.5px solid #9DB5A7"><span style="width: 59.375%; background: repeating-linear-gradient(45deg, #0E6B4D 0 3px, #CFE6D8 3px 8px)"></span></div>
+      <span style="font-size: 13px; color: #3F4A44">Hatched: projected · $475 (estimated) — Empty: left · $325</span>
+    </section>
+
+    <section style="padding: 24px; border-radius: 24px; background: #07110D; color: #F4F8F5; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700">Capture problems</h2>
+      <p style="margin: 0; font-size: 13px; line-height: 19px; color: #A3AFA8">A failed attachment never erases a valid transcript or other documents. Each message names the fix.</p>
+      <sc-for list="{{capture}}" as="c" hint-placeholder-count="4">
+        <span style="display: flex; gap: 10px; padding: 12px 14px; border-radius: 14px; background: rgba(255,196,107,0.10); border: 1px solid rgba(255,196,107,0.35); font-size: 14px; line-height: 20px; color: #FFE0B0"><strong style="font-weight: 700; flex-shrink: 0; width: 96px">{{c.k}}</strong><span>{{c.v}}</span></span>
+      </sc-for>
+    </section>
+  </div>
+
+  <!-- Recovery causes + permission prompts -->
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start">
+    <section style="padding: 24px; border-radius: 24px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700">Recovery causes</h2>
+      <p style="margin: 0; font-size: 13px; line-height: 19px; color: #3F4A44">One recovery screen, five distinct causes. Primary / secondary / tertiary map to Retry / Review details / Back. Full screens are in the “Review, save, recovery” row.</p>
+      <sc-for list="{{recovery}}" as="r" hint-placeholder-count="5">
+        <span style="display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; padding-top: 10px; border-top: 1px solid #EEF2EF; font-size: 14px; line-height: 20px"><strong style="font-weight: 700">{{r.k}}</strong><span style="color: #3F4A44">{{r.v}}</span></span>
+      </sc-for>
+    </section>
+    <section style="padding: 24px; border-radius: 24px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 700">Permission prompts</h2>
+      <p style="margin: 0; font-size: 13px; line-height: 19px; color: #3F4A44">Our screen explains the reason first, then the system prompt appears. Every prompt has a fallback. The microphone is never always-on.</p>
+      <sc-for list="{{perms}}" as="r" hint-placeholder-count="4">
+        <span style="display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; padding-top: 10px; border-top: 1px solid #EEF2EF; font-size: 14px; line-height: 20px"><strong style="font-weight: 700">{{r.k}}</strong><span style="color: #3F4A44">{{r.v}}</span></span>
+      </sc-for>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1640,"height":2920}}'>
+const P = {
+  file: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z M14 2v4a2 2 0 0 0 2 2h4',
+  user: 'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2 M8 7a4 4 0 1 0 8 0a4 4 0 1 0-8 0',
+  alert: 'M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3 M12 9v4 M12 17h.01',
+  help: 'M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0 M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3 M12 17h.01',
+  calc: 'M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z M8 6h8 M16 14v4',
+  check: 'M20 6 9 17l-5-5', x: 'M18 6 6 18 M6 6l12 12',
+  eye: 'M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0 M9 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0',
+  clock: 'M2 12a10 10 0 1 0 20 0a10 10 0 1 0-20 0 M12 6v6l4 2',
+};
+class Component extends DCLogic {
+  renderVals() {
+    const choice = (labels, picked) => labels.map((l) => ({ label: l, ring: l === picked ? 'inset 0 0 0 2px #0E6B4D' : 'inset 0 0 0 1px #D8E7DE', radio: l === picked ? '#0E6B4D' : '#9DB5A7', dot: l === picked ? '#0E6B4D' : 'transparent' }));
+    const row = (k, v, strong, line) => ({ k: k, v: v, color: strong ? '#101512' : '#3F4A44', weight: strong ? 700 : 500, pad: line ? '8px' : '0px', line: line ? '1px solid #E4EBE6' : '0' });
+    return {
+      badges: [
+        { text: 'From your document', bg: '#E3F2E8', fg: '#0B5A40', bd: '#E3F2E8', dash: 'solid', icon: P.file, use: 'Read from a document you added. Opens the exact excerpt.' },
+        { text: 'Provided by you', bg: '#F0F2EE', fg: '#3F4A44', bd: '#F0F2EE', dash: 'solid', icon: P.user, use: 'You typed, said or confirmed it. Editable in the review.' },
+        { text: 'Needs confirmation', bg: '#FFF4E0', fg: '#7A4A00', bd: '#F3DDB5', dash: 'solid', icon: P.alert, use: 'Used, but someone should confirm it. Listed near the top of plan details with who to ask.' },
+        { text: 'Assumed for comparison', bg: '#FFFFFF', fg: '#3F4A44', bd: '#7E9A8A', dash: 'dashed', icon: P.help, use: 'Not known; held constant so the options compare fairly.' },
+        { text: 'Estimated', bg: '#EAF0EC', fg: '#101512', bd: '#EAF0EC', dash: 'solid', icon: P.calc, use: 'Calculated by ActionBridge. Every money value says Estimated, its year and its label.' },
+      ],
+      statuses: [
+        { text: 'Needs information', bg: '#FFF4E0', fg: '#7A4A00', icon: P.alert, goes: 'Opens the next question' },
+        { text: 'Ready to review', bg: '#E3F2E8', fg: '#0B5A40', icon: P.eye, goes: 'Opens Your dental options' },
+        { text: 'Plan saved', bg: '#0E6B4D', fg: '#FFFFFF', icon: P.check, goes: 'Opens plan details' },
+        { text: 'Could not finish', bg: '#FDECEA', fg: '#B42318', icon: P.x, goes: 'Explains why and how to retry' },
+        { text: 'Working', bg: '#EAF0EC', fg: '#3F4A44', icon: P.clock, goes: 'Opens the progress screen' },
+      ],
+      coverage: choice(['Insured', 'Self-pay', 'Not sure'], 'Insured'),
+      network: choice(['In network', 'Out of network', 'Not sure'], 'In network'),
+      procedures: [
+        { label: 'Filling', detail: '$250 · Nov 10, 2026 · from your document', on: true },
+        { label: 'Filling', detail: '$250 · Nov 11, 2026 · from your document', on: true },
+        { label: 'Crown', detail: '$1,000 · window Nov 12, 2026 – Jan 29, 2027', on: false },
+      ].map((p) => Object.assign(p, { ring: p.on ? 'inset 0 0 0 2px #0E6B4D' : 'inset 0 0 0 1px #D8E7DE', box: p.on ? '#0E6B4D' : '#FFFFFF', boxBorder: p.on ? '#0E6B4D' : '#9DB5A7', tick: p.on ? P.check : '' })),
+      selfpay: [
+        row('Charge', '$1,500'),
+        row('Contractual adjustment', '−$500'),
+        row('Allowed amount', '$1,000'),
+        row('Deductible', '$50'),
+        row('Plan pays · 50% of $950 · est.', '$475'),
+        row('You pay with insurance · est.', '$525', true, true),
+        row('Self-pay quote · provided by you', '$1,200', true),
+      ],
+      capture: [
+        { k: 'Blurry', v: 'This photo is too blurry to read the amounts. Hold the phone steady and retake.' },
+        { k: 'Incomplete', v: 'Part of the page is cut off. Fit all four corners in the frame.' },
+        { k: 'Unsupported', v: "We can't open this file type. Choose a PDF, JPG or PNG." },
+        { k: 'Too long', v: 'This file has more than 10 pages. Choose just the estimate pages.' },
+      ],
+      recovery: [
+        { k: 'Save failed', v: "“We couldn't confirm your plan was saved.” Try again (same plan, no duplicate) · Review details · Back to plan. Attempt n of 3." },
+        { k: 'Extraction failed', v: "“We couldn't read one document.” Try reading again · Replace the document · Back to Home. Transcript kept." },
+        { k: 'Unknown input', v: '“One amount needs a look.” An implausible value is held back until reviewed. Review details · Replace · Back.' },
+        { k: 'Expired session', v: '“Your session expired.” Sign in again · Not now. Saved plan stays in the account.' },
+        { k: 'Stale result', v: '“This estimate may be out of date.” Recalculate · Review details · Back to plan.' },
+      ],
+      perms: [
+        { k: 'Microphone', v: "Asked on first Speak. “We listen only while you're recording.” Fallback: Type instead." },
+        { k: 'Camera', v: 'Asked on first Take photo. “Only to photograph documents.” Fallback: Choose a file or a photo.' },
+        { k: 'Photos', v: 'System photo picker; no library-wide permission needed.' },
+        { k: 'Notifications', v: 'Asked only when you turn on a reminder. Fallback: no reminder, with a Settings note.' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
