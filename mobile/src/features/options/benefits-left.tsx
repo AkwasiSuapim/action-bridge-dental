@@ -1,16 +1,44 @@
 import { plainDate, plainMoney, type DentalCase, type Scenario } from '@actionbridge/contracts';
-import * as Notifications from 'expo-notifications';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+import type * as NotificationsModule from 'expo-notifications';
 import { useEffect, useState } from 'react';
-import { Platform, View } from 'react-native';
+import { Linking, Platform, View } from 'react-native';
 import { AppText, Button, Card, Notice } from '../../components/ui';
 import { space } from '../../theme/tokens';
 
 const REMINDER_ID = 'actionbridge-benefits-reminder';
 
-// Show reminders even while the app is open.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
-});
+/**
+ * expo-notifications throws on import in Expo Go on Android (SDK 53+), which would take the whole
+ * Options screen down. Load it only where it works; elsewhere the calendar link still offers a reminder.
+ */
+const Notifications: typeof NotificationsModule | null = (() => {
+  if (Platform.OS === 'android' && Constants.executionEnvironment === ExecutionEnvironment.StoreClient) return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const module = require('expo-notifications') as typeof NotificationsModule;
+    // Show reminders even while the app is open.
+    module.setNotificationHandler({
+      handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
+    });
+    return module;
+  } catch {
+    return null;
+  }
+})();
+
+/** A Google Calendar event on the reminder day, 9:00–9:15. Opens in the browser or the Calendar app. */
+function googleCalendarUrl(leftCents: number, yearEnd: string, when: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const day = `${when.getFullYear()}${pad(when.getMonth() + 1)}${pad(when.getDate())}`;
+  const params = [
+    ['action', 'TEMPLATE'],
+    ['text', `Use your dental benefits: ${plainMoney(leftCents)} left until ${plainDate(yearEnd)}`],
+    ['dates', `${day}T090000/${day}T091500`],
+    ['details', `Unused benefits don't carry over after ${plainDate(yearEnd)}. Ask your dentist whether planned treatment can happen before then. (Reminder from ActionBridge Dental; estimates only.)`],
+  ];
+  return `https://calendar.google.com/calendar/render?${params.map(([k, v]) => `${k}=${encodeURIComponent(v as string)}`).join('&')}`;
+}
 
 /** 30 days before the benefit year ends at 9:00, or tomorrow at 9:00 if that has passed. */
 export function reminderMoment(yearEnd: string, now: Date): Date {
@@ -26,6 +54,7 @@ function nextDay(iso: string): string {
 }
 
 async function allowed(): Promise<boolean> {
+  if (!Notifications) return false;
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('reminders', { name: 'Benefit reminders', importance: Notifications.AndroidImportance.HIGH });
   }
@@ -46,7 +75,7 @@ export function BenefitsLeft({ scenario, record }: { scenario: Scenario; record:
   const terms = year ? record.planYears[year.planYearId] : undefined;
 
   useEffect(() => {
-    void Notifications.getAllScheduledNotificationsAsync().then((all) => {
+    void Notifications?.getAllScheduledNotificationsAsync().then((all) => {
       const existing = all.find((n) => n.identifier === REMINDER_ID);
       const trigger = existing?.trigger as { value?: number; date?: number } | undefined;
       const when = trigger?.value ?? trigger?.date;
@@ -63,7 +92,7 @@ export function BenefitsLeft({ scenario, record }: { scenario: Scenario; record:
   };
 
   const schedule = async () => {
-    if (!(await allowed())) {
+    if (!Notifications || !(await allowed())) {
       setMessage({ tone: 'warning', title: 'Notifications are off for this app. Turn them on in Settings to get a reminder.' });
       return;
     }
@@ -75,7 +104,7 @@ export function BenefitsLeft({ scenario, record }: { scenario: Scenario; record:
   };
 
   const test = async () => {
-    if (!(await allowed())) {
+    if (!Notifications || !(await allowed())) {
       setMessage({ tone: 'warning', title: 'Notifications are off for this app. Turn them on in Settings to get a reminder.' });
       return;
     }
@@ -84,7 +113,7 @@ export function BenefitsLeft({ scenario, record }: { scenario: Scenario; record:
   };
 
   const cancel = async () => {
-    await Notifications.cancelScheduledNotificationAsync(REMINDER_ID);
+    await Notifications?.cancelScheduledNotificationAsync(REMINDER_ID);
     setScheduledFor(null);
     setMessage({ tone: 'info', title: 'Reminder canceled.' });
   };
@@ -105,17 +134,24 @@ export function BenefitsLeft({ scenario, record }: { scenario: Scenario; record:
       </AppText>
       {left > 0 ? (
         <View style={{ gap: space(2) }}>
-          {scheduledFor ? (
-            <>
-              <AppText variant="caption">
-                Reminder set for {scheduledFor.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.
-              </AppText>
-              <Button label="Cancel reminder" variant="ghost" onPress={() => void cancel()} />
-            </>
-          ) : (
-            <Button label="Remind me before they reset" variant="secondary" onPress={() => void schedule()} />
-          )}
-          <Button label="Send a test reminder" variant="ghost" onPress={() => void test()} />
+          {Notifications ? (
+            scheduledFor ? (
+              <>
+                <AppText variant="caption">
+                  Reminder set for {scheduledFor.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.
+                </AppText>
+                <Button label="Cancel reminder" variant="ghost" onPress={() => void cancel()} />
+              </>
+            ) : (
+              <Button label="Remind me before they reset" variant="secondary" onPress={() => void schedule()} />
+            )
+          ) : null}
+          <Button
+            label="Add to Google Calendar"
+            variant={Notifications ? 'ghost' : 'secondary'}
+            onPress={() => void Linking.openURL(googleCalendarUrl(left, terms.endDate, reminderMoment(terms.endDate, new Date())))}
+          />
+          {Notifications ? <Button label="Send a test reminder" variant="ghost" onPress={() => void test()} /> : null}
         </View>
       ) : null}
       {message ? <Notice tone={message.tone} title={message.title} /> : null}
